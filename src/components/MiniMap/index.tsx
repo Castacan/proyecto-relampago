@@ -62,19 +62,30 @@ export default function MiniMap({ zones, routes, onZoneClick }: Props) {
   )
 }
 
-// Approximate positions for each zone in the cenital view
+// Posiciones cenitales basadas en el modelo 3D del gym
+// Espacio trapezoidal: paredes laterales + fondo + estructura de túnel central
 function getZoneShape(slug: string, w: number, h: number): { x: number; y: number; w: number; h: number } | null {
   const shapes: Record<string, { x: number; y: number; w: number; h: number }> = {
-    'pared-izquierda':        { x: 4,       y: 6,      w: 10, h: h - 12 },
-    'fondo-izquierdo':        { x: 14,      y: 6,      w: 16, h: h - 12 },
-    'flanco-tunel-izquierdo': { x: 30,      y: 6,      w: 10, h: h - 12 },
-    'tunel-norte':            { x: 40,      y: 6,      w: 12, h: (h - 14) / 2 },
-    'tunel-sur':              { x: 40,      y: 8 + (h - 14) / 2, w: 12, h: (h - 14) / 2 },
-    'desplome':               { x: 52,      y: 6,      w: 12, h: h - 12 },
-    'flanco-tunel-derecho':   { x: 64,      y: 6,      w: 10, h: h - 12 },
-    'fondo-derecho-izq':      { x: 74,      y: 6,      w: 18, h: h - 12 },
-    'fondo-derecho-der':      { x: 92,      y: 6,      w: 18, h: h - 12 },
-    'pared-derecha':          { x: w - 14,  y: 6,      w: 10, h: h - 12 },
+    // Pared lateral izquierda (franja vertical izq)
+    'pared-izquierda':        { x: 4,       y: 6,       w: 8,  h: h - 12 },
+    // Fondo izquierdo (pared trasera izq, arriba)
+    'fondo-izquierdo':        { x: 12,      y: 6,       w: 28, h: 18 },
+    // Flanco túnel izquierdo (lado izq de la estructura)
+    'flanco-tunel-izquierdo': { x: 12,      y: 24,      w: 14, h: h - 36 },
+    // Desplome (nariz del túnel, abajo centro)
+    'desplome':               { x: 26,      y: h - 22,  w: 30, h: 16 },
+    // Flanco túnel derecho (lado der de la estructura)
+    'flanco-tunel-derecho':   { x: 56,      y: 24,      w: 14, h: h - 36 },
+    // Fondo derecho izq (pared trasera der, arriba — foto izq)
+    'fondo-derecho-izq':      { x: 56,      y: 6,       w: 20, h: 18 },
+    // Fondo derecho der (pared trasera der, arriba — foto der)
+    'fondo-derecho-der':      { x: 76,      y: 6,       w: 20, h: 18 },
+    // Pared lateral derecha (franja vertical der)
+    'pared-derecha':          { x: w - 12,  y: 6,       w: 8,  h: h - 12 },
+    // Túnel norte (cara interior norte del túnel)
+    'tunel-norte':            { x: 28,      y: 24,      w: 26, h: (h - 50) / 2 },
+    // Túnel sur (cara interior sur del túnel)
+    'tunel-sur':              { x: 28,      y: 24 + (h - 50) / 2 + 2, w: 26, h: (h - 50) / 2 },
   }
   return shapes[slug] ?? null
 }

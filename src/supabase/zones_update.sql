@@ -16,16 +16,16 @@ DELETE FROM public.routes;
 -- 3. Limpiar zonas viejas
 DELETE FROM public.zones;
 
--- 3. Insertar zonas reales (izquierda → derecha en el canvas panorámico)
---    Las coordenadas x son aproximadas, ajustar cuando se tengan fotos de todas las secciones.
+-- 3. Insertar zonas reales en orden panorámico:
+--    Circuito principal (1–7) + caras interiores del túnel (8–9)
 INSERT INTO public.zones (name, slug, order_index, map_x, map_y, canvas_x_start, canvas_x_end, image_url) VALUES
-  ('Pared Izquierda',        'pared-izquierda',        1,  0.04, 0.50,  0.00, 0.08,  NULL),
-  ('Fondo Izquierdo',        'fondo-izquierdo',        2,  0.14, 0.50,  0.08, 0.20,  NULL),
-  ('Flanco Túnel Izquierdo', 'flanco-tunel-izquierdo', 3,  0.24, 0.50,  0.20, 0.28,  NULL),
-  ('Túnel Norte',            'tunel-norte',            4,  0.32, 0.35,  0.28, 0.36,  NULL),
-  ('Túnel Sur',              'tunel-sur',              5,  0.32, 0.65,  0.36, 0.44,  NULL),
-  ('Desplome',               'desplome',               6,  0.48, 0.50,  0.44, 0.52,  NULL),
-  ('Flanco Túnel Derecho',   'flanco-tunel-derecho',   7,  0.56, 0.50,  0.52, 0.60,  NULL),
-  ('Fondo Derecho',          'fondo-derecho-izq',      8,  0.69, 0.50,  0.60, 0.78,  '/wall/test%20izq.jpeg'),
-  ('Fondo Derecho',          'fondo-derecho-der',      9,  0.85, 0.50,  0.78, 0.92,  '/wall/test%20der.jpeg'),
-  ('Pared Derecha',          'pared-derecha',         10,  0.96, 0.50,  0.92, 1.00,  NULL);
+  ('Pared Izquierda',        'pared-izquierda',        1,  0.04, 0.50,  0.00, 0.05,  NULL),
+  ('Fondo Izquierdo',        'fondo-izquierdo',        2,  0.18, 0.20,  0.05, 0.22,  NULL),
+  ('Flanco Túnel Izquierdo', 'flanco-tunel-izquierdo', 3,  0.30, 0.45,  0.22, 0.35,  NULL),
+  ('Desplome',               'desplome',               4,  0.36, 0.65,  0.35, 0.45,  NULL),
+  ('Flanco Túnel Derecho',   'flanco-tunel-derecho',   5,  0.44, 0.45,  0.45, 0.57,  NULL),
+  ('Fondo Derecho',          'fondo-derecho-izq',      6,  0.65, 0.20,  0.57, 0.72,  '/wall/test%20izq.jpeg'),
+  ('Fondo Derecho',          'fondo-derecho-der',      7,  0.76, 0.20,  0.72, 0.87,  '/wall/test%20der.jpeg'),
+  ('Pared Derecha',          'pared-derecha',          8,  0.90, 0.50,  0.87, 0.92,  NULL),
+  ('Túnel Norte',            'tunel-norte',            9,  0.35, 0.25,  0.92, 0.96,  NULL),
+  ('Túnel Sur',              'tunel-sur',             10,  0.35, 0.55,  0.96, 1.00,  NULL);
