@@ -5,6 +5,7 @@ export interface Database {
         Row: { id: string; name: string; created_at: string }
         Insert: { id: string; name: string; created_at?: string }
         Update: { name?: string }
+        Relationships: []
       }
       zones: {
         Row: {
@@ -17,8 +18,9 @@ export interface Database {
           canvas_x_start: number
           canvas_x_end: number
         }
-        Insert: Omit<Database['public']['Tables']['zones']['Row'], 'id'>
-        Update: Partial<Database['public']['Tables']['zones']['Insert']>
+        Insert: { name: string; slug: string; order_index: number; map_x: number; map_y: number; canvas_x_start: number; canvas_x_end: number }
+        Update: { name?: string; slug?: string; order_index?: number; map_x?: number; map_y?: number; canvas_x_start?: number; canvas_x_end?: number }
+        Relationships: []
       }
       routes: {
         Row: {
@@ -33,10 +35,27 @@ export interface Database {
           notes: string | null
           blob_path: { x: number; y: number }[]
         }
-        Insert: Omit<Database['public']['Tables']['routes']['Row'], 'id' | 'placed_at' | 'retired_at' | 'status'> & {
+        Insert: {
+          color: string
+          grade: string
+          setter_id: string
+          zone_id: string
+          blob_path: { x: number; y: number }[]
           status?: 'active' | 'retired'
+          notes?: string | null
         }
-        Update: Partial<Database['public']['Tables']['routes']['Row']>
+        Update: {
+          color?: string
+          grade?: string
+          setter_id?: string
+          zone_id?: string
+          status?: 'active' | 'retired'
+          placed_at?: string
+          retired_at?: string | null
+          notes?: string | null
+          blob_path?: { x: number; y: number }[]
+        }
+        Relationships: []
       }
       qr_codes: {
         Row: {
@@ -46,6 +65,7 @@ export interface Database {
         }
         Insert: { id: string; status?: 'available' | 'in_use'; route_id?: string | null }
         Update: { status?: 'available' | 'in_use'; route_id?: string | null }
+        Relationships: []
       }
       votes: {
         Row: {
@@ -55,8 +75,9 @@ export interface Database {
           device_id: string
           created_at: string
         }
-        Insert: Omit<Database['public']['Tables']['votes']['Row'], 'id' | 'created_at'>
+        Insert: { route_id: string; value: 'up' | 'down'; device_id: string }
         Update: { value?: 'up' | 'down' }
+        Relationships: []
       }
       betas: {
         Row: {
@@ -66,9 +87,12 @@ export interface Database {
           uploaded_by: string
           created_at: string
         }
-        Insert: Omit<Database['public']['Tables']['betas']['Row'], 'id' | 'created_at'>
-        Update: never
+        Insert: { route_id: string; file_url: string; uploaded_by: string }
+        Update: Record<string, never>
+        Relationships: []
       }
     }
+    Views: Record<string, never>
+    Functions: Record<string, never>
   }
 }

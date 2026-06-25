@@ -119,7 +119,7 @@ export default function PanoramaCanvas({ zones, routes, paintMode, drawColor, pr
   }, [screenToWorld])
 
   // --- Mouse events (desktop) ---
-  const handleMouseDown = useCallback((e: KonvaEventObject<MouseEvent>) => {
+  const handleMouseDown = useCallback((_e: KonvaEventObject<MouseEvent>) => {
     if (!paintMode) return
     isDrawing.current = true
     const stage = stageRef.current!
@@ -127,7 +127,7 @@ export default function PanoramaCanvas({ zones, routes, paintMode, drawColor, pr
     addDrawPoint(p.x, p.y)
   }, [paintMode, addDrawPoint])
 
-  const handleMouseMove = useCallback((e: KonvaEventObject<MouseEvent>) => {
+  const handleMouseMove = useCallback((_e: KonvaEventObject<MouseEvent>) => {
     if (!paintMode || !isDrawing.current) return
     const stage = stageRef.current!
     const p = stage.getPointerPosition()!
