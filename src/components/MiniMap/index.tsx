@@ -64,16 +64,17 @@ export default function MiniMap({ zones, routes, onZoneClick }: Props) {
 
 // Approximate positions for each zone in the cenital view
 function getZoneShape(slug: string, w: number, h: number): { x: number; y: number; w: number; h: number } | null {
-  const cx = w / 2
-  const cy = h / 2
   const shapes: Record<string, { x: number; y: number; w: number; h: number }> = {
-    'pared-izquierda':  { x: 6,      y: 8,      w: 18, h: h - 16 },
-    'pared-derecha':    { x: w - 24,  y: 8,      w: 18, h: h - 16 },
-    'cara-frontal':     { x: cx - 22, y: 8,      w: 44, h: 20 },
-    'flanco-izquierdo': { x: cx - 32, y: 28,     w: 12, h: 32 },
-    'flanco-derecho':   { x: cx + 20, y: 28,     w: 12, h: 32 },
-    'tunel':            { x: cx - 20, y: cy - 6, w: 40, h: 18 },
-    'desplome':         { x: cx - 16, y: cy + 16, w: 32, h: 16 },
+    'pared-izquierda':        { x: 4,       y: 6,      w: 10, h: h - 12 },
+    'fondo-izquierdo':        { x: 14,      y: 6,      w: 16, h: h - 12 },
+    'flanco-tunel-izquierdo': { x: 30,      y: 6,      w: 10, h: h - 12 },
+    'tunel-norte':            { x: 40,      y: 6,      w: 12, h: (h - 14) / 2 },
+    'tunel-sur':              { x: 40,      y: 8 + (h - 14) / 2, w: 12, h: (h - 14) / 2 },
+    'desplome':               { x: 52,      y: 6,      w: 12, h: h - 12 },
+    'flanco-tunel-derecho':   { x: 64,      y: 6,      w: 10, h: h - 12 },
+    'fondo-derecho-izq':      { x: 74,      y: 6,      w: 18, h: h - 12 },
+    'fondo-derecho-der':      { x: 92,      y: 6,      w: 18, h: h - 12 },
+    'pared-derecha':          { x: w - 14,  y: 6,      w: 10, h: h - 12 },
   }
   return shapes[slug] ?? null
 }

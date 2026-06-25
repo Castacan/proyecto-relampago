@@ -1,5 +1,5 @@
 import { useRef, useState, useCallback, useEffect } from 'react'
-import { Stage, Layer, Line, Rect, Text, Group } from 'react-konva'
+import { Stage, Layer, Line, Rect, Text, Group, Image as KonvaImage } from 'react-konva'
 import type Konva from 'konva'
 import type { KonvaEventObject } from 'konva/lib/Node'
 import type { Zone, Route } from '../../types'
@@ -46,6 +46,18 @@ export default function PanoramaCanvas({ zones, routes, paintMode, drawColor, pr
   const [size, setSize] = useState({ w: 300, h: 500 })
   const [scale, setScale] = useState(1)
   const [pos, setPos] = useState({ x: 0, y: 0 })
+
+  // Zone images
+  const [zoneImages, setZoneImages] = useState<Record<string, HTMLImageElement>>({})
+  useEffect(() => {
+    zones.forEach(zone => {
+      if (!zone.image_url) return
+      const img = new window.Image()
+      img.crossOrigin = 'anonymous'
+      img.onload = () => setZoneImages(prev => ({ ...prev, [zone.id]: img }))
+      img.src = zone.image_url
+    })
+  }, [zones])
 
   // Drawing state
   const [drawPoints, setDrawPoints] = useState<number[]>([])
@@ -219,20 +231,29 @@ export default function PanoramaCanvas({ zones, routes, paintMode, drawColor, pr
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
       >
-        {/* Capa 1: Fondo del muro (placeholders por zona) */}
+        {/* Capa 1: Fondo del muro — fotos reales o placeholders de color */}
         <Layer listening={false}>
           {zones.map((zone, i) => {
             const x = zone.canvas_x_start * WALL_WIDTH
             const w = (zone.canvas_x_end - zone.canvas_x_start) * WALL_WIDTH
+            const img = zoneImages[zone.id]
             return (
               <Group key={zone.id}>
-                <Rect x={x} y={0} width={w} height={WALL_HEIGHT} fill={ZONE_COLORS[i % ZONE_COLORS.length]} />
-                <Rect x={x + w - 1} y={0} width={2} height={WALL_HEIGHT} fill="rgba(255,255,255,0.08)" />
-                <Text x={x + 12} y={12} text={zone.name} fontSize={13} fill="rgba(255,255,255,0.25)" fontFamily="sans-serif" />
+                {img ? (
+                  <KonvaImage x={x} y={0} width={w} height={WALL_HEIGHT} image={img} />
+                ) : (
+                  <Rect x={x} y={0} width={w} height={WALL_HEIGHT} fill={ZONE_COLORS[i % ZONE_COLORS.length]} />
+                )}
+                {/* Separador entre zonas */}
+                <Rect x={x + w - 1} y={0} width={2} height={WALL_HEIGHT} fill="rgba(255,255,255,0.06)" />
+                {/* Nombre de zona — solo en secciones sin foto */}
+                {!img && (
+                  <Text x={x + 12} y={12} text={zone.name} fontSize={13} fill="rgba(255,255,255,0.25)" fontFamily="sans-serif" />
+                )}
               </Group>
             )
           })}
-          <Rect x={0} y={WALL_HEIGHT - 2} width={WALL_WIDTH} height={2} fill="rgba(255,255,255,0.08)" />
+          <Rect x={0} y={WALL_HEIGHT - 2} width={WALL_WIDTH} height={2} fill="rgba(255,255,255,0.06)" />
         </Layer>
 
         {/* Capa 2: Blobs de rutas existentes */}

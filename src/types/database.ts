@@ -17,9 +17,10 @@ export interface Database {
           map_y: number
           canvas_x_start: number
           canvas_x_end: number
+          image_url: string | null
         }
-        Insert: { name: string; slug: string; order_index: number; map_x: number; map_y: number; canvas_x_start: number; canvas_x_end: number }
-        Update: { name?: string; slug?: string; order_index?: number; map_x?: number; map_y?: number; canvas_x_start?: number; canvas_x_end?: number }
+        Insert: { name: string; slug: string; order_index: number; map_x: number; map_y: number; canvas_x_start: number; canvas_x_end: number; image_url?: string | null }
+        Update: { name?: string; slug?: string; order_index?: number; map_x?: number; map_y?: number; canvas_x_start?: number; canvas_x_end?: number; image_url?: string | null }
         Relationships: []
       }
       routes: {

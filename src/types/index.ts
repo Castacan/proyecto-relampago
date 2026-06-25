@@ -7,6 +7,7 @@ export interface Zone {
   map_y: number
   canvas_x_start: number
   canvas_x_end: number
+  image_url: string | null
 }
 
 export interface Route {
