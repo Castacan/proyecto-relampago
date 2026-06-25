@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import LoginPage from './pages/staff/LoginPage'
 import StaffLayout from './pages/staff/StaffLayout'
 import WallPage from './pages/staff/WallPage'
+import QrInventoryPage from './pages/staff/QrInventoryPage'
 import PublicWallPage from './pages/public/PublicWallPage'
 import PublicRoutePage from './pages/public/PublicRoutePage'
 import { useAuth } from './lib/auth'
@@ -29,6 +30,7 @@ export default function App() {
           }
         >
           <Route index element={<WallPage />} />
+          <Route path="qr" element={<QrInventoryPage />} />
         </Route>
         <Route path="/" element={<Navigate to="/muro" replace />} />
       </Routes>

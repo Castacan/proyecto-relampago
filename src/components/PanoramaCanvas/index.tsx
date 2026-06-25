@@ -4,7 +4,7 @@ import type Konva from 'konva'
 import type { KonvaEventObject } from 'konva/lib/Node'
 import type { Zone, Route } from '../../types'
 import { getColorHex } from '../../lib/colors'
-import { getFreshnessLevel, getFreshnessColor, getDaysOnWall } from '../../lib/freshness'
+import { getFreshnessLevel, getFreshnessColor, getDaysOnWall, getPublicLabel } from '../../lib/freshness'
 
 export const WALL_WIDTH = 3500
 export const WALL_HEIGHT = 800
@@ -252,12 +252,20 @@ export default function PanoramaCanvas({ zones, routes, paintMode, drawColor, pr
                 <Line points={flat} stroke={freshnessHex} strokeWidth={STROKE_W + 8} tension={0.5} lineCap="round" lineJoin="round" opacity={0.35} listening={false} />
                 {/* Blob principal */}
                 <Line points={flat} stroke={colorHex} strokeWidth={STROKE_W} tension={0.5} lineCap="round" lineJoin="round" opacity={0.92} hitStrokeWidth={40} />
-                {/* Tag de días (solo staff) */}
+                {/* Tag de días (staff) */}
                 {isStaff && (
                   <Group x={c.x} y={c.y - 36} listening={false}>
                     <Line points={[0, 4, 0, 22]} stroke={freshnessHex} strokeWidth={2} />
                     <Rect x={-22} y={-14} width={44} height={18} fill={freshnessHex} cornerRadius={5} />
                     <Text x={-20} y={-11} text={`${days}d`} fontSize={12} fill="#111" fontStyle="bold" fontFamily="sans-serif" width={40} align="center" />
+                  </Group>
+                )}
+                {/* Etiqueta pública (Crudo / Al dente / Quemada) */}
+                {!isStaff && (
+                  <Group x={c.x} y={c.y - 36} listening={false}>
+                    <Line points={[0, 4, 0, 22]} stroke={freshnessHex} strokeWidth={2} />
+                    <Rect x={-38} y={-14} width={76} height={18} fill="rgba(0,0,0,0.75)" cornerRadius={5} />
+                    <Text x={-36} y={-11} text={getPublicLabel(level)} fontSize={11} fill={freshnessHex} fontStyle="bold" fontFamily="sans-serif" width={72} align="center" />
                   </Group>
                 )}
               </Group>
