@@ -1,13 +1,19 @@
 -- ============================================================
 -- Actualización de zonas — ejecutar en Supabase SQL Editor
--- ATENCIÓN: borra las zonas viejas. Si hay rutas creadas,
--- primero elimínalas o comenta el DELETE.
+-- Borra rutas de prueba y zonas viejas, inserta zonas reales.
 -- ============================================================
 
 -- 1. Agregar columna image_url a zones (si no existe)
 ALTER TABLE public.zones ADD COLUMN IF NOT EXISTS image_url TEXT;
 
--- 2. Limpiar zonas viejas
+-- 2. Borrar datos dependientes en orden (FK chain)
+DELETE FROM public.betas;
+DELETE FROM public.votes;
+DELETE FROM public.qr_codes WHERE route_id IS NOT NULL;
+UPDATE public.qr_codes SET route_id = NULL;
+DELETE FROM public.routes;
+
+-- 3. Limpiar zonas viejas
 DELETE FROM public.zones;
 
 -- 3. Insertar zonas reales (izquierda → derecha en el canvas panorámico)
