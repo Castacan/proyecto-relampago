@@ -70,31 +70,28 @@ export default function WallPage() {
         </div>
       )}
 
-      {/* Main action button */}
+      {/* Bottom action bar */}
       {(ui === 'idle' || ui === 'color-pick' || ui === 'drawing') && (
-        <div className="absolute bottom-6 right-4">
+        <div className="absolute bottom-4 left-4 right-4 flex items-center justify-between pointer-events-none">
+          <div className="pointer-events-auto bg-zinc-900/90 backdrop-blur-sm rounded-full px-3 py-1.5 border border-zinc-800/60">
+            <span className="text-zinc-400 text-xs">{routes.length} rutas activas</span>
+          </div>
           {ui === 'idle' ? (
             <button
               onClick={() => setUi('color-pick')}
-              className="px-5 py-3 rounded-2xl font-semibold text-sm shadow-xl bg-yellow-400 text-zinc-950"
+              className="pointer-events-auto flex items-center gap-2 px-5 py-3 rounded-2xl font-bold text-sm shadow-2xl shadow-yellow-400/20 bg-yellow-400 text-zinc-950 active:scale-95 transition-transform"
             >
-              + Nueva ruta
+              <span className="text-lg leading-none">+</span>
+              Nueva ruta
             </button>
           ) : (
             <button
               onClick={cancelAll}
-              className="px-5 py-3 rounded-2xl font-semibold text-sm shadow-xl bg-zinc-700 text-zinc-300"
+              className="pointer-events-auto px-5 py-3 rounded-2xl font-semibold text-sm shadow-xl bg-zinc-800 text-zinc-300 border border-zinc-700 active:scale-95 transition-transform"
             >
               Cancelar
             </button>
           )}
-        </div>
-      )}
-
-      {/* Route count */}
-      {ui === 'idle' && (
-        <div className="absolute bottom-6 left-4 bg-zinc-900/80 rounded-full px-3 py-1.5">
-          <span className="text-zinc-400 text-xs">{routes.length} rutas activas</span>
         </div>
       )}
 
