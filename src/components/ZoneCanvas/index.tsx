@@ -6,30 +6,31 @@ import type { Zone, Route } from '../../types'
 import { getColorHex } from '../../lib/colors'
 import { getFreshnessLevel, getFreshnessColor, getDaysOnWall, getPublicLabel } from '../../lib/freshness'
 
-export const WALL_WIDTH = 3500
-export const WALL_HEIGHT = 800
-const MIN_SCALE = 0.1
-const MAX_SCALE = 6
-const STROKE_W = 20
-const MIN_POINT_GAP = 8  // min world pixels between captured points
+export const ZONE_W = 1200
+export const ZONE_H = 900
 
-const ZONE_COLORS = ['#1a2e22','#1a2433','#2a1f33','#332b1a','#1a3333','#1f1a33','#331a26']
+const MIN_SCALE = 0.1
+const MAX_SCALE = 8
+const STROKE_W = 8
+const MIN_POINT_GAP = 4
+
+const ZONE_COLORS = ['#1a2e22', '#1a2433', '#2a1f33', '#332b1a', '#1a3333', '#1f1a33', '#331a26']
 
 function dist2(p1: Touch, p2: Touch) {
   return Math.sqrt((p2.clientX - p1.clientX) ** 2 + (p2.clientY - p1.clientY) ** 2)
 }
 
 function toFlat(path: { x: number; y: number }[]): number[] {
-  return path.flatMap(p => [p.x * WALL_WIDTH, p.y * WALL_HEIGHT])
+  return path.flatMap(p => [p.x * ZONE_W, p.y * ZONE_H])
 }
 
 function centroid(path: { x: number; y: number }[]): { x: number; y: number } {
   const sum = path.reduce((a, p) => ({ x: a.x + p.x, y: a.y + p.y }), { x: 0, y: 0 })
-  return { x: (sum.x / path.length) * WALL_WIDTH, y: (sum.y / path.length) * WALL_HEIGHT }
+  return { x: (sum.x / path.length) * ZONE_W, y: (sum.y / path.length) * ZONE_H }
 }
 
 interface Props {
-  zones: Zone[]
+  zone: Zone
   routes: Route[]
   paintMode: boolean
   drawColor: string
@@ -39,7 +40,7 @@ interface Props {
   onRouteClick: (route: Route) => void
 }
 
-export default function PanoramaCanvas({ zones, routes, paintMode, drawColor, previewBlob, isStaff, onBlobComplete, onRouteClick }: Props) {
+export default function ZoneCanvas({ zone, routes, paintMode, drawColor, previewBlob, isStaff, onBlobComplete, onRouteClick }: Props) {
   const containerRef = useRef<HTMLDivElement>(null)
   const stageRef = useRef<Konva.Stage>(null)
   const scaleRef = useRef(1)
@@ -47,17 +48,15 @@ export default function PanoramaCanvas({ zones, routes, paintMode, drawColor, pr
   const [scale, setScale] = useState(1)
   const [pos, setPos] = useState({ x: 0, y: 0 })
 
-  // Zone images
-  const [zoneImages, setZoneImages] = useState<Record<string, HTMLImageElement>>({})
+  // Zone image
+  const [zoneImage, setZoneImage] = useState<HTMLImageElement | null>(null)
   useEffect(() => {
-    zones.forEach(zone => {
-      if (!zone.image_url) return
-      const img = new window.Image()
-      img.crossOrigin = 'anonymous'
-      img.onload = () => setZoneImages(prev => ({ ...prev, [zone.id]: img }))
-      img.src = zone.image_url
-    })
-  }, [zones])
+    if (!zone.image_url) { setZoneImage(null); return }
+    const img = new window.Image()
+    img.crossOrigin = 'anonymous'
+    img.onload = () => setZoneImage(img)
+    img.src = zone.image_url
+  }, [zone.image_url])
 
   // Drawing state
   const [drawPoints, setDrawPoints] = useState<number[]>([])
@@ -68,24 +67,24 @@ export default function PanoramaCanvas({ zones, routes, paintMode, drawColor, pr
   const lastPinchDist = useRef(0)
   const isPinching = useRef(false)
 
-  // Measure container once mounted
+  // Measure container
   useEffect(() => {
     const el = containerRef.current
     if (!el) return
     const ro = new ResizeObserver(() => {
       const w = el.offsetWidth
       const h = el.offsetHeight
-      const initScale = w / WALL_WIDTH
+      const initScale = w / ZONE_W
       scaleRef.current = initScale
       setSize({ w, h })
       setScale(initScale)
-      setPos({ x: 0, y: Math.max(0, (h - WALL_HEIGHT * initScale) / 2) })
+      setPos({ x: 0, y: Math.max(0, (h - ZONE_H * initScale) / 2) })
     })
     ro.observe(el)
     return () => ro.disconnect()
   }, [])
 
-  // --- Zoom via scroll wheel ---
+  // Zoom via scroll wheel
   const handleWheel = useCallback((e: KonvaEventObject<WheelEvent>) => {
     e.evt.preventDefault()
     const stage = stageRef.current
@@ -107,12 +106,10 @@ export default function PanoramaCanvas({ zones, routes, paintMode, drawColor, pr
     setPos(newPos)
   }, [])
 
-  // --- Stage drag end (sync pos) ---
   const handleDragEnd = useCallback((e: KonvaEventObject<DragEvent>) => {
     setPos({ x: e.target.x(), y: e.target.y() })
   }, [])
 
-  // --- Drawing helpers ---
   const screenToWorld = useCallback((sx: number, sy: number) => {
     const stage = stageRef.current!
     const s = scaleRef.current
@@ -130,7 +127,6 @@ export default function PanoramaCanvas({ zones, routes, paintMode, drawColor, pr
     setDrawPoints(prev => [...prev, wp.x, wp.y])
   }, [screenToWorld])
 
-  // --- Mouse events (desktop) ---
   const handleMouseDown = useCallback((_e: KonvaEventObject<MouseEvent>) => {
     if (!paintMode) return
     isDrawing.current = true
@@ -152,7 +148,6 @@ export default function PanoramaCanvas({ zones, routes, paintMode, drawColor, pr
     finishDrawing()
   }, [paintMode]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // --- Touch events (mobile) ---
   const handleTouchStart = useCallback((e: KonvaEventObject<TouchEvent>) => {
     e.evt.preventDefault()
     if (e.evt.touches.length === 2) {
@@ -204,7 +199,7 @@ export default function PanoramaCanvas({ zones, routes, paintMode, drawColor, pr
       if (prev.length < 4) return []
       const normalized: { x: number; y: number }[] = []
       for (let i = 0; i < prev.length; i += 2) {
-        normalized.push({ x: prev[i] / WALL_WIDTH, y: prev[i + 1] / WALL_HEIGHT })
+        normalized.push({ x: prev[i] / ZONE_W, y: prev[i + 1] / ZONE_H })
       }
       onBlobComplete(normalized)
       return []
@@ -231,32 +226,19 @@ export default function PanoramaCanvas({ zones, routes, paintMode, drawColor, pr
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
       >
-        {/* Capa 1: Fondo del muro — fotos reales o placeholders de color */}
+        {/* Layer 1: Zone background */}
         <Layer listening={false}>
-          {zones.map((zone, i) => {
-            const x = zone.canvas_x_start * WALL_WIDTH
-            const w = (zone.canvas_x_end - zone.canvas_x_start) * WALL_WIDTH
-            const img = zoneImages[zone.id]
-            return (
-              <Group key={zone.id}>
-                {img ? (
-                  <KonvaImage x={x} y={0} width={w} height={WALL_HEIGHT} image={img} />
-                ) : (
-                  <Rect x={x} y={0} width={w} height={WALL_HEIGHT} fill={ZONE_COLORS[i % ZONE_COLORS.length]} />
-                )}
-                {/* Separador entre zonas */}
-                <Rect x={x + w - 1} y={0} width={2} height={WALL_HEIGHT} fill="rgba(255,255,255,0.06)" />
-                {/* Nombre de zona — solo en secciones sin foto */}
-                {!img && (
-                  <Text x={x + 12} y={12} text={zone.name} fontSize={13} fill="rgba(255,255,255,0.25)" fontFamily="sans-serif" />
-                )}
-              </Group>
-            )
-          })}
-          <Rect x={0} y={WALL_HEIGHT - 2} width={WALL_WIDTH} height={2} fill="rgba(255,255,255,0.06)" />
+          {zoneImage ? (
+            <KonvaImage x={0} y={0} width={ZONE_W} height={ZONE_H} image={zoneImage} />
+          ) : (
+            <>
+              <Rect x={0} y={0} width={ZONE_W} height={ZONE_H} fill={ZONE_COLORS[zone.order_index % ZONE_COLORS.length]} />
+              <Text x={24} y={24} text={zone.name} fontSize={22} fill="rgba(255,255,255,0.2)" fontFamily="sans-serif" />
+            </>
+          )}
         </Layer>
 
-        {/* Capa 2: Blobs de rutas existentes */}
+        {/* Layer 2: Route blobs */}
         <Layer>
           {routes.map(route => {
             if (!route.blob_path || route.blob_path.length < 2) return null
@@ -269,24 +251,20 @@ export default function PanoramaCanvas({ zones, routes, paintMode, drawColor, pr
 
             return (
               <Group key={route.id} onClick={() => onRouteClick(route)} onTap={() => onRouteClick(route)}>
-                {/* Halo de frescura */}
-                <Line points={flat} stroke={freshnessHex} strokeWidth={STROKE_W + 8} tension={0.5} lineCap="round" lineJoin="round" opacity={0.35} listening={false} />
-                {/* Blob principal */}
-                <Line points={flat} stroke={colorHex} strokeWidth={STROKE_W} tension={0.5} lineCap="round" lineJoin="round" opacity={0.92} hitStrokeWidth={40} />
-                {/* Tag de días (staff) */}
+                <Line points={flat} stroke={freshnessHex} strokeWidth={STROKE_W + 6} tension={0.5} lineCap="round" lineJoin="round" opacity={0.35} listening={false} />
+                <Line points={flat} stroke={colorHex} strokeWidth={STROKE_W} tension={0.5} lineCap="round" lineJoin="round" opacity={0.92} hitStrokeWidth={32} />
                 {isStaff && (
-                  <Group x={c.x} y={c.y - 36} listening={false}>
-                    <Line points={[0, 4, 0, 22]} stroke={freshnessHex} strokeWidth={2} />
-                    <Rect x={-22} y={-14} width={44} height={18} fill={freshnessHex} cornerRadius={5} />
-                    <Text x={-20} y={-11} text={`${days}d`} fontSize={12} fill="#111" fontStyle="bold" fontFamily="sans-serif" width={40} align="center" />
+                  <Group x={c.x} y={c.y - 28} listening={false}>
+                    <Line points={[0, 4, 0, 18]} stroke={freshnessHex} strokeWidth={2} />
+                    <Rect x={-18} y={-12} width={36} height={16} fill={freshnessHex} cornerRadius={4} />
+                    <Text x={-16} y={-9} text={`${days}d`} fontSize={10} fill="#111" fontStyle="bold" fontFamily="sans-serif" width={32} align="center" />
                   </Group>
                 )}
-                {/* Etiqueta pública (Crudo / Al dente / Quemada) */}
                 {!isStaff && (
-                  <Group x={c.x} y={c.y - 36} listening={false}>
-                    <Line points={[0, 4, 0, 22]} stroke={freshnessHex} strokeWidth={2} />
-                    <Rect x={-38} y={-14} width={76} height={18} fill="rgba(0,0,0,0.75)" cornerRadius={5} />
-                    <Text x={-36} y={-11} text={getPublicLabel(level)} fontSize={11} fill={freshnessHex} fontStyle="bold" fontFamily="sans-serif" width={72} align="center" />
+                  <Group x={c.x} y={c.y - 28} listening={false}>
+                    <Line points={[0, 4, 0, 18]} stroke={freshnessHex} strokeWidth={2} />
+                    <Rect x={-30} y={-12} width={60} height={16} fill="rgba(0,0,0,0.75)" cornerRadius={4} />
+                    <Text x={-28} y={-9} text={getPublicLabel(level)} fontSize={9} fill={freshnessHex} fontStyle="bold" fontFamily="sans-serif" width={56} align="center" />
                   </Group>
                 )}
               </Group>
@@ -294,7 +272,7 @@ export default function PanoramaCanvas({ zones, routes, paintMode, drawColor, pr
           })}
         </Layer>
 
-        {/* Capa 3: Preview blob (mientras el form está abierto) + trazo activo */}
+        {/* Layer 3: Preview blob + active draw */}
         <Layer listening={false}>
           {previewBlob && previewBlob.path.length >= 2 && (
             <Line
@@ -305,7 +283,7 @@ export default function PanoramaCanvas({ zones, routes, paintMode, drawColor, pr
               lineCap="round"
               lineJoin="round"
               opacity={0.75}
-              dash={[30, 12]}
+              dash={[20, 8]}
             />
           )}
           {paintMode && drawPoints.length >= 4 && (

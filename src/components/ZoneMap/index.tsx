@@ -1,0 +1,138 @@
+import { useState } from 'react'
+import type { Zone, Route } from '../../types'
+import { getFreshnessLevel, getFreshnessColor } from '../../lib/freshness'
+
+interface Props {
+  zones: Zone[]
+  routes: Route[]
+  onZoneSelect: (zone: Zone) => void
+  assignQrHint?: boolean
+}
+
+function getZoneFreshnessColor(zone: Zone, routes: Route[]): string {
+  const zoneRoutes = routes.filter(r => r.zone_id === zone.id)
+  if (zoneRoutes.length === 0) return '#27272a'
+  const oldest = zoneRoutes.reduce((a, b) => a.placed_at < b.placed_at ? a : b)
+  return getFreshnessColor(getFreshnessLevel(oldest.placed_at))
+}
+
+type PolyDef = { points: string; label: string; labelX: number; labelY: number; badgeX: number; badgeY: number }
+
+const ZONE_POLYS: Record<string, PolyDef> = {
+  'pared-izquierda':        { points: '30,15 62,15 100,300 80,300',          label: 'Pared\nIzq',       labelX: 57,  labelY: 168, badgeX: 57,  badgeY: 155 },
+  'fondo-izquierdo':        { points: '62,15 198,15 198,58 62,58',           label: 'Fondo Izq',        labelX: 130, labelY: 40,  badgeX: 170, badgeY: 27  },
+  'fondo-derecho-izq':      { points: '198,15 285,15 285,58 198,58',         label: 'Fondo Der',        labelX: 242, labelY: 40,  badgeX: 272, badgeY: 27  },
+  'fondo-derecho-der':      { points: '285,15 368,15 320,58 285,58',         label: '',                 labelX: 320, labelY: 40,  badgeX: 350, badgeY: 27  },
+  'fondo-derecho':          { points: '198,15 368,15 320,58 198,58',         label: 'Fondo Der',        labelX: 280, labelY: 40,  badgeX: 340, badgeY: 27  },
+  'pared-derecha':          { points: '320,58 368,15 320,300 300,300',       label: 'Pared\nDer',       labelX: 330, labelY: 168, badgeX: 340, badgeY: 155 },
+  'flanco-tunel-izquierdo': { points: '108,82 155,82 155,248 108,248',       label: 'Flanco\nIzq',      labelX: 132, labelY: 168, badgeX: 132, badgeY: 155 },
+  'flanco-tunel-derecho':   { points: '245,82 292,82 292,248 245,248',       label: 'Flanco\nDer',      labelX: 269, labelY: 168, badgeX: 269, badgeY: 155 },
+  'tunel-norte':            { points: '155,82 245,82 245,165 155,165',       label: 'Túnel\nNorte',     labelX: 200, labelY: 128, badgeX: 200, badgeY: 115 },
+  'tunel-sur':              { points: '155,165 245,165 245,248 155,248',     label: 'Túnel\nSur',       labelX: 200, labelY: 210, badgeX: 200, badgeY: 197 },
+  'desplome':               { points: '108,248 292,248 292,295 108,295',     label: 'Desplome',         labelX: 200, labelY: 274, badgeX: 260, badgeY: 261 },
+}
+
+export default function ZoneMap({ zones, routes, onZoneSelect, assignQrHint }: Props) {
+  const [hovered, setHovered] = useState<string | null>(null)
+
+  return (
+    <div className="w-full h-full flex flex-col bg-zinc-950">
+      {assignQrHint && (
+        <div className="shrink-0 mx-4 mt-3 bg-yellow-400/10 border border-yellow-400/40 rounded-xl px-4 py-2.5 text-center">
+          <p className="text-yellow-400 text-sm font-semibold">Selecciona la zona donde colocaste la ruta</p>
+        </div>
+      )}
+
+      <div className="flex-1 flex items-center justify-center p-4">
+        <svg
+          viewBox="0 0 400 320"
+          width="100%"
+          height="100%"
+          style={{ maxHeight: '100%' }}
+          preserveAspectRatio="xMidYMid meet"
+        >
+          {/* Gym outline */}
+          <polygon
+            points="30,15 368,15 320,300 80,300"
+            fill="#18181b"
+            stroke="#3f3f46"
+            strokeWidth="1.5"
+          />
+
+          {/* Tunnel structure background */}
+          <rect x="108" y="82" width="184" height="213" fill="#09090b" rx="2" />
+          <rect x="108" y="82" width="184" height="213" fill="none" stroke="#3f3f46" strokeWidth="1" rx="2" />
+
+          {/* Zone polygons */}
+          {zones.map(zone => {
+            const poly = ZONE_POLYS[zone.slug]
+            if (!poly) return null
+            const color = getZoneFreshnessColor(zone, routes)
+            const count = routes.filter(r => r.zone_id === zone.id).length
+            const isHovered = hovered === zone.id
+            const labelLines = poly.label.split('\n')
+
+            return (
+              <g
+                key={zone.id}
+                onClick={() => onZoneSelect(zone)}
+                onMouseEnter={() => setHovered(zone.id)}
+                onMouseLeave={() => setHovered(null)}
+                style={{ cursor: 'pointer' }}
+              >
+                <polygon
+                  points={poly.points}
+                  fill={color}
+                  fillOpacity={isHovered ? 0.80 : 0.55}
+                  stroke={color}
+                  strokeWidth={isHovered ? 1.5 : 0.5}
+                />
+
+                {/* Zone label */}
+                {poly.label && labelLines.map((line, i) => (
+                  <text
+                    key={i}
+                    x={poly.labelX}
+                    y={poly.labelY + i * 10}
+                    textAnchor="middle"
+                    fontSize="8"
+                    fill="rgba(255,255,255,0.7)"
+                    fontFamily="system-ui, sans-serif"
+                    fontWeight={isHovered ? 'bold' : 'normal'}
+                    style={{ pointerEvents: 'none', userSelect: 'none' }}
+                  >
+                    {line}
+                  </text>
+                ))}
+
+                {/* Route count badge */}
+                {count > 0 && (
+                  <g>
+                    <circle cx={poly.badgeX} cy={poly.badgeY} r="8" fill={color} opacity="0.9" />
+                    <text
+                      x={poly.badgeX}
+                      y={poly.badgeY + 3}
+                      textAnchor="middle"
+                      fontSize="8"
+                      fontWeight="bold"
+                      fill="#09090b"
+                      fontFamily="system-ui, sans-serif"
+                      style={{ pointerEvents: 'none', userSelect: 'none' }}
+                    >
+                      {count}
+                    </text>
+                  </g>
+                )}
+              </g>
+            )
+          })}
+
+          {/* Gym label */}
+          <text x="200" y="310" textAnchor="middle" fontSize="7" fill="#52525b" fontFamily="system-ui, sans-serif">
+            Toca una zona para ver sus rutas
+          </text>
+        </svg>
+      </div>
+    </div>
+  )
+}

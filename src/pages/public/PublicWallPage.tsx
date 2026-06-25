@@ -1,10 +1,11 @@
+import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import PanoramaCanvas from '../../components/PanoramaCanvas'
-import MiniMap from '../../components/MiniMap'
+import ZoneMap from '../../components/ZoneMap'
+import ZoneCanvas from '../../components/ZoneCanvas'
 import { useZones } from '../../hooks/useZones'
 import { useRoutes } from '../../hooks/useRoutes'
 import { useQrByRoute } from '../../hooks/useQrByRoute'
-import type { Route } from '../../types'
+import type { Route, Zone } from '../../types'
 
 export default function PublicWallPage() {
   const navigate = useNavigate()
@@ -12,10 +13,15 @@ export default function PublicWallPage() {
   const { routes } = useRoutes()
   const { qrByRoute } = useQrByRoute()
 
+  const [view, setView] = useState<'map' | 'zone'>('map')
+  const [selectedZone, setSelectedZone] = useState<Zone | null>(null)
+
   function handleRouteClick(route: Route) {
     const qrId = qrByRoute[route.id]
     if (qrId) navigate(`/q/${qrId}`)
   }
+
+  const zoneRoutes = selectedZone ? routes.filter(r => r.zone_id === selectedZone.id) : []
 
   return (
     <div className="relative w-full h-screen bg-zinc-950 flex flex-col">
@@ -31,24 +37,38 @@ export default function PublicWallPage() {
       </header>
 
       <div className="relative flex-1 overflow-hidden">
-        <PanoramaCanvas
-          zones={zones}
-          routes={routes}
-          paintMode={false}
-          drawColor="amarillo"
-          previewBlob={null}
-          isStaff={false}
-          onBlobComplete={() => {}}
-          onRouteClick={handleRouteClick}
-        />
-        <MiniMap zones={zones} routes={routes} onZoneClick={() => {}} />
+        {view === 'map' ? (
+          <ZoneMap
+            zones={zones}
+            routes={routes}
+            onZoneSelect={zone => { setSelectedZone(zone); setView('zone') }}
+          />
+        ) : selectedZone && (
+          <>
+            <ZoneCanvas
+              zone={selectedZone}
+              routes={zoneRoutes}
+              paintMode={false}
+              drawColor="amarillo"
+              previewBlob={null}
+              isStaff={false}
+              onBlobComplete={() => {}}
+              onRouteClick={handleRouteClick}
+            />
+            <button
+              onClick={() => { setView('map'); setSelectedZone(null) }}
+              className="absolute top-3 left-3 z-30 flex items-center gap-1.5 bg-zinc-900/90 backdrop-blur-sm border border-zinc-700 rounded-xl px-3 py-2 text-white text-sm font-medium"
+            >
+              <span className="text-base leading-none">←</span>
+              <span className="truncate max-w-32">{selectedZone.name}</span>
+            </button>
 
-        {routes.length === 0 && (
-          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-            <div className="text-center">
-              <p className="text-zinc-600 text-sm">Toca un blob de color para ver la ruta</p>
-            </div>
-          </div>
+            {zoneRoutes.length === 0 && (
+              <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                <p className="text-zinc-600 text-sm">No hay rutas en esta zona todavía</p>
+              </div>
+            )}
+          </>
         )}
       </div>
     </div>
