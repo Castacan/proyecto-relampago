@@ -111,14 +111,21 @@ export default function RouteDetail({ route, zones, onClose, onUpdate, onRetire 
           <>
             {/* Edit: Color */}
             <label className="block text-zinc-400 text-xs uppercase tracking-widest mb-2">Color</label>
-            <div className="flex flex-wrap gap-2 mb-4">
+            <div className="grid grid-cols-5 gap-3 mb-4">
               {ROUTE_COLORS.map(c => (
                 <button
                   key={c.key}
                   onClick={() => setEditColor(c.key)}
-                  className={`w-9 h-9 rounded-full border-2 transition-all ${editColor === c.key ? 'border-white scale-110' : 'border-transparent'}`}
-                  style={{ backgroundColor: c.hex }}
-                />
+                  className="flex flex-col items-center gap-1.5"
+                >
+                  <div
+                    className={`w-12 h-12 rounded-full transition-all ${editColor === c.key ? 'ring-4 ring-white scale-110' : ''}`}
+                    style={{ backgroundColor: c.hex }}
+                  />
+                  <span className={`text-[10px] ${editColor === c.key ? 'text-white' : 'text-zinc-500'}`}>
+                    {c.label}
+                  </span>
+                </button>
               ))}
             </div>
 

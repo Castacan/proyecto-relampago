@@ -51,15 +51,21 @@ export default function RouteForm({ blobPath, zones, initialColor = 'amarillo', 
 
         {/* Color */}
         <label className="block text-zinc-400 text-xs uppercase tracking-widest mb-2">Color de presas</label>
-        <div className="flex flex-wrap gap-2 mb-5">
+        <div className="grid grid-cols-5 gap-3 mb-5">
           {ROUTE_COLORS.map(c => (
             <button
               key={c.key}
               onClick={() => setColor(c.key)}
-              className={`w-9 h-9 rounded-full border-2 transition-all ${color === c.key ? 'border-white scale-110' : 'border-transparent'}`}
-              style={{ backgroundColor: c.hex }}
-              title={c.label}
-            />
+              className="flex flex-col items-center gap-1.5"
+            >
+              <div
+                className={`w-12 h-12 rounded-full transition-all ${color === c.key ? 'ring-4 ring-white scale-110' : ''}`}
+                style={{ backgroundColor: c.hex }}
+              />
+              <span className={`text-[10px] ${color === c.key ? 'text-white' : 'text-zinc-500'}`}>
+                {c.label}
+              </span>
+            </button>
           ))}
         </div>
 
