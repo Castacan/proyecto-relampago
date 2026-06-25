@@ -4,6 +4,7 @@ import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../lib/auth'
 import { getColorHex } from '../../lib/colors'
 import { getFreshnessLevel, getFreshnessColor, getPublicLabel } from '../../lib/freshness'
+import VoteButtons from '../../components/VoteButtons'
 
 interface RouteData {
   id: string
@@ -141,17 +142,10 @@ export default function PublicRoutePage() {
           )}
         </div>
 
-        {/* Votación — Fase 4 */}
+        {/* Votación */}
         <div className="mt-auto pt-4">
           <p className="text-zinc-500 text-xs text-center mb-3">¿Qué te pareció?</p>
-          <div className="flex gap-3">
-            <button className="flex-1 py-5 bg-zinc-900 rounded-2xl text-3xl border border-zinc-800 active:bg-zinc-800 transition-colors">
-              👍
-            </button>
-            <button className="flex-1 py-5 bg-zinc-900 rounded-2xl text-3xl border border-zinc-800 active:bg-zinc-800 transition-colors">
-              👎
-            </button>
-          </div>
+          <VoteButtons routeId={route.id} />
         </div>
       </div>
 
