@@ -32,12 +32,14 @@ interface Props {
   zones: Zone[]
   routes: Route[]
   paintMode: boolean
+  drawColor: string
+  previewBlob: { path: { x: number; y: number }[]; color: string } | null
   isStaff: boolean
   onBlobComplete: (points: { x: number; y: number }[]) => void
   onRouteClick: (route: Route) => void
 }
 
-export default function PanoramaCanvas({ zones, routes, paintMode, isStaff, onBlobComplete, onRouteClick }: Props) {
+export default function PanoramaCanvas({ zones, routes, paintMode, drawColor, previewBlob, isStaff, onBlobComplete, onRouteClick }: Props) {
   const containerRef = useRef<HTMLDivElement>(null)
   const stageRef = useRef<Konva.Stage>(null)
   const scaleRef = useRef(1)
@@ -263,12 +265,24 @@ export default function PanoramaCanvas({ zones, routes, paintMode, isStaff, onBl
           })}
         </Layer>
 
-        {/* Capa 3: Trazo activo mientras se pinta */}
+        {/* Capa 3: Preview blob (mientras el form está abierto) + trazo activo */}
         <Layer listening={false}>
+          {previewBlob && previewBlob.path.length >= 2 && (
+            <Line
+              points={toFlat(previewBlob.path)}
+              stroke={getColorHex(previewBlob.color)}
+              strokeWidth={STROKE_W}
+              tension={0.5}
+              lineCap="round"
+              lineJoin="round"
+              opacity={0.75}
+              dash={[30, 12]}
+            />
+          )}
           {paintMode && drawPoints.length >= 4 && (
             <Line
               points={drawPoints}
-              stroke="#FACC15"
+              stroke={getColorHex(drawColor)}
               strokeWidth={STROKE_W}
               tension={0.5}
               lineCap="round"

@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { supabase } from '../../lib/supabase'
-import { getColorHex } from '../../lib/colors'
+import { getColorHex, ROUTE_COLORS, GRADES } from '../../lib/colors'
 import { getDaysOnWall, getFreshnessColor, getFreshnessLevel } from '../../lib/freshness'
 import type { Route, Zone } from '../../types'
 
@@ -8,12 +8,19 @@ interface Props {
   route: Route
   zones: Zone[]
   onClose: () => void
+  onUpdate: () => void
   onRetire: () => void
 }
 
-export default function RouteDetail({ route, zones, onClose, onRetire }: Props) {
+export default function RouteDetail({ route, zones, onClose, onUpdate, onRetire }: Props) {
+  const [editing, setEditing] = useState(false)
+  const [editColor, setEditColor] = useState(route.color)
+  const [editGrade, setEditGrade] = useState(route.grade)
+  const [editZoneId, setEditZoneId] = useState(route.zone_id)
+  const [editNotes, setEditNotes] = useState(route.notes ?? '')
+  const [saving, setSaving] = useState(false)
   const [retiring, setRetiring] = useState(false)
-  const [confirm, setConfirm] = useState(false)
+  const [confirmRetire, setConfirmRetire] = useState(false)
 
   const days = getDaysOnWall(route.placed_at)
   const level = getFreshnessLevel(route.placed_at)
@@ -21,18 +28,23 @@ export default function RouteDetail({ route, zones, onClose, onRetire }: Props) 
   const colorHex = getColorHex(route.color)
   const zone = zones.find(z => z.id === route.zone_id)
 
+  async function handleSaveEdit() {
+    setSaving(true)
+    await supabase.from('routes').update({
+      color: editColor,
+      grade: editGrade,
+      zone_id: editZoneId,
+      notes: editNotes.trim() || null,
+    }).eq('id', route.id)
+    setSaving(false)
+    onUpdate()
+  }
+
   async function handleRetire() {
-    if (!confirm) { setConfirm(true); return }
+    if (!confirmRetire) { setConfirmRetire(true); return }
     setRetiring(true)
-    await supabase
-      .from('routes')
-      .update({ status: 'retired', retired_at: new Date().toISOString() })
-      .eq('id', route.id)
-    // Free up the QR if assigned
-    await supabase
-      .from('qr_codes')
-      .update({ status: 'available', route_id: null })
-      .eq('route_id', route.id)
+    await supabase.from('routes').update({ status: 'retired', retired_at: new Date().toISOString() }).eq('id', route.id)
+    await supabase.from('qr_codes').update({ status: 'available', route_id: null }).eq('route_id', route.id)
     setRetiring(false)
     onRetire()
   }
@@ -40,7 +52,7 @@ export default function RouteDetail({ route, zones, onClose, onRetire }: Props) 
   return (
     <div className="fixed inset-0 bg-black/70 flex items-end z-50" onClick={onClose}>
       <div
-        className="w-full bg-zinc-900 rounded-t-2xl p-5 max-h-[80vh] overflow-y-auto"
+        className="w-full bg-zinc-900 rounded-t-2xl p-5 max-h-[90vh] overflow-y-auto"
         onClick={e => e.stopPropagation()}
       >
         {/* Header */}
@@ -52,44 +64,105 @@ export default function RouteDetail({ route, zones, onClose, onRetire }: Props) 
             </h2>
             <p className="text-zinc-400 text-sm">{zone?.name}</p>
           </div>
-          <button onClick={onClose} className="ml-auto text-zinc-400 text-2xl leading-none">×</button>
-        </div>
-
-        {/* Freshness */}
-        <div className="flex items-center gap-2 mb-4 p-3 rounded-xl" style={{ backgroundColor: freshnessHex + '22', borderColor: freshnessHex + '44', border: '1px solid' }}>
-          <span className="font-bold text-2xl" style={{ color: freshnessHex }}>{days}</span>
-          <span className="text-zinc-300 text-sm">días en la pared</span>
-        </div>
-
-        {/* Notes */}
-        {route.notes && (
-          <div className="mb-4 p-3 bg-zinc-800 rounded-xl">
-            <p className="text-zinc-400 text-xs uppercase tracking-widest mb-1">Notas</p>
-            <p className="text-zinc-200 text-sm">{route.notes}</p>
+          <div className="ml-auto flex gap-2">
+            <button
+              onClick={() => { setEditing(e => !e); setConfirmRetire(false) }}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold ${editing ? 'bg-zinc-700 text-zinc-300' : 'bg-zinc-800 text-zinc-300'}`}
+            >
+              {editing ? 'Cancelar' : 'Editar'}
+            </button>
+            <button onClick={onClose} className="text-zinc-400 text-2xl leading-none ml-1">×</button>
           </div>
-        )}
+        </div>
 
-        {/* Fecha */}
-        <p className="text-zinc-500 text-xs mb-5">
-          Colocada el {new Date(route.placed_at).toLocaleDateString('es-MX', { day: 'numeric', month: 'long', year: 'numeric' })}
-        </p>
+        {!editing ? (
+          <>
+            {/* Freshness */}
+            <div className="flex items-center gap-2 mb-4 p-3 rounded-xl" style={{ backgroundColor: freshnessHex + '22', border: `1px solid ${freshnessHex}44` }}>
+              <span className="font-bold text-2xl" style={{ color: freshnessHex }}>{days}</span>
+              <span className="text-zinc-300 text-sm">días en la pared</span>
+            </div>
 
-        {/* Retire button */}
-        <button
-          onClick={handleRetire}
-          disabled={retiring}
-          className={`w-full py-3 rounded-xl font-semibold text-sm transition-all ${
-            confirm
-              ? 'bg-red-500 text-white'
-              : 'bg-zinc-800 text-zinc-300'
-          } disabled:opacity-50`}
-        >
-          {retiring ? 'Retirando...' : confirm ? '¿Confirmar retiro?' : 'Retirar ruta'}
-        </button>
-        {confirm && (
-          <button onClick={() => setConfirm(false)} className="w-full py-2 text-zinc-500 text-sm mt-1">
-            Cancelar
-          </button>
+            {route.notes && (
+              <div className="mb-4 p-3 bg-zinc-800 rounded-xl">
+                <p className="text-zinc-400 text-xs uppercase tracking-widest mb-1">Notas</p>
+                <p className="text-zinc-200 text-sm">{route.notes}</p>
+              </div>
+            )}
+
+            <p className="text-zinc-500 text-xs mb-5">
+              Colocada el {new Date(route.placed_at).toLocaleDateString('es-MX', { day: 'numeric', month: 'long', year: 'numeric' })}
+            </p>
+
+            <button
+              onClick={handleRetire}
+              disabled={retiring}
+              className={`w-full py-3 rounded-xl font-semibold text-sm transition-all ${confirmRetire ? 'bg-red-500 text-white' : 'bg-zinc-800 text-zinc-300'} disabled:opacity-50`}
+            >
+              {retiring ? 'Retirando...' : confirmRetire ? '¿Confirmar retiro?' : 'Retirar ruta'}
+            </button>
+            {confirmRetire && (
+              <button onClick={() => setConfirmRetire(false)} className="w-full py-2 text-zinc-500 text-sm mt-1">
+                Cancelar
+              </button>
+            )}
+          </>
+        ) : (
+          <>
+            {/* Edit: Color */}
+            <label className="block text-zinc-400 text-xs uppercase tracking-widest mb-2">Color</label>
+            <div className="flex flex-wrap gap-2 mb-4">
+              {ROUTE_COLORS.map(c => (
+                <button
+                  key={c.key}
+                  onClick={() => setEditColor(c.key)}
+                  className={`w-9 h-9 rounded-full border-2 transition-all ${editColor === c.key ? 'border-white scale-110' : 'border-transparent'}`}
+                  style={{ backgroundColor: c.hex }}
+                />
+              ))}
+            </div>
+
+            {/* Edit: Grade */}
+            <label className="block text-zinc-400 text-xs uppercase tracking-widest mb-2">Grado</label>
+            <div className="flex flex-wrap gap-2 mb-4">
+              {GRADES.map(g => (
+                <button
+                  key={g}
+                  onClick={() => setEditGrade(g)}
+                  className={`px-3 py-1.5 rounded-lg text-sm font-mono font-semibold transition-all ${editGrade === g ? 'bg-yellow-400 text-zinc-950' : 'bg-zinc-800 text-zinc-300'}`}
+                >
+                  {g}
+                </button>
+              ))}
+            </div>
+
+            {/* Edit: Zone */}
+            <label className="block text-zinc-400 text-xs uppercase tracking-widest mb-2">Zona</label>
+            <select
+              value={editZoneId}
+              onChange={e => setEditZoneId(e.target.value)}
+              className="w-full bg-zinc-800 text-white rounded-lg px-4 py-3 text-sm mb-4 outline-none"
+            >
+              {zones.map(z => <option key={z.id} value={z.id}>{z.name}</option>)}
+            </select>
+
+            {/* Edit: Notes */}
+            <label className="block text-zinc-400 text-xs uppercase tracking-widest mb-2">Notas</label>
+            <textarea
+              value={editNotes}
+              onChange={e => setEditNotes(e.target.value)}
+              rows={2}
+              className="w-full bg-zinc-800 text-white rounded-lg px-4 py-3 text-sm mb-4 outline-none resize-none placeholder-zinc-600"
+            />
+
+            <button
+              onClick={handleSaveEdit}
+              disabled={saving}
+              className="w-full py-3 rounded-xl bg-yellow-400 text-zinc-950 font-semibold text-sm disabled:opacity-50"
+            >
+              {saving ? 'Guardando...' : 'Guardar cambios'}
+            </button>
+          </>
         )}
       </div>
     </div>
