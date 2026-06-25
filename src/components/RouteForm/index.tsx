@@ -8,11 +8,12 @@ interface Props {
   blobPath: { x: number; y: number }[]
   zones: Zone[]
   initialColor?: string
+  assignQrId?: string
   onSave: () => void
   onCancel: () => void
 }
 
-export default function RouteForm({ blobPath, zones, initialColor = 'amarillo', onSave, onCancel }: Props) {
+export default function RouteForm({ blobPath, zones, initialColor = 'amarillo', assignQrId, onSave, onCancel }: Props) {
   const { profile } = useProfile()
   const [color, setColor] = useState(initialColor)
   const [grade, setGrade] = useState('V4')
@@ -25,16 +26,21 @@ export default function RouteForm({ blobPath, zones, initialColor = 'amarillo', 
     if (!profile) return
     setSaving(true)
     setError('')
-    const { error: err } = await supabase.from('routes').insert({
+    const { data: newRoute, error: err } = await supabase.from('routes').insert({
       color,
       grade,
       setter_id: profile.id,
       zone_id: zoneId,
       blob_path: blobPath,
       notes: notes.trim() || null,
-    })
+    }).select('id').single()
+    if (err || !newRoute) { setSaving(false); setError('Error al guardar. Intenta de nuevo.'); return }
+
+    if (assignQrId) {
+      await supabase.from('qr_codes').update({ status: 'in_use', route_id: newRoute.id }).eq('id', assignQrId)
+    }
+
     setSaving(false)
-    if (err) { setError('Error al guardar. Intenta de nuevo.'); return }
     onSave()
   }
 

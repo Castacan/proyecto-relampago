@@ -65,10 +65,15 @@ export default function PublicRoutePage() {
         <div className="text-5xl mb-4">📦</div>
         <h1 className="text-white font-bold text-xl mb-2">Sin ruta asignada</h1>
         <p className="text-zinc-400 text-sm mb-6">Este QR todavía no tiene ruta.</p>
-        {session && (
-          <Link to="/staff" className="px-5 py-3 bg-yellow-400 text-zinc-950 font-semibold rounded-xl text-sm">
-            Ir al staff →
+        {session ? (
+          <Link
+            to={`/staff?qr=${qrId}`}
+            className="px-5 py-3 bg-yellow-400 text-zinc-950 font-semibold rounded-xl text-sm"
+          >
+            🎨 Crear ruta para este QR
           </Link>
+        ) : (
+          <p className="text-zinc-600 text-xs">Escanea con el app de staff para asignarlo.</p>
         )}
       </div>
     )

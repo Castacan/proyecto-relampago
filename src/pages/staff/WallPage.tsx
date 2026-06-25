@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import PanoramaCanvas from '../../components/PanoramaCanvas'
 import MiniMap from '../../components/MiniMap'
 import RouteForm from '../../components/RouteForm'
@@ -11,6 +12,9 @@ import type { Route, Zone } from '../../types'
 type UIState = 'idle' | 'color-pick' | 'drawing' | 'form'
 
 export default function WallPage() {
+  const [searchParams] = useSearchParams()
+  const assignQrId = searchParams.get('qr') ?? undefined
+
   const { zones } = useZones()
   const { routes, refetch } = useRoutes()
 
@@ -46,6 +50,15 @@ export default function WallPage() {
       />
 
       <MiniMap zones={zones} routes={routes} onZoneClick={handleZoneClick} />
+
+      {/* QR assignment banner */}
+      {assignQrId && ui !== 'form' && (
+        <div className="absolute top-16 left-0 right-0 flex justify-center pointer-events-none z-30">
+          <div className="bg-yellow-400 text-zinc-950 px-4 py-2 rounded-full text-xs font-bold shadow-lg">
+            QR {assignQrId} — dibuja la ruta para asignarlo
+          </div>
+        </div>
+      )}
 
       {/* Draw hint */}
       {ui === 'drawing' && (
@@ -126,6 +139,7 @@ export default function WallPage() {
           blobPath={newBlobPath}
           zones={zones}
           initialColor={paintColor}
+          assignQrId={assignQrId}
           onSave={() => { cancelAll(); refetch() }}
           onCancel={cancelAll}
         />
