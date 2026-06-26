@@ -1,4 +1,4 @@
-import { useRef, useState, useCallback, useEffect } from 'react'
+import { useRef, useState, useCallback, useEffect, useMemo } from 'react'
 import { Stage, Layer, Line, Rect, Text, Group, Image as KonvaImage } from 'react-konva'
 import type Konva from 'konva'
 import type { KonvaEventObject } from 'konva/lib/Node'
@@ -20,27 +20,56 @@ function dist2(p1: Touch, p2: Touch) {
   return Math.sqrt((p2.clientX - p1.clientX) ** 2 + (p2.clientY - p1.clientY) ** 2)
 }
 
-function toFlat(path: { x: number; y: number }[]): number[] {
-  return path.flatMap(p => [p.x * ZONE_W, p.y * ZONE_H])
+// Compute pixel layout for a group of zones using canvas_x_start/end proportions.
+// All zones are assumed to be adjacent and ordered left-to-right.
+function computeGroupLayout(zones: Zone[]): {
+  combinedW: number
+  offsets: Record<string, { x: number; w: number }>
+} {
+  if (zones.length === 1) {
+    return { combinedW: ZONE_W, offsets: { [zones[0].id]: { x: 0, w: ZONE_W } } }
+  }
+  const groupStart = zones[0].canvas_x_start
+  const groupEnd = zones[zones.length - 1].canvas_x_end
+  const groupSpan = groupEnd - groupStart
+  // Combined canvas width is proportional — ZONE_W per equal-sized zone
+  const combinedW = ZONE_W * zones.length
+  const offsets: Record<string, { x: number; w: number }> = {}
+  for (const zone of zones) {
+    const relStart = (zone.canvas_x_start - groupStart) / groupSpan
+    const relEnd = (zone.canvas_x_end - groupStart) / groupSpan
+    offsets[zone.id] = {
+      x: Math.round(relStart * combinedW),
+      w: Math.round((relEnd - relStart) * combinedW),
+    }
+  }
+  return { combinedW, offsets }
 }
 
-function centroid(path: { x: number; y: number }[]): { x: number; y: number } {
+function toFlatOffset(path: { x: number; y: number }[], offsetX: number, zoneW: number): number[] {
+  return path.flatMap(p => [p.x * zoneW + offsetX, p.y * ZONE_H])
+}
+
+function centroidOffset(path: { x: number; y: number }[], offsetX: number, zoneW: number) {
   const sum = path.reduce((a, p) => ({ x: a.x + p.x, y: a.y + p.y }), { x: 0, y: 0 })
-  return { x: (sum.x / path.length) * ZONE_W, y: (sum.y / path.length) * ZONE_H }
+  return {
+    x: (sum.x / path.length) * zoneW + offsetX,
+    y: (sum.y / path.length) * ZONE_H,
+  }
 }
 
 interface Props {
-  zone: Zone
+  zones: Zone[]
   routes: Route[]
   paintMode: boolean
   drawColor: string
-  previewBlob: { path: { x: number; y: number }[]; color: string } | null
+  previewBlob: { path: { x: number; y: number }[]; color: string; zone?: Zone } | null
   isStaff: boolean
-  onBlobComplete: (points: { x: number; y: number }[]) => void
+  onBlobComplete: (points: { x: number; y: number }[], zone: Zone) => void
   onRouteClick: (route: Route) => void
 }
 
-export default function ZoneCanvas({ zone, routes, paintMode, drawColor, previewBlob, isStaff, onBlobComplete, onRouteClick }: Props) {
+export default function ZoneCanvas({ zones, routes, paintMode, drawColor, previewBlob, isStaff, onBlobComplete, onRouteClick }: Props) {
   const containerRef = useRef<HTMLDivElement>(null)
   const stageRef = useRef<Konva.Stage>(null)
   const scaleRef = useRef(1)
@@ -48,17 +77,34 @@ export default function ZoneCanvas({ zone, routes, paintMode, drawColor, preview
   const [scale, setScale] = useState(1)
   const [pos, setPos] = useState({ x: 0, y: 0 })
 
-  // Zone image
-  const [zoneImage, setZoneImage] = useState<HTMLImageElement | null>(null)
+  // Always-current refs to avoid stale closures in stable callbacks
+  const zonesRef = useRef(zones)
+  zonesRef.current = zones
+  const onBlobCompleteRef = useRef(onBlobComplete)
+  onBlobCompleteRef.current = onBlobComplete
+
+  // Group layout (combined canvas dimensions)
+  const zonesKey = zones.map(z => z.id).join(',')
+  const { combinedW, offsets } = useMemo(() => computeGroupLayout(zones), [zonesKey]) // eslint-disable-line react-hooks/exhaustive-deps
+  const offsetsRef = useRef(offsets)
+  offsetsRef.current = offsets
+  const combinedWRef = useRef(combinedW)
+  combinedWRef.current = combinedW
+
+  // Zone images keyed by zone.id
+  const [zoneImages, setZoneImages] = useState<Record<string, HTMLImageElement>>({})
   useEffect(() => {
-    if (!zone.image_url) { setZoneImage(null); return }
-    const img = new window.Image()
-    img.crossOrigin = 'anonymous'
-    img.onload = () => setZoneImage(img)
-    img.src = zone.image_url
-  }, [zone.image_url])
+    zones.forEach(zone => {
+      if (!zone.image_url) return
+      const img = new window.Image()
+      img.crossOrigin = 'anonymous'
+      img.onload = () => setZoneImages(prev => ({ ...prev, [zone.id]: img }))
+      img.src = zone.image_url
+    })
+  }, [zonesKey]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Drawing state
+  const drawPointsRef = useRef<number[]>([])
   const [drawPoints, setDrawPoints] = useState<number[]>([])
   const isDrawing = useRef(false)
   const lastDrawPoint = useRef({ x: 0, y: 0 })
@@ -74,7 +120,9 @@ export default function ZoneCanvas({ zone, routes, paintMode, drawColor, preview
     const ro = new ResizeObserver(() => {
       const w = el.offsetWidth
       const h = el.offsetHeight
-      const initScale = w / ZONE_W
+      if (w === 0 || h === 0) return
+      const cw = combinedWRef.current
+      const initScale = w / cw
       scaleRef.current = initScale
       setSize({ w, h })
       setScale(initScale)
@@ -82,7 +130,20 @@ export default function ZoneCanvas({ zone, routes, paintMode, drawColor, preview
     })
     ro.observe(el)
     return () => ro.disconnect()
-  }, [])
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Reset view when zones group changes
+  useEffect(() => {
+    const el = containerRef.current
+    if (!el) return
+    const w = el.offsetWidth
+    const h = el.offsetHeight
+    if (w === 0 || h === 0) return
+    const initScale = w / combinedW
+    scaleRef.current = initScale
+    setScale(initScale)
+    setPos({ x: 0, y: Math.max(0, (h - ZONE_H * initScale) / 2) })
+  }, [zonesKey, combinedW])
 
   // Zoom via scroll wheel
   const handleWheel = useCallback((e: KonvaEventObject<WheelEvent>) => {
@@ -98,12 +159,11 @@ export default function ZoneCanvas({ zone, routes, paintMode, drawColor, preview
     const factor = e.evt.deltaY < 0 ? 1.12 : 0.9
     const newScale = Math.max(MIN_SCALE, Math.min(MAX_SCALE, oldScale * factor))
     scaleRef.current = newScale
-    const newPos = {
+    setScale(newScale)
+    setPos({
       x: pointer.x - mousePointTo.x * newScale,
       y: pointer.y - mousePointTo.y * newScale,
-    }
-    setScale(newScale)
-    setPos(newPos)
+    })
   }, [])
 
   const handleDragEnd = useCallback((e: KonvaEventObject<DragEvent>) => {
@@ -124,8 +184,44 @@ export default function ZoneCanvas({ zone, routes, paintMode, drawColor, preview
       if (Math.sqrt(dx * dx + dy * dy) < MIN_POINT_GAP) return
     }
     lastDrawPoint.current = wp
+    drawPointsRef.current.push(wp.x, wp.y)
     setDrawPoints(prev => [...prev, wp.x, wp.y])
   }, [screenToWorld])
+
+  function finishDrawing() {
+    const pts = drawPointsRef.current
+    drawPointsRef.current = []
+    setDrawPoints([])
+
+    if (pts.length < 4) return
+
+    // Detect which zone the stroke started in
+    const firstWorldX = pts[0]
+    const currentZones = zonesRef.current
+    const currentOffsets = offsetsRef.current
+
+    let drawZone = currentZones[0]
+    let layout = { x: 0, w: ZONE_W }
+
+    for (const zone of currentZones) {
+      const zl = currentOffsets[zone.id]
+      if (zl && firstWorldX >= zl.x && firstWorldX < zl.x + zl.w) {
+        drawZone = zone
+        layout = zl
+        break
+      }
+    }
+
+    const normalized: { x: number; y: number }[] = []
+    for (let i = 0; i < pts.length; i += 2) {
+      normalized.push({
+        x: Math.max(0, Math.min(1, (pts[i] - layout.x) / layout.w)),
+        y: Math.max(0, Math.min(1, pts[i + 1] / ZONE_H)),
+      })
+    }
+
+    onBlobCompleteRef.current(normalized, drawZone)
+  }
 
   const handleMouseDown = useCallback((_e: KonvaEventObject<MouseEvent>) => {
     if (!paintMode) return
@@ -168,8 +264,7 @@ export default function ZoneCanvas({ zone, routes, paintMode, drawColor, preview
     if (e.evt.touches.length === 2) {
       const d = dist2(e.evt.touches[0], e.evt.touches[1])
       if (lastPinchDist.current) {
-        const oldScale = scaleRef.current
-        const newScale = Math.max(MIN_SCALE, Math.min(MAX_SCALE, oldScale * (d / lastPinchDist.current)))
+        const newScale = Math.max(MIN_SCALE, Math.min(MAX_SCALE, scaleRef.current * (d / lastPinchDist.current)))
         scaleRef.current = newScale
         setScale(newScale)
       }
@@ -183,28 +278,14 @@ export default function ZoneCanvas({ zone, routes, paintMode, drawColor, preview
     }
   }, [paintMode, addDrawPoint])
 
-  const handleTouchEnd = useCallback((e: KonvaEventObject<TouchEvent>) => {
-    if (e.evt.touches.length < 2) {
-      isPinching.current = false
-      lastPinchDist.current = 0
-    }
+  const handleTouchEnd = useCallback((_e: KonvaEventObject<TouchEvent>) => {
+    isPinching.current = false
+    lastPinchDist.current = 0
     if (paintMode && isDrawing.current) {
       isDrawing.current = false
       finishDrawing()
     }
   }, [paintMode]) // eslint-disable-line react-hooks/exhaustive-deps
-
-  function finishDrawing() {
-    setDrawPoints(prev => {
-      if (prev.length < 4) return []
-      const normalized: { x: number; y: number }[] = []
-      for (let i = 0; i < prev.length; i += 2) {
-        normalized.push({ x: prev[i] / ZONE_W, y: prev[i + 1] / ZONE_H })
-      }
-      onBlobComplete(normalized)
-      return []
-    })
-  }
 
   return (
     <div ref={containerRef} className="w-full h-full overflow-hidden touch-none select-none">
@@ -226,28 +307,58 @@ export default function ZoneCanvas({ zone, routes, paintMode, drawColor, preview
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
       >
-        {/* Layer 1: Zone background */}
+        {/* Layer 1: Zone backgrounds */}
         <Layer listening={false}>
-          {zoneImage ? (
-            <KonvaImage x={0} y={0} width={ZONE_W} height={ZONE_H} image={zoneImage} />
-          ) : (
-            <>
-              <Rect x={0} y={0} width={ZONE_W} height={ZONE_H} fill={ZONE_COLORS[zone.order_index % ZONE_COLORS.length]} />
-              <Text x={24} y={24} text={zone.name} fontSize={22} fill="rgba(255,255,255,0.2)" fontFamily="sans-serif" />
-            </>
-          )}
+          {zones.map(zone => {
+            const layout = offsets[zone.id] ?? { x: 0, w: ZONE_W }
+            const img = zoneImages[zone.id]
+            if (img) {
+              return (
+                <KonvaImage
+                  key={zone.id}
+                  x={layout.x}
+                  y={0}
+                  width={layout.w}
+                  height={ZONE_H}
+                  image={img}
+                />
+              )
+            }
+            return (
+              <Group key={zone.id}>
+                <Rect
+                  x={layout.x}
+                  y={0}
+                  width={layout.w}
+                  height={ZONE_H}
+                  fill={ZONE_COLORS[zone.order_index % ZONE_COLORS.length]}
+                />
+                <Text
+                  x={layout.x + 24}
+                  y={24}
+                  text={zone.name}
+                  fontSize={22}
+                  fill="rgba(255,255,255,0.2)"
+                  fontFamily="sans-serif"
+                />
+              </Group>
+            )
+          })}
         </Layer>
 
         {/* Layer 2: Route blobs */}
         <Layer>
           {routes.map(route => {
             if (!route.blob_path || route.blob_path.length < 2) return null
-            const flat = toFlat(route.blob_path)
+            const layout = offsets[route.zone_id]
+            if (!layout) return null
+
+            const flat = toFlatOffset(route.blob_path, layout.x, layout.w)
             const colorHex = getColorHex(route.color)
             const level = getFreshnessLevel(route.placed_at)
             const freshnessHex = getFreshnessColor(level)
             const days = getDaysOnWall(route.placed_at)
-            const c = centroid(route.blob_path)
+            const c = centroidOffset(route.blob_path, layout.x, layout.w)
 
             return (
               <Group key={route.id} onClick={() => onRouteClick(route)} onTap={() => onRouteClick(route)}>
@@ -274,18 +385,22 @@ export default function ZoneCanvas({ zone, routes, paintMode, drawColor, preview
 
         {/* Layer 3: Preview blob + active draw */}
         <Layer listening={false}>
-          {previewBlob && previewBlob.path.length >= 2 && (
-            <Line
-              points={toFlat(previewBlob.path)}
-              stroke={getColorHex(previewBlob.color)}
-              strokeWidth={STROKE_W}
-              tension={0.5}
-              lineCap="round"
-              lineJoin="round"
-              opacity={0.75}
-              dash={[20, 8]}
-            />
-          )}
+          {previewBlob && previewBlob.path.length >= 2 && (() => {
+            const previewZone = previewBlob.zone
+            const layout = previewZone ? (offsets[previewZone.id] ?? { x: 0, w: ZONE_W }) : { x: 0, w: ZONE_W }
+            return (
+              <Line
+                points={toFlatOffset(previewBlob.path, layout.x, layout.w)}
+                stroke={getColorHex(previewBlob.color)}
+                strokeWidth={STROKE_W}
+                tension={0.5}
+                lineCap="round"
+                lineJoin="round"
+                opacity={0.75}
+                dash={[20, 8]}
+              />
+            )
+          })()}
           {paintMode && drawPoints.length >= 4 && (
             <Line
               points={drawPoints}

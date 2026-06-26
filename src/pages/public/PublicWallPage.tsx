@@ -5,6 +5,7 @@ import ZoneCanvas from '../../components/ZoneCanvas'
 import { useZones } from '../../hooks/useZones'
 import { useRoutes } from '../../hooks/useRoutes'
 import { useQrByRoute } from '../../hooks/useQrByRoute'
+import { getZoneGroup } from '../../lib/zoneGroups'
 import type { Route, Zone } from '../../types'
 
 export default function PublicWallPage() {
@@ -15,11 +16,8 @@ export default function PublicWallPage() {
 
   const [selectedZone, setSelectedZone] = useState<Zone | null>(null)
 
-  // Default to first zone when zones load
   useEffect(() => {
-    if (zones.length > 0 && !selectedZone) {
-      setSelectedZone(zones[0])
-    }
+    if (zones.length > 0 && !selectedZone) setSelectedZone(zones[0])
   }, [zones, selectedZone])
 
   function handleRouteClick(route: Route) {
@@ -27,12 +25,13 @@ export default function PublicWallPage() {
     if (qrId) navigate(`/q/${qrId}`)
   }
 
-  const zoneRoutes = selectedZone ? routes.filter(r => r.zone_id === selectedZone.id) : []
+  const zoneGroup = selectedZone ? getZoneGroup(selectedZone, zones) : []
+  const groupRoutes = routes.filter(r => zoneGroup.some(z => z.id === r.zone_id))
+  const groupIds = zoneGroup.map(z => z.id)
 
   return (
     <div className="relative w-full h-screen bg-zinc-950 flex flex-col">
-      {/* Header */}
-      <header className="shrink-0 flex items-center justify-between px-4 h-13 bg-zinc-950/95 backdrop-blur-sm border-b border-zinc-800/40 z-10">
+      <header className="shrink-0 flex items-center justify-between px-4 h-12 bg-zinc-950/95 backdrop-blur-sm border-b border-zinc-800/40 z-10">
         <div className="flex items-center gap-2">
           <div className="w-7 h-7 bg-yellow-400 rounded-lg flex items-center justify-center">
             <span className="text-sm leading-none">⚡</span>
@@ -45,8 +44,7 @@ export default function PublicWallPage() {
         </div>
       </header>
 
-      {/* Canvas area */}
-      <div className="relative flex-1 overflow-hidden">
+      <div className="relative flex-1 overflow-hidden min-h-0">
         {!selectedZone ? (
           <div className="w-full h-full flex items-center justify-center">
             <div className="w-6 h-6 rounded-full border-2 border-yellow-400 border-t-transparent animate-spin" />
@@ -54,8 +52,8 @@ export default function PublicWallPage() {
         ) : (
           <>
             <ZoneCanvas
-              zone={selectedZone}
-              routes={zoneRoutes}
+              zones={zoneGroup}
+              routes={groupRoutes}
               paintMode={false}
               drawColor="amarillo"
               previewBlob={null}
@@ -64,22 +62,22 @@ export default function PublicWallPage() {
               onRouteClick={handleRouteClick}
             />
 
-            {/* Minimap overlay (top-right) */}
             <ZoneMap
               zones={zones}
               routes={routes}
               onZoneSelect={zone => setSelectedZone(zone)}
               mini={true}
-              selectedZoneId={selectedZone.id}
+              selectedZoneIds={groupIds}
             />
 
-            {/* Zone name (top-left) */}
             <div className="absolute top-3 left-3 z-30 flex items-center gap-2 bg-zinc-900/95 backdrop-blur-sm border border-zinc-700/60 rounded-xl px-3.5 py-2.5 pointer-events-none">
-              <span className="text-white text-sm font-semibold truncate max-w-32">{selectedZone.name}</span>
-              <span className="text-zinc-500 text-xs font-medium">{zoneRoutes.length} rutas</span>
+              <span className="text-white text-sm font-semibold truncate max-w-36">
+                {zoneGroup.length > 1 ? zoneGroup[0].name.replace(/ Izq$| Izquierdo$/, '') : selectedZone.name}
+              </span>
+              <span className="text-zinc-500 text-xs font-medium">{groupRoutes.length} rutas</span>
             </div>
 
-            {zoneRoutes.length === 0 && (
+            {groupRoutes.length === 0 && (
               <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                 <p className="text-zinc-600 text-sm font-medium">No hay rutas en esta zona todavía</p>
               </div>

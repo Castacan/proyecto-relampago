@@ -8,7 +8,7 @@ interface Props {
   onZoneSelect: (zone: Zone) => void
   assignQrHint?: boolean
   mini?: boolean
-  selectedZoneId?: string
+  selectedZoneIds?: string[]
 }
 
 function getZoneFreshnessColor(zone: Zone, routes: Route[]): string {
@@ -35,7 +35,8 @@ const ZONE_POLYS: Record<string, PolyDef> = {
 }
 
 // ── Mini overlay (siempre visible en esquina) ──────────────────────────────
-function ZoneMapMini({ zones, routes, onZoneSelect, selectedZoneId }: Props) {
+function ZoneMapMini({ zones, routes, onZoneSelect, selectedZoneIds }: Props) {
+  const selected = new Set(selectedZoneIds ?? [])
   return (
     <div className="absolute top-3 right-3 z-30 bg-zinc-950/95 backdrop-blur-sm rounded-2xl border border-zinc-800/60 shadow-2xl p-2.5">
       <p className="text-zinc-600 text-[8px] font-bold uppercase tracking-widest mb-1.5 px-0.5 select-none">Mapa</p>
@@ -55,7 +56,7 @@ function ZoneMapMini({ zones, routes, onZoneSelect, selectedZoneId }: Props) {
           const poly = ZONE_POLYS[zone.slug]
           if (!poly) return null
           const color = getZoneFreshnessColor(zone, routes)
-          const isSelected = zone.id === selectedZoneId
+          const isSelected = selected.has(zone.id)
           const count = routes.filter(r => r.zone_id === zone.id).length
 
           return (
@@ -71,7 +72,6 @@ function ZoneMapMini({ zones, routes, onZoneSelect, selectedZoneId }: Props) {
                 stroke={isSelected ? '#ffffff' : color}
                 strokeWidth={isSelected ? 2.5 : 0.5}
               />
-              {/* Route count dot (small) */}
               {count > 0 && (
                 <circle
                   cx={poly.badgeX}
@@ -90,11 +90,11 @@ function ZoneMapMini({ zones, routes, onZoneSelect, selectedZoneId }: Props) {
 }
 
 // ── Full screen (selector inicial) ────────────────────────────────────────
-export default function ZoneMap({ zones, routes, onZoneSelect, assignQrHint, mini, selectedZoneId }: Props) {
+export default function ZoneMap({ zones, routes, onZoneSelect, assignQrHint, mini, selectedZoneIds }: Props) {
   const [hovered, setHovered] = useState<string | null>(null)
 
   if (mini) {
-    return <ZoneMapMini zones={zones} routes={routes} onZoneSelect={onZoneSelect} selectedZoneId={selectedZoneId} />
+    return <ZoneMapMini zones={zones} routes={routes} onZoneSelect={onZoneSelect} selectedZoneIds={selectedZoneIds} />
   }
 
   return (

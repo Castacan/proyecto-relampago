@@ -6,6 +6,7 @@ import RouteForm from '../../components/RouteForm'
 import RouteDetail from '../../components/RouteDetail'
 import { useZones } from '../../hooks/useZones'
 import { useRoutes } from '../../hooks/useRoutes'
+import { getZoneGroup } from '../../lib/zoneGroups'
 import { ROUTE_COLORS, getColorHex } from '../../lib/colors'
 import type { Route, Zone } from '../../types'
 
@@ -22,13 +23,12 @@ export default function WallPage() {
   const [ui, setUi] = useState<UIState>('idle')
   const [paintColor, setPaintColor] = useState('amarillo')
   const [newBlobPath, setNewBlobPath] = useState<{ x: number; y: number }[] | null>(null)
+  const [drawingZone, setDrawingZone] = useState<Zone | null>(null)
   const [selectedRoute, setSelectedRoute] = useState<Route | null>(null)
 
   // Default to first zone when zones load
   useEffect(() => {
-    if (zones.length > 0 && !selectedZone) {
-      setSelectedZone(zones[0])
-    }
+    if (zones.length > 0 && !selectedZone) setSelectedZone(zones[0])
   }, [zones, selectedZone])
 
   function handleZoneSelect(zone: Zone) {
@@ -36,18 +36,23 @@ export default function WallPage() {
     cancelAll()
   }
 
-  function handleBlobComplete(path: { x: number; y: number }[]) {
+  function handleBlobComplete(path: { x: number; y: number }[], zone: Zone) {
     setNewBlobPath(path)
+    setDrawingZone(zone)
     setUi('form')
   }
 
   function cancelAll() {
     setUi('idle')
     setNewBlobPath(null)
+    setDrawingZone(null)
     setPaintColor('amarillo')
   }
 
-  const zoneRoutes = selectedZone ? routes.filter(r => r.zone_id === selectedZone.id) : []
+  // Compute the zone group for the selected zone
+  const zoneGroup = selectedZone ? getZoneGroup(selectedZone, zones) : []
+  const groupRoutes = routes.filter(r => zoneGroup.some(z => z.id === r.zone_id))
+  const groupIds = zoneGroup.map(z => z.id)
 
   if (!selectedZone) return (
     <div className="w-full h-full flex items-center justify-center bg-zinc-950">
@@ -59,11 +64,15 @@ export default function WallPage() {
     <div className="relative w-full h-full">
       {/* ── Main: Zone Canvas ── */}
       <ZoneCanvas
-        zone={selectedZone}
-        routes={zoneRoutes}
+        zones={zoneGroup}
+        routes={groupRoutes}
         paintMode={ui === 'drawing'}
         drawColor={paintColor}
-        previewBlob={ui === 'form' && newBlobPath ? { path: newBlobPath, color: paintColor } : null}
+        previewBlob={
+          ui === 'form' && newBlobPath && drawingZone
+            ? { path: newBlobPath, color: paintColor, zone: drawingZone }
+            : null
+        }
         isStaff={true}
         onBlobComplete={handleBlobComplete}
         onRouteClick={route => { if (ui === 'idle') setSelectedRoute(route) }}
@@ -75,13 +84,15 @@ export default function WallPage() {
         routes={routes}
         onZoneSelect={handleZoneSelect}
         mini={true}
-        selectedZoneId={selectedZone.id}
+        selectedZoneIds={groupIds}
       />
 
       {/* Zone name (top-left) */}
       <div className="absolute top-3 left-3 z-30 flex items-center gap-2 bg-zinc-900/95 backdrop-blur-sm border border-zinc-700/60 rounded-xl px-3.5 py-2.5 pointer-events-none">
-        <span className="text-white text-sm font-semibold truncate max-w-32">{selectedZone.name}</span>
-        <span className="text-zinc-500 text-xs font-medium">{zoneRoutes.length} rutas</span>
+        <span className="text-white text-sm font-semibold truncate max-w-36">
+          {zoneGroup.length > 1 ? zoneGroup[0].name.replace(/ Izq$| Izquierdo$/, '') : selectedZone.name}
+        </span>
+        <span className="text-zinc-500 text-xs font-medium">{groupRoutes.length} rutas</span>
       </div>
 
       {/* QR assignment banner */}
@@ -136,9 +147,7 @@ export default function WallPage() {
                 <button key={c.key} onClick={() => setPaintColor(c.key)} className="flex flex-col items-center gap-2 group cursor-pointer">
                   <div
                     className={`w-13 h-13 rounded-full transition-all duration-150 ${
-                      paintColor === c.key
-                        ? 'ring-4 ring-white scale-110 shadow-lg'
-                        : 'ring-0 group-hover:ring-2 group-hover:ring-white/40 group-hover:scale-105'
+                      paintColor === c.key ? 'ring-4 ring-white scale-110 shadow-lg' : 'ring-0 group-hover:ring-2 group-hover:ring-white/40 group-hover:scale-105'
                     }`}
                     style={{ backgroundColor: c.hex }}
                   />
@@ -163,7 +172,7 @@ export default function WallPage() {
           blobPath={newBlobPath}
           zones={zones}
           initialColor={paintColor}
-          initialZoneId={selectedZone.id}
+          initialZoneId={drawingZone?.id ?? selectedZone.id}
           assignQrId={assignQrId}
           onSave={() => { cancelAll(); refetch() }}
           onCancel={cancelAll}
