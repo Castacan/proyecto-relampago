@@ -25,14 +25,16 @@ export default function PublicWallPage() {
 
   return (
     <div className="relative w-full h-screen bg-zinc-950 flex flex-col">
-      <header className="shrink-0 flex items-center justify-between px-4 h-12 bg-zinc-950/95 backdrop-blur-sm border-b border-zinc-800/40 z-10">
-        <div className="flex items-center gap-1.5">
-          <span className="text-yellow-400">⚡</span>
-          <span className="text-white font-bold text-sm tracking-wide">Relámpago</span>
+      <header className="shrink-0 flex items-center justify-between px-4 h-13 bg-zinc-950/95 backdrop-blur-sm border-b border-zinc-800/40 z-10">
+        <div className="flex items-center gap-2">
+          <div className="w-7 h-7 bg-yellow-400 rounded-lg flex items-center justify-center">
+            <span className="text-sm leading-none">⚡</span>
+          </div>
+          <span className="text-white font-bold text-sm tracking-tight">Relámpago</span>
         </div>
-        <div className="flex items-center gap-1.5 bg-zinc-900 rounded-full px-3 py-1">
+        <div className="flex items-center gap-2 bg-zinc-900 rounded-full px-3.5 py-1.5 border border-zinc-800/60">
           <div className="w-1.5 h-1.5 rounded-full bg-green-400" />
-          <span className="text-zinc-300 text-xs">{routes.length} rutas</span>
+          <span className="text-zinc-300 text-xs font-semibold">{routes.length} rutas</span>
         </div>
       </header>
 
@@ -57,7 +59,7 @@ export default function PublicWallPage() {
             />
             <button
               onClick={() => { setView('map'); setSelectedZone(null) }}
-              className="absolute top-3 left-3 z-30 flex items-center gap-1.5 bg-zinc-900/90 backdrop-blur-sm border border-zinc-700 rounded-xl px-3 py-2 text-white text-sm font-medium"
+              className="absolute top-3 left-3 z-30 flex items-center gap-2 bg-zinc-900/95 backdrop-blur-sm border border-zinc-700/60 rounded-xl px-3.5 py-2.5 text-white text-sm font-semibold hover:bg-zinc-800 hover:border-zinc-600 transition-all"
             >
               <span className="text-base leading-none">←</span>
               <span className="truncate max-w-32">{selectedZone.name}</span>
@@ -65,7 +67,7 @@ export default function PublicWallPage() {
 
             {zoneRoutes.length === 0 && (
               <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                <p className="text-zinc-600 text-sm">No hay rutas en esta zona todavía</p>
+                <p className="text-zinc-600 text-sm font-medium">No hay rutas en esta zona todavía</p>
               </div>
             )}
           </>

@@ -27,7 +27,6 @@ export default function VoteButtons({ routeId }: Props) {
 
   async function vote(value: 'up' | 'down') {
     if (loading) return
-    // Si ya votó lo mismo, quita el voto
     const newValue = myVote === value ? null : value
     setLoading(true)
     const deviceId = getDeviceId()
@@ -55,10 +54,10 @@ export default function VoteButtons({ routeId }: Props) {
       <button
         onClick={() => vote('up')}
         disabled={loading}
-        className={`flex-1 py-5 rounded-2xl text-3xl border transition-all active:scale-95 disabled:opacity-60 ${
+        className={`flex-1 py-5 rounded-2xl text-3xl border-2 transition-all active:scale-95 disabled:opacity-60 cursor-pointer ${
           myVote === 'up'
-            ? 'bg-green-500/20 border-green-500'
-            : 'bg-zinc-900 border-zinc-800 active:bg-zinc-800'
+            ? 'bg-green-500/20 border-green-500 shadow-lg shadow-green-500/10'
+            : 'bg-zinc-900 border-zinc-800 hover:bg-green-500/10 hover:border-green-500/40'
         }`}
       >
         👍
@@ -66,10 +65,10 @@ export default function VoteButtons({ routeId }: Props) {
       <button
         onClick={() => vote('down')}
         disabled={loading}
-        className={`flex-1 py-5 rounded-2xl text-3xl border transition-all active:scale-95 disabled:opacity-60 ${
+        className={`flex-1 py-5 rounded-2xl text-3xl border-2 transition-all active:scale-95 disabled:opacity-60 cursor-pointer ${
           myVote === 'down'
-            ? 'bg-red-500/20 border-red-500'
-            : 'bg-zinc-900 border-zinc-800 active:bg-zinc-800'
+            ? 'bg-red-500/20 border-red-500 shadow-lg shadow-red-500/10'
+            : 'bg-zinc-900 border-zinc-800 hover:bg-red-500/10 hover:border-red-500/40'
         }`}
       >
         👎
