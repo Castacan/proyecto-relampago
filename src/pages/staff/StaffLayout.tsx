@@ -5,9 +5,9 @@ export default function StaffLayout() {
   return (
     <div className="h-screen bg-zinc-950 flex flex-col overflow-hidden">
       {/* Top header */}
-      <header className="shrink-0 flex items-center justify-between px-4 h-13 border-b border-zinc-800/60 bg-zinc-950/95 backdrop-blur-sm">
+      <header className="shrink-0 flex items-center justify-between px-4 h-12 border-b border-zinc-800/60 bg-zinc-950/95 backdrop-blur-sm">
         <div className="flex items-center gap-2">
-          <div className="w-7 h-7 bg-yellow-400 rounded-lg flex items-center justify-center">
+          <div className="w-7 h-7 bg-yellow-400 rounded-lg flex items-center justify-center shrink-0">
             <span className="text-sm leading-none">⚡</span>
           </div>
           <span className="text-white font-bold text-sm tracking-tight">Relámpago</span>
@@ -15,58 +15,52 @@ export default function StaffLayout() {
         </div>
         <button
           onClick={signOut}
-          className="text-zinc-400 hover:text-white text-xs font-medium px-3 py-1.5 rounded-lg hover:bg-zinc-800 transition-all"
+          className="text-zinc-400 hover:text-white text-xs font-semibold px-3 py-1.5 rounded-lg bg-zinc-800/80 hover:bg-zinc-700 border border-zinc-700/50 transition-all"
         >
           Salir
         </button>
       </header>
 
       {/* Main content */}
-      <main className="flex-1 overflow-hidden pb-16">
+      <main className="flex-1 overflow-hidden min-h-0 pb-16">
         <Outlet />
       </main>
 
       {/* Bottom tab bar */}
-      <nav className="fixed bottom-0 left-0 right-0 h-16 bg-zinc-900/95 backdrop-blur-sm border-t border-zinc-800/60 flex z-40">
+      <nav className="fixed bottom-0 left-0 right-0 h-16 bg-zinc-900/95 backdrop-blur-sm border-t border-zinc-800/60 flex items-center justify-around px-6 z-40">
         <NavLink
           to="/staff"
           end
-          className={({ isActive }) =>
-            `flex-1 flex flex-col items-center justify-center gap-1 text-xs font-semibold transition-all relative ${
-              isActive ? 'text-yellow-400' : 'text-zinc-500 hover:text-zinc-300'
-            }`
-          }
+          className="flex-1 flex justify-center"
         >
           {({ isActive }) => (
-            <>
-              {isActive && (
-                <div className="absolute top-0 left-6 right-6 h-0.5 bg-yellow-400 rounded-full" />
-              )}
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={isActive ? 2.5 : 2} strokeLinecap="round" strokeLinejoin="round">
+            <div className={`flex items-center gap-2 px-5 py-2 rounded-2xl transition-all ${
+              isActive
+                ? 'bg-yellow-400 text-zinc-950 shadow-md shadow-yellow-400/20'
+                : 'bg-zinc-800/70 text-zinc-400 hover:bg-zinc-700 hover:text-zinc-200 border border-zinc-700/40'
+            }`}>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={isActive ? 2.5 : 2} strokeLinecap="round" strokeLinejoin="round">
                 <rect x="3" y="3" width="7" height="7" rx="1.5" />
                 <rect x="14" y="3" width="7" height="7" rx="1.5" />
                 <rect x="3" y="14" width="7" height="7" rx="1.5" />
                 <rect x="14" y="14" width="7" height="7" rx="1.5" />
               </svg>
-              <span>Muro</span>
-            </>
+              <span className="text-xs font-bold">Muro</span>
+            </div>
           )}
         </NavLink>
 
         <NavLink
           to="/staff/qr"
-          className={({ isActive }) =>
-            `flex-1 flex flex-col items-center justify-center gap-1 text-xs font-semibold transition-all relative ${
-              isActive ? 'text-yellow-400' : 'text-zinc-500 hover:text-zinc-300'
-            }`
-          }
+          className="flex-1 flex justify-center"
         >
           {({ isActive }) => (
-            <>
-              {isActive && (
-                <div className="absolute top-0 left-6 right-6 h-0.5 bg-yellow-400 rounded-full" />
-              )}
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={isActive ? 2.5 : 2} strokeLinecap="round" strokeLinejoin="round">
+            <div className={`flex items-center gap-2 px-5 py-2 rounded-2xl transition-all ${
+              isActive
+                ? 'bg-yellow-400 text-zinc-950 shadow-md shadow-yellow-400/20'
+                : 'bg-zinc-800/70 text-zinc-400 hover:bg-zinc-700 hover:text-zinc-200 border border-zinc-700/40'
+            }`}>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={isActive ? 2.5 : 2} strokeLinecap="round" strokeLinejoin="round">
                 <path d="M3 7V5a2 2 0 0 1 2-2h2" />
                 <path d="M17 3h2a2 2 0 0 1 2 2v2" />
                 <path d="M21 17v2a2 2 0 0 1-2 2h-2" />
@@ -76,8 +70,8 @@ export default function StaffLayout() {
                 <rect x="7" y="14" width="3" height="3" />
                 <path d="M14 14h3v3" />
               </svg>
-              <span>QRs</span>
-            </>
+              <span className="text-xs font-bold">QRs</span>
+            </div>
           )}
         </NavLink>
       </nav>

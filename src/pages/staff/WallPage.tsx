@@ -109,15 +109,15 @@ export default function WallPage() {
           {ui === 'idle' ? (
             <button
               onClick={() => setUi('color-pick')}
-              className="pointer-events-auto flex items-center gap-2 px-5 py-3 rounded-2xl font-bold text-sm shadow-xl shadow-yellow-400/25 bg-yellow-400 text-zinc-950 hover:bg-yellow-300 active:scale-95 transition-all"
+              className="pointer-events-auto flex items-center gap-2.5 px-6 py-3.5 rounded-2xl font-black text-base shadow-2xl shadow-yellow-400/30 bg-yellow-400 text-zinc-950 hover:bg-yellow-300 active:scale-95 transition-all border-2 border-yellow-300/40"
             >
-              <span className="text-lg leading-none">+</span>
+              <span className="text-xl leading-none font-black">+</span>
               Nueva ruta
             </button>
           ) : (
             <button
               onClick={cancelAll}
-              className="pointer-events-auto px-5 py-3 rounded-2xl font-semibold text-sm shadow-lg bg-zinc-800 text-zinc-300 border border-zinc-700 hover:bg-zinc-700 hover:text-white active:scale-95 transition-all"
+              className="pointer-events-auto px-6 py-3.5 rounded-2xl font-bold text-sm shadow-xl bg-zinc-800 text-zinc-300 border-2 border-zinc-700 hover:bg-zinc-700 hover:text-white active:scale-95 transition-all"
             >
               Cancelar
             </button>
