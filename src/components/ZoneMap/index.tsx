@@ -7,6 +7,8 @@ interface Props {
   routes: Route[]
   onZoneSelect: (zone: Zone) => void
   assignQrHint?: boolean
+  mini?: boolean
+  selectedZoneId?: string
 }
 
 function getZoneFreshnessColor(zone: Zone, routes: Route[]): string {
@@ -32,8 +34,68 @@ const ZONE_POLYS: Record<string, PolyDef> = {
   'desplome':               { points: '108,248 292,248 292,295 108,295',     label: 'Desplome',         labelX: 200, labelY: 274, badgeX: 260, badgeY: 261 },
 }
 
-export default function ZoneMap({ zones, routes, onZoneSelect, assignQrHint }: Props) {
+// ── Mini overlay (siempre visible en esquina) ──────────────────────────────
+function ZoneMapMini({ zones, routes, onZoneSelect, selectedZoneId }: Props) {
+  return (
+    <div className="absolute top-3 right-3 z-30 bg-zinc-950/95 backdrop-blur-sm rounded-2xl border border-zinc-800/60 shadow-2xl p-2.5">
+      <p className="text-zinc-600 text-[8px] font-bold uppercase tracking-widest mb-1.5 px-0.5 select-none">Mapa</p>
+      <svg
+        viewBox="0 0 400 320"
+        width="148"
+        style={{ display: 'block' }}
+        preserveAspectRatio="xMidYMid meet"
+      >
+        {/* Gym outline */}
+        <polygon points="30,15 368,15 320,300 80,300" fill="#18181b" stroke="#3f3f46" strokeWidth="1.5" />
+        {/* Tunnel background */}
+        <rect x="108" y="82" width="184" height="213" fill="#09090b" rx="2" />
+        <rect x="108" y="82" width="184" height="213" fill="none" stroke="#3f3f46" strokeWidth="1" rx="2" />
+
+        {zones.map(zone => {
+          const poly = ZONE_POLYS[zone.slug]
+          if (!poly) return null
+          const color = getZoneFreshnessColor(zone, routes)
+          const isSelected = zone.id === selectedZoneId
+          const count = routes.filter(r => r.zone_id === zone.id).length
+
+          return (
+            <g
+              key={zone.id}
+              onClick={() => onZoneSelect(zone)}
+              style={{ cursor: 'pointer' }}
+            >
+              <polygon
+                points={poly.points}
+                fill={color}
+                fillOpacity={isSelected ? 0.9 : 0.45}
+                stroke={isSelected ? '#ffffff' : color}
+                strokeWidth={isSelected ? 2.5 : 0.5}
+              />
+              {/* Route count dot (small) */}
+              {count > 0 && (
+                <circle
+                  cx={poly.badgeX}
+                  cy={poly.badgeY}
+                  r="5"
+                  fill={isSelected ? '#fff' : color}
+                  opacity={isSelected ? 1 : 0.7}
+                />
+              )}
+            </g>
+          )
+        })}
+      </svg>
+    </div>
+  )
+}
+
+// ── Full screen (selector inicial) ────────────────────────────────────────
+export default function ZoneMap({ zones, routes, onZoneSelect, assignQrHint, mini, selectedZoneId }: Props) {
   const [hovered, setHovered] = useState<string | null>(null)
+
+  if (mini) {
+    return <ZoneMapMini zones={zones} routes={routes} onZoneSelect={onZoneSelect} selectedZoneId={selectedZoneId} />
+  }
 
   return (
     <div className="w-full h-full flex flex-col bg-zinc-950">
@@ -88,7 +150,6 @@ export default function ZoneMap({ zones, routes, onZoneSelect, assignQrHint }: P
                   strokeWidth={isHovered ? 1.5 : 0.5}
                 />
 
-                {/* Zone label */}
                 {poly.label && labelLines.map((line, i) => (
                   <text
                     key={i}
@@ -105,7 +166,6 @@ export default function ZoneMap({ zones, routes, onZoneSelect, assignQrHint }: P
                   </text>
                 ))}
 
-                {/* Route count badge */}
                 {count > 0 && (
                   <g>
                     <circle cx={poly.badgeX} cy={poly.badgeY} r="8" fill={color} opacity="0.9" />
@@ -127,8 +187,7 @@ export default function ZoneMap({ zones, routes, onZoneSelect, assignQrHint }: P
             )
           })}
 
-          {/* Gym label */}
-          <text x="200" y="310" textAnchor="middle" fontSize="7" fill="#52525b" fontFamily="system-ui, sans-serif">
+          <text x="200" y="312" textAnchor="middle" fontSize="7" fill="#52525b" fontFamily="system-ui, sans-serif">
             Toca una zona para ver sus rutas
           </text>
         </svg>
