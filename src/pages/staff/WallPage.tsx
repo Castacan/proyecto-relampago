@@ -6,7 +6,7 @@ import RouteForm from '../../components/RouteForm'
 import RouteDetail from '../../components/RouteDetail'
 import { useZones } from '../../hooks/useZones'
 import { useRoutes } from '../../hooks/useRoutes'
-import { getZoneGroup } from '../../lib/zoneGroups'
+import { getZoneGroup, getGroupDisplayName } from '../../lib/zoneGroups'
 import { ROUTE_COLORS, getColorHex } from '../../lib/colors'
 import type { Route, Zone } from '../../types'
 
@@ -90,7 +90,7 @@ export default function WallPage() {
       {/* Zone name (top-left) */}
       <div className="absolute top-3 left-3 z-30 flex items-center gap-2 bg-zinc-900/95 backdrop-blur-sm border border-zinc-700/60 rounded-xl px-3.5 py-2.5 pointer-events-none">
         <span className="text-white text-sm font-semibold truncate max-w-36">
-          {zoneGroup.length > 1 ? zoneGroup[0].name.replace(/ Izq$| Izquierdo$/, '') : selectedZone.name}
+          {getGroupDisplayName(zoneGroup)}
         </span>
         <span className="text-zinc-500 text-xs font-medium">{groupRoutes.length} rutas</span>
       </div>

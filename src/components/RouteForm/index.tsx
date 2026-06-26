@@ -3,6 +3,7 @@ import { supabase } from '../../lib/supabase'
 import { useProfile } from '../../hooks/useProfile'
 import { ROUTE_COLORS, GRADES, getColorHex } from '../../lib/colors'
 import type { Zone } from '../../types'
+import { getZoneDisplayName } from '../../lib/zoneGroups'
 
 interface Props {
   blobPath: { x: number; y: number }[]
@@ -113,7 +114,7 @@ export default function RouteForm({ blobPath, zones, initialColor = 'amarillo', 
           onChange={e => setZoneId(e.target.value)}
           className="w-full bg-zinc-800 text-white rounded-xl px-4 py-3 text-sm mb-6 outline-none border border-zinc-700/50 hover:border-zinc-600 focus:border-yellow-400/60 focus:ring-2 focus:ring-yellow-400/20 transition-all cursor-pointer"
         >
-          {zones.map(z => <option key={z.id} value={z.id}>{z.name}</option>)}
+          {zones.map(z => <option key={z.id} value={z.id}>{getZoneDisplayName(z)}</option>)}
         </select>
 
         {/* Notes */}
@@ -133,7 +134,7 @@ export default function RouteForm({ blobPath, zones, initialColor = 'amarillo', 
           <span className="text-zinc-600">·</span>
           <span className="text-white font-black font-mono text-base">{grade}</span>
           <span className="text-zinc-600">·</span>
-          <span className="text-zinc-300 text-sm">{zones.find(z => z.id === zoneId)?.name}</span>
+          <span className="text-zinc-300 text-sm">{getZoneDisplayName(zones.find(z => z.id === zoneId) ?? zones[0])}</span>
         </div>
 
         {error && (
