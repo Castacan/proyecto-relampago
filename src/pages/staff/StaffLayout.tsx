@@ -27,40 +27,33 @@ export default function StaffLayout() {
       </main>
 
       {/* Bottom tab bar */}
-      <nav className="fixed bottom-0 left-0 right-0 h-16 bg-zinc-900/95 backdrop-blur-sm border-t border-zinc-800/60 flex items-center justify-around px-6 z-40">
-        <NavLink
-          to="/staff"
-          end
-          className="flex-1 flex justify-center"
-        >
+      <nav className="fixed bottom-0 left-0 right-0 h-16 bg-zinc-950 border-t border-zinc-800 flex items-center justify-around px-6 z-40">
+        <NavLink to="/staff" end className="flex-1 flex justify-center">
           {({ isActive }) => (
-            <div className={`flex items-center gap-2 px-5 py-2 rounded-2xl transition-all ${
+            <div className={`flex items-center gap-2 px-6 py-2.5 rounded-2xl transition-all text-sm font-bold ${
               isActive
-                ? 'bg-yellow-400 text-zinc-950 shadow-md shadow-yellow-400/20'
-                : 'bg-zinc-800/70 text-zinc-400 hover:bg-zinc-700 hover:text-zinc-200 border border-zinc-700/40'
+                ? 'bg-yellow-400 text-zinc-950 shadow-lg shadow-yellow-400/25'
+                : 'bg-zinc-800 text-zinc-300 hover:bg-zinc-700 hover:text-white border border-zinc-700'
             }`}>
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={isActive ? 2.5 : 2} strokeLinecap="round" strokeLinejoin="round">
+              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={isActive ? 2.5 : 2} strokeLinecap="round" strokeLinejoin="round">
                 <rect x="3" y="3" width="7" height="7" rx="1.5" />
                 <rect x="14" y="3" width="7" height="7" rx="1.5" />
                 <rect x="3" y="14" width="7" height="7" rx="1.5" />
                 <rect x="14" y="14" width="7" height="7" rx="1.5" />
               </svg>
-              <span className="text-xs font-bold">Muro</span>
+              <span>Muro</span>
             </div>
           )}
         </NavLink>
 
-        <NavLink
-          to="/staff/qr"
-          className="flex-1 flex justify-center"
-        >
+        <NavLink to="/staff/qr" className="flex-1 flex justify-center">
           {({ isActive }) => (
-            <div className={`flex items-center gap-2 px-5 py-2 rounded-2xl transition-all ${
+            <div className={`flex items-center gap-2 px-6 py-2.5 rounded-2xl transition-all text-sm font-bold ${
               isActive
-                ? 'bg-yellow-400 text-zinc-950 shadow-md shadow-yellow-400/20'
-                : 'bg-zinc-800/70 text-zinc-400 hover:bg-zinc-700 hover:text-zinc-200 border border-zinc-700/40'
+                ? 'bg-yellow-400 text-zinc-950 shadow-lg shadow-yellow-400/25'
+                : 'bg-zinc-800 text-zinc-300 hover:bg-zinc-700 hover:text-white border border-zinc-700'
             }`}>
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={isActive ? 2.5 : 2} strokeLinecap="round" strokeLinejoin="round">
+              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={isActive ? 2.5 : 2} strokeLinecap="round" strokeLinejoin="round">
                 <path d="M3 7V5a2 2 0 0 1 2-2h2" />
                 <path d="M17 3h2a2 2 0 0 1 2 2v2" />
                 <path d="M21 17v2a2 2 0 0 1-2 2h-2" />
@@ -70,7 +63,7 @@ export default function StaffLayout() {
                 <rect x="7" y="14" width="3" height="3" />
                 <path d="M14 14h3v3" />
               </svg>
-              <span className="text-xs font-bold">QRs</span>
+              <span>QRs</span>
             </div>
           )}
         </NavLink>

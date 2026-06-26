@@ -215,7 +215,7 @@ export default function ZoneCanvas({ zones, routes, paintMode, drawColor, previe
     const normalized: { x: number; y: number }[] = []
     for (let i = 0; i < pts.length; i += 2) {
       normalized.push({
-        x: Math.max(0, Math.min(1, (pts[i] - layout.x) / layout.w)),
+        x: (pts[i] - layout.x) / layout.w,  // no x-clamp: blob can span adjacent zones
         y: Math.max(0, Math.min(1, pts[i + 1] / ZONE_H)),
       })
     }
