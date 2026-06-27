@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import QRCode from 'react-qr-code'
 import { supabase } from '../../lib/supabase'
 import { getColorHex } from '../../lib/colors'
 
@@ -16,6 +17,7 @@ export default function QrInventoryPage() {
   const [qrs, setQrs] = useState<QrRow[]>([])
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState<'all' | 'available' | 'in_use'>('all')
+  const [selectedQr, setSelectedQr] = useState<QrRow | null>(null)
 
   useEffect(() => {
     supabase
@@ -31,6 +33,7 @@ export default function QrInventoryPage() {
   const filtered = qrs.filter(q => filter === 'all' || q.status === filter)
   const available = qrs.filter(q => q.status === 'available').length
   const inUse = qrs.filter(q => q.status === 'in_use').length
+  const qrUrl = selectedQr ? `${window.location.origin}/q/${selectedQr.id}` : ''
 
   return (
     <div className="h-full overflow-y-auto bg-zinc-950">
@@ -81,19 +84,20 @@ export default function QrInventoryPage() {
       ) : (
         <div className="grid grid-cols-2 gap-2.5 px-4 pb-6">
           {filtered.map(qr => (
-            <div
+            <button
               key={qr.id}
-              className={`p-4 rounded-2xl border transition-all ${
+              onClick={() => setSelectedQr(qr)}
+              className={`p-4 rounded-2xl border text-left transition-all active:scale-95 ${
                 qr.status === 'available'
-                  ? 'bg-zinc-900 border-zinc-800/80'
-                  : 'bg-zinc-900 border-zinc-700/60'
+                  ? 'bg-zinc-900 border-zinc-800/80 hover:border-zinc-700'
+                  : 'bg-zinc-900 border-zinc-700/60 hover:border-zinc-600'
               }`}
             >
               <div className="flex items-center gap-2 mb-2.5">
                 <div className={`w-2 h-2 rounded-full shrink-0 ${
                   qr.status === 'available' ? 'bg-green-400' : 'bg-yellow-400'
                 }`} />
-                <span className="text-zinc-300 text-xs font-bold font-mono">{qr.id}</span>
+                <span className="text-zinc-300 text-[10px] font-bold font-mono truncate">{qr.id.slice(0, 8)}</span>
               </div>
 
               {qr.status === 'available' ? (
@@ -112,8 +116,59 @@ export default function QrInventoryPage() {
               ) : (
                 <p className="text-zinc-600 text-xs font-medium">Ruta retirada</p>
               )}
-            </div>
+            </button>
           ))}
+        </div>
+      )}
+
+      {/* QR Detail sheet */}
+      {selectedQr && (
+        <div
+          className="fixed inset-0 z-50 flex items-end"
+          onClick={() => setSelectedQr(null)}
+        >
+          <div className="absolute inset-0 bg-black/60" />
+          <div
+            className="relative w-full bg-zinc-900 rounded-t-3xl p-6 flex flex-col items-center gap-5"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="w-10 h-1 bg-zinc-700 rounded-full mb-1" />
+
+            <div className="bg-white p-4 rounded-2xl">
+              <QRCode value={qrUrl} size={180} level="M" />
+            </div>
+
+            <div className="text-center">
+              <p className="text-zinc-400 text-[11px] font-mono break-all">{selectedQr.id}</p>
+              {selectedQr.routes && (
+                <div className="flex items-center justify-center gap-2 mt-2">
+                  <div
+                    className="w-4 h-4 rounded-full border border-white/10"
+                    style={{ backgroundColor: getColorHex(selectedQr.routes.color) }}
+                  />
+                  <span className="text-white text-sm font-black font-mono">{selectedQr.routes.grade}</span>
+                  <span className="text-zinc-500 text-xs">{selectedQr.routes.zones?.name}</span>
+                </div>
+              )}
+              {selectedQr.status === 'available' && (
+                <p className="text-green-400 text-xs font-medium mt-2">Disponible</p>
+              )}
+            </div>
+
+            <button
+              onClick={() => window.print()}
+              className="w-full bg-yellow-400 text-zinc-950 font-black text-sm py-3 rounded-2xl hover:bg-yellow-300 transition-all"
+            >
+              Imprimir
+            </button>
+
+            <button
+              onClick={() => setSelectedQr(null)}
+              className="w-full bg-zinc-800 text-zinc-300 font-bold text-sm py-3 rounded-2xl hover:bg-zinc-700 transition-all"
+            >
+              Cerrar
+            </button>
+          </div>
         </div>
       )}
     </div>
