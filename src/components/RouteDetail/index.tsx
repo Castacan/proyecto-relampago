@@ -4,6 +4,7 @@ import { getColorHex, ROUTE_COLORS, GRADES } from '../../lib/colors'
 import { getDaysOnWall, getFreshnessColor, getFreshnessLevel } from '../../lib/freshness'
 import { useProfile } from '../../hooks/useProfile'
 import type { Route, Zone } from '../../types'
+import QrScanner from '../QrScanner'
 
 interface Props {
   route: Route
@@ -34,12 +35,19 @@ export default function RouteDetail({ route, zones, onClose, onUpdate, onRetire 
   const [betas, setBetas] = useState<Beta[]>([])
   const [uploading, setUploading] = useState(false)
   const [showBeta, setShowBeta] = useState(false)
+  const [qrId, setQrId] = useState<string | null | undefined>(undefined)
+  const [showScanner, setShowScanner] = useState(false)
 
   const days = getDaysOnWall(route.placed_at)
   const level = getFreshnessLevel(route.placed_at)
   const freshnessHex = getFreshnessColor(level)
   const colorHex = getColorHex(route.color)
   const zone = zones.find(z => z.id === route.zone_id)
+
+  useEffect(() => {
+    supabase.from('qr_codes').select('id').eq('route_id', route.id).eq('status', 'in_use').maybeSingle()
+      .then(({ data }) => setQrId(data?.id ?? null))
+  }, [route.id])
 
   useEffect(() => {
     supabase.from('votes').select('value').eq('route_id', route.id).then(({ data }) => {
@@ -93,7 +101,20 @@ export default function RouteDetail({ route, zones, onClose, onUpdate, onRetire 
     if (fileInputRef.current) fileInputRef.current.value = ''
   }
 
+  function handleQrAssigned(id: string) {
+    setQrId(id)
+    setShowScanner(false)
+  }
+
   return (
+    <>
+    {showScanner && (
+      <QrScanner
+        routeId={route.id}
+        onAssigned={handleQrAssigned}
+        onClose={() => setShowScanner(false)}
+      />
+    )}
     <div className="fixed inset-0 bg-black/75 backdrop-blur-sm flex items-end z-50" onClick={onClose}>
       <div className="w-full bg-zinc-900 rounded-t-3xl p-6 max-h-[92vh] overflow-y-auto border-t border-zinc-800/80" onClick={e => e.stopPropagation()}>
 
@@ -215,6 +236,28 @@ export default function RouteDetail({ route, zones, onClose, onUpdate, onRetire 
               Colocada el {new Date(route.placed_at).toLocaleDateString('es-MX', { day: 'numeric', month: 'long', year: 'numeric' })}
             </p>
 
+            {/* QR status */}
+            {qrId === null && (
+              <button
+                onClick={() => setShowScanner(true)}
+                className="w-full flex items-center justify-center gap-2.5 py-3.5 rounded-2xl bg-zinc-800 border border-dashed border-zinc-600 text-zinc-300 hover:bg-zinc-700 hover:border-zinc-500 hover:text-white font-bold text-sm transition-all mb-3"
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M3 7V5a2 2 0 0 1 2-2h2"/><path d="M17 3h2a2 2 0 0 1 2 2v2"/>
+                  <path d="M21 17v2a2 2 0 0 1-2 2h-2"/><path d="M7 21H5a2 2 0 0 1-2-2v-2"/>
+                  <rect x="7" y="7" width="3" height="3"/><rect x="14" y="7" width="3" height="3"/>
+                  <rect x="7" y="14" width="3" height="3"/><path d="M14 14h3v3"/>
+                </svg>
+                Asignar QR
+              </button>
+            )}
+            {qrId && (
+              <div className="flex items-center gap-2 mb-3 px-3 py-2.5 bg-zinc-800/60 rounded-xl border border-zinc-700/40">
+                <div className="w-2 h-2 rounded-full bg-green-400 shrink-0" />
+                <span className="text-zinc-400 text-xs font-mono truncate">{qrId}</span>
+              </div>
+            )}
+
             <button
               onClick={handleRetire}
               disabled={retiring}
@@ -296,5 +339,6 @@ export default function RouteDetail({ route, zones, onClose, onUpdate, onRetire 
         )}
       </div>
     </div>
+    </>
   )
 }
