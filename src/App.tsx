@@ -4,6 +4,7 @@ import StaffLayout from './pages/staff/StaffLayout'
 import WallPage from './pages/staff/WallPage'
 import QrInventoryPage from './pages/staff/QrInventoryPage'
 import AdminPage from './pages/staff/AdminPage'
+import { ErrorBoundary } from './components/ErrorBoundary'
 import PublicWallPage from './pages/public/PublicWallPage'
 import PublicRoutePage from './pages/public/PublicRoutePage'
 import { useAuth } from './lib/auth'
@@ -32,7 +33,7 @@ export default function App() {
         >
           <Route index element={<WallPage />} />
           <Route path="qr" element={<QrInventoryPage />} />
-          <Route path="admin" element={<AdminPage />} />
+          <Route path="admin" element={<ErrorBoundary><AdminPage /></ErrorBoundary>} />
         </Route>
         <Route path="/" element={<Navigate to="/muro" replace />} />
       </Routes>
