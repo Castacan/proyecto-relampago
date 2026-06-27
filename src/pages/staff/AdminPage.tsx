@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { QRCodeSVG } from 'qrcode.react'
+import QRCode from 'react-qr-code'
 import { supabase } from '../../lib/supabase'
 
 interface GeneratedQr {
@@ -105,7 +105,7 @@ export default function AdminPage() {
               <div className="grid grid-cols-3 gap-3">
                 {generatedQrs.map(qr => (
                   <div key={qr.id} className="flex flex-col items-center gap-1.5 p-3 bg-white rounded-xl">
-                    <QRCodeSVG value={qr.url} size={76} level="M" />
+                    <QRCode value={qr.url} size={76} level="M" />
                     <span className="text-zinc-700 text-[9px] font-mono font-bold text-center break-all leading-tight">
                       {qr.id.slice(0, 8)}
                     </span>
