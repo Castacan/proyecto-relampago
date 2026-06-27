@@ -262,11 +262,22 @@ export default function ZoneCanvas({ zones, routes, paintMode, drawColor, previe
   const handleTouchMove = useCallback((e: KonvaEventObject<TouchEvent>) => {
     e.evt.preventDefault()
     if (e.evt.touches.length === 2) {
-      const d = dist2(e.evt.touches[0], e.evt.touches[1])
+      const t1 = e.evt.touches[0]
+      const t2 = e.evt.touches[1]
+      const d = dist2(t1, t2)
       if (lastPinchDist.current) {
-        const newScale = Math.max(MIN_SCALE, Math.min(MAX_SCALE, scaleRef.current * (d / lastPinchDist.current)))
+        const stage = stageRef.current!
+        const rect = stage.container().getBoundingClientRect()
+        const oldScale = scaleRef.current
+        const newScale = Math.max(MIN_SCALE, Math.min(MAX_SCALE, oldScale * (d / lastPinchDist.current)))
+        // Zoom toward pinch center, not canvas origin
+        const pinchX = (t1.clientX + t2.clientX) / 2 - rect.left
+        const pinchY = (t1.clientY + t2.clientY) / 2 - rect.top
+        const worldX = (pinchX - stage.x()) / oldScale
+        const worldY = (pinchY - stage.y()) / oldScale
         scaleRef.current = newScale
         setScale(newScale)
+        setPos({ x: pinchX - worldX * newScale, y: pinchY - worldY * newScale })
       }
       lastPinchDist.current = d
       return

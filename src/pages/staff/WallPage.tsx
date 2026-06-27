@@ -139,7 +139,7 @@ export default function WallPage() {
       {/* Color picker sheet */}
       {ui === 'color-pick' && (
         <div className="absolute inset-0 bg-black/75 backdrop-blur-sm flex items-end z-40" onClick={cancelAll}>
-          <div className="w-full bg-zinc-900 rounded-t-3xl p-6 border-t border-zinc-800/80" onClick={e => e.stopPropagation()}>
+          <div className="w-full bg-zinc-900 rounded-t-3xl px-6 pt-6 pb-24 border-t border-zinc-800/80" onClick={e => e.stopPropagation()}>
             <div className="w-10 h-1 bg-zinc-700 rounded-full mx-auto mb-5" />
             <h2 className="text-white font-bold text-lg tracking-tight mb-5">¿De qué color son las presas?</h2>
             <div className="grid grid-cols-5 gap-4 mb-6">
