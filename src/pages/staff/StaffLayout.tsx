@@ -1,7 +1,11 @@
 import { Outlet, NavLink } from 'react-router-dom'
 import { signOut } from '../../lib/auth'
+import { useProfile } from '../../hooks/useProfile'
 
 export default function StaffLayout() {
+  const { profile } = useProfile()
+  const isAdmin = profile?.role === 'admin'
+
   return (
     <div className="h-screen bg-zinc-950 flex flex-col overflow-hidden">
       {/* Top header */}
@@ -67,6 +71,26 @@ export default function StaffLayout() {
             </div>
           )}
         </NavLink>
+
+        {isAdmin && (
+          <NavLink to="/staff/admin" className="flex-1 flex justify-center">
+            {({ isActive }) => (
+              <div className={`flex items-center gap-2 px-6 py-2.5 rounded-2xl transition-all text-sm font-bold ${
+                isActive
+                  ? 'bg-yellow-400 text-zinc-950 shadow-lg shadow-yellow-400/25'
+                  : 'bg-zinc-800 text-zinc-300 hover:bg-zinc-700 hover:text-white border border-zinc-700'
+              }`}>
+                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={isActive ? 2.5 : 2} strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M12 2a5 5 0 1 1 0 10A5 5 0 0 1 12 2z" />
+                  <path d="M12 14c-5.33 0-8 2.67-8 4v2h16v-2c0-1.33-2.67-4-8-4z" />
+                  <circle cx="19" cy="8" r="1.5" />
+                  <path d="M19 6v1.5M19 9.5V11M17.2 7l1.3.75M20.8 9.25l1.3.75M17.2 9.25l1.3-.75M20.8 7l1.3-.75" />
+                </svg>
+                <span>Admin</span>
+              </div>
+            )}
+          </NavLink>
+        )}
       </nav>
     </div>
   )

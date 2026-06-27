@@ -26,5 +26,6 @@ export interface Route {
 export interface Profile {
   id: string
   name: string
+  role: 'staff' | 'admin'
   created_at: string
 }

@@ -2,9 +2,9 @@ export interface Database {
   public: {
     Tables: {
       profiles: {
-        Row: { id: string; name: string; created_at: string }
-        Insert: { id: string; name: string; created_at?: string }
-        Update: { name?: string }
+        Row: { id: string; name: string; role: 'staff' | 'admin'; created_at: string }
+        Insert: { id: string; name: string; role?: 'staff' | 'admin'; created_at?: string }
+        Update: { name?: string; role?: 'staff' | 'admin' }
         Relationships: []
       }
       zones: {
