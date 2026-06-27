@@ -37,12 +37,13 @@ export default function AdminPage() {
       .order('placed_at', { ascending: false })
 
     if (routes) {
+      type RouteRow = { id: string; color: string; grade: string; status: string; placed_at: string; retired_at: string | null; notes: string | null; zones: { name: string } | null }
       const header = 'ID,Color,Grado,Zona,Estado,Colocada,Retirada,Notas\n'
-      const rows = routes.map(r => [
+      const rows = (routes as unknown as RouteRow[]).map(r => [
         r.id,
         r.color,
         r.grade,
-        ((r as any).zones as { name: string } | null)?.name ?? '',
+        r.zones?.name ?? '',
         r.status,
         r.placed_at?.slice(0, 10) ?? '',
         r.retired_at?.slice(0, 10) ?? '',
