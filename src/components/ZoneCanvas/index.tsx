@@ -109,9 +109,11 @@ export default function ZoneCanvas({ zones, routes, paintMode, drawColor, previe
   const isDrawing = useRef(false)
   const lastDrawPoint = useRef({ x: 0, y: 0 })
 
-  // Touch pinch state
+  // Touch pinch + pan state
   const lastPinchDist = useRef(0)
   const isPinching = useRef(false)
+  const isPanning = useRef(false)
+  const lastPanPos = useRef({ x: 0, y: 0 })
 
   // Measure container
   useEffect(() => {
@@ -164,10 +166,6 @@ export default function ZoneCanvas({ zones, routes, paintMode, drawColor, previe
       x: pointer.x - mousePointTo.x * newScale,
       y: pointer.y - mousePointTo.y * newScale,
     })
-  }, [])
-
-  const handleDragEnd = useCallback((e: KonvaEventObject<DragEvent>) => {
-    setPos({ x: e.target.x(), y: e.target.y() })
   }, [])
 
   const screenToWorld = useCallback((sx: number, sy: number) => {
@@ -246,31 +244,39 @@ export default function ZoneCanvas({ zones, routes, paintMode, drawColor, previe
 
   const handleTouchStart = useCallback((e: KonvaEventObject<TouchEvent>) => {
     e.evt.preventDefault()
-    if (e.evt.touches.length === 2) {
+    const touches = e.evt.touches
+    if (touches.length === 2) {
       isPinching.current = true
-      lastPinchDist.current = dist2(e.evt.touches[0], e.evt.touches[1])
+      isPanning.current = false
+      isDrawing.current = false
+      lastPinchDist.current = dist2(touches[0], touches[1])
       return
     }
-    if (paintMode && e.evt.touches.length === 1) {
-      const t = e.evt.touches[0]
+    if (touches.length === 1) {
+      const t = touches[0]
       const rect = stageRef.current!.container().getBoundingClientRect()
-      isDrawing.current = true
-      addDrawPoint(t.clientX - rect.left, t.clientY - rect.top)
+      if (paintMode) {
+        isDrawing.current = true
+        addDrawPoint(t.clientX - rect.left, t.clientY - rect.top)
+      } else {
+        isPanning.current = true
+        lastPanPos.current = { x: t.clientX, y: t.clientY }
+      }
     }
   }, [paintMode, addDrawPoint])
 
   const handleTouchMove = useCallback((e: KonvaEventObject<TouchEvent>) => {
     e.evt.preventDefault()
-    if (e.evt.touches.length === 2) {
-      const t1 = e.evt.touches[0]
-      const t2 = e.evt.touches[1]
+    const touches = e.evt.touches
+    if (touches.length === 2) {
+      const t1 = touches[0]
+      const t2 = touches[1]
       const d = dist2(t1, t2)
       if (lastPinchDist.current) {
         const stage = stageRef.current!
         const rect = stage.container().getBoundingClientRect()
         const oldScale = scaleRef.current
         const newScale = Math.max(MIN_SCALE, Math.min(MAX_SCALE, oldScale * (d / lastPinchDist.current)))
-        // Zoom toward pinch center, not canvas origin
         const pinchX = (t1.clientX + t2.clientX) / 2 - rect.left
         const pinchY = (t1.clientY + t2.clientY) / 2 - rect.top
         const worldX = (pinchX - stage.x()) / oldScale
@@ -282,19 +288,31 @@ export default function ZoneCanvas({ zones, routes, paintMode, drawColor, previe
       lastPinchDist.current = d
       return
     }
-    if (paintMode && e.evt.touches.length === 1 && isDrawing.current && !isPinching.current) {
-      const t = e.evt.touches[0]
+    if (touches.length === 1 && !isPinching.current) {
+      const t = touches[0]
       const rect = stageRef.current!.container().getBoundingClientRect()
-      addDrawPoint(t.clientX - rect.left, t.clientY - rect.top)
+      if (paintMode && isDrawing.current) {
+        addDrawPoint(t.clientX - rect.left, t.clientY - rect.top)
+      } else if (!paintMode && isPanning.current) {
+        const dx = t.clientX - lastPanPos.current.x
+        const dy = t.clientY - lastPanPos.current.y
+        lastPanPos.current = { x: t.clientX, y: t.clientY }
+        setPos(prev => ({ x: prev.x + dx, y: prev.y + dy }))
+      }
     }
   }, [paintMode, addDrawPoint])
 
-  const handleTouchEnd = useCallback((_e: KonvaEventObject<TouchEvent>) => {
-    isPinching.current = false
-    lastPinchDist.current = 0
-    if (paintMode && isDrawing.current) {
-      isDrawing.current = false
-      finishDrawing()
+  const handleTouchEnd = useCallback((e: KonvaEventObject<TouchEvent>) => {
+    if (e.evt.touches.length < 2) {
+      isPinching.current = false
+      lastPinchDist.current = 0
+    }
+    if (e.evt.touches.length === 0) {
+      isPanning.current = false
+      if (paintMode && isDrawing.current) {
+        isDrawing.current = false
+        finishDrawing()
+      }
     }
   }, [paintMode]) // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -308,8 +326,7 @@ export default function ZoneCanvas({ zones, routes, paintMode, drawColor, previe
         scaleY={scale}
         x={pos.x}
         y={pos.y}
-        draggable={!paintMode}
-        onDragEnd={handleDragEnd}
+        draggable={false}
         onWheel={handleWheel}
         onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}
