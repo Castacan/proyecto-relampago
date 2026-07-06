@@ -72,6 +72,23 @@ export default function StaffLayout() {
           )}
         </NavLink>
 
+        <NavLink to="/staff/stats" className="flex-1 flex justify-center">
+          {({ isActive }) => (
+            <div className={`flex items-center gap-2 px-6 py-2.5 rounded-2xl transition-all text-sm font-bold ${
+              isActive
+                ? 'bg-yellow-400 text-zinc-950 shadow-lg shadow-yellow-400/25'
+                : 'bg-zinc-800 text-zinc-300 hover:bg-zinc-700 hover:text-white border border-zinc-700'
+            }`}>
+              <svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor">
+                <rect x="3" y="12" width="4" height="10" rx="1" />
+                <rect x="10" y="7" width="4" height="15" rx="1" />
+                <rect x="17" y="2" width="4" height="20" rx="1" />
+              </svg>
+              <span>Stats</span>
+            </div>
+          )}
+        </NavLink>
+
         {isAdmin && (
           <NavLink to="/staff/admin" className="flex-1 flex justify-center">
             {({ isActive }) => (
