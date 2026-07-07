@@ -27,13 +27,14 @@ export function computeChainLayout(
 
   const sorted = [...zones].sort((a, b) => a.chain_position - b.chain_position)
 
-  // Calcula virtualW de cada zona basado en el aspect ratio real de la imagen
+  // Calcula virtualW de cada zona basado en el aspect ratio real de la imagen y su render_scale
   const widths = sorted.map(z => {
     const img = images[z.id]
+    const scale = z.render_scale ?? 1
     if (img && img.naturalWidth > 0 && img.naturalHeight > 0) {
-      return CHAIN_H * (img.naturalWidth / img.naturalHeight)
+      return CHAIN_H * (img.naturalWidth / img.naturalHeight) * scale
     }
-    return CHAIN_H * DEFAULT_ASPECT
+    return CHAIN_H * DEFAULT_ASPECT * scale
   })
 
   // Calcula posición X de inicio de cada zona

@@ -10,6 +10,8 @@ export interface Zone {
   image_url: string | null
   chain_id: string | null
   chain_position: number
+  render_scale: number
+  render_y_offset: number
 }
 
 export interface Route {
