@@ -10,12 +10,13 @@ interface Props {
   zones: Zone[]
   initialColor?: string
   initialZoneId?: string
+  initialChainId?: string
   assignQrId?: string
   onSave: () => void
   onCancel: () => void
 }
 
-export default function RouteForm({ blobPath, zones, initialColor = 'amarillo', initialZoneId, assignQrId, onSave, onCancel }: Props) {
+export default function RouteForm({ blobPath, zones, initialColor = 'amarillo', initialZoneId, initialChainId, assignQrId, onSave, onCancel }: Props) {
   const { profile } = useProfile()
   const [color, setColor] = useState(initialColor)
   const [grade, setGrade] = useState('V4')
@@ -33,6 +34,7 @@ export default function RouteForm({ blobPath, zones, initialColor = 'amarillo', 
       grade,
       setter_id: profile.id,
       zone_id: zoneId,
+      chain_id: (initialChainId ?? null) as unknown as never,
       blob_path: blobPath,
       notes: notes.trim() || null,
     }).select('id').single()

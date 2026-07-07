@@ -1,12 +1,12 @@
 import { useState, useEffect } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import ZoneMap from '../../components/ZoneMap'
-import ZoneCanvas from '../../components/ZoneCanvas'
+import ChainCanvas from '../../components/ChainCanvas'
 import RouteForm from '../../components/RouteForm'
 import RouteDetail from '../../components/RouteDetail'
 import { useZones } from '../../hooks/useZones'
 import { useRoutes } from '../../hooks/useRoutes'
-import { getZoneGroup, getGroupDisplayName } from '../../lib/zoneGroups'
+import { useChain } from '../../hooks/useChain'
 import { ROUTE_COLORS, getColorHex } from '../../lib/colors'
 import type { Route, Zone } from '../../types'
 
@@ -16,83 +16,90 @@ export default function WallPage() {
   const [searchParams] = useSearchParams()
   const assignQrId = searchParams.get('qr') ?? undefined
 
-  const { zones } = useZones()
+  const { zones: allZones } = useZones()
   const { routes, refetch } = useRoutes()
 
-  const [selectedZone, setSelectedZone] = useState<Zone | null>(null)
+  // Encuentra la primera cadena disponible
+  const defaultChainId = allZones.find(z => z.chain_id)?.chain_id ?? null
+  const { zones: chainZones, anchors, loading: chainLoading } = useChain(defaultChainId)
+
+  const [activeZoneId, setActiveZoneId] = useState<string | null>(null)
+  const [selectedRoute, setSelectedRoute] = useState<Route | null>(null)
   const [ui, setUi] = useState<UIState>('idle')
   const [paintColor, setPaintColor] = useState('amarillo')
   const [newBlobPath, setNewBlobPath] = useState<{ x: number; y: number }[] | null>(null)
-  const [drawingZone, setDrawingZone] = useState<Zone | null>(null)
-  const [selectedRoute, setSelectedRoute] = useState<Route | null>(null)
+  const [newBlobZoneId, setNewBlobZoneId] = useState<string | null>(null)
+  const [newBlobChainId, setNewBlobChainId] = useState<string | null>(null)
 
-  // Default to first zone when zones load
   useEffect(() => {
-    if (zones.length > 0 && !selectedZone) setSelectedZone(zones[0])
-  }, [zones, selectedZone])
+    if (chainZones.length > 0 && !activeZoneId) {
+      setActiveZoneId(chainZones[0].id)
+    }
+  }, [chainZones, activeZoneId])
 
-  function handleZoneSelect(zone: Zone) {
-    setSelectedZone(zone)
-    cancelAll()
-  }
+  const activeZone: Zone | null = chainZones.find(z => z.id === activeZoneId) ?? null
 
-  function handleBlobComplete(path: { x: number; y: number }[], zone: Zone) {
+  function handleBlobComplete(path: { x: number; y: number }[], zoneId: string, chainId: string) {
     setNewBlobPath(path)
-    setDrawingZone(zone)
+    setNewBlobZoneId(zoneId)
+    setNewBlobChainId(chainId)
     setUi('form')
   }
 
   function cancelAll() {
     setUi('idle')
     setNewBlobPath(null)
-    setDrawingZone(null)
+    setNewBlobZoneId(null)
+    setNewBlobChainId(null)
     setPaintColor('amarillo')
   }
 
-  // Compute the zone group for the selected zone
-  const zoneGroup = selectedZone ? getZoneGroup(selectedZone, zones) : []
-  const groupRoutes = routes.filter(r => zoneGroup.some(z => z.id === r.zone_id))
-  const groupIds = zoneGroup.map(z => z.id)
-
-  if (!selectedZone) return (
+  if (chainLoading || allZones.length === 0) return (
     <div className="w-full h-full flex items-center justify-center bg-zinc-950">
       <div className="w-6 h-6 rounded-full border-2 border-yellow-400 border-t-transparent animate-spin" />
     </div>
   )
 
+  if (!defaultChainId || chainZones.length === 0) return (
+    <div className="w-full h-full flex items-center justify-center bg-zinc-950 px-8 text-center">
+      <div>
+        <p className="text-zinc-400 text-sm font-medium mb-2">No hay cadenas configuradas.</p>
+        <p className="text-zinc-600 text-xs">Ve a Admin → Calibración para configurar las zonas.</p>
+      </div>
+    </div>
+  )
+
   return (
     <div className="relative w-full h-full">
-      {/* ── Main: Zone Canvas ── */}
-      <ZoneCanvas
-        zones={zoneGroup}
-        routes={groupRoutes}
+      {/* Canvas principal */}
+      <ChainCanvas
+        zones={chainZones}
+        anchors={anchors}
+        routes={routes}
         paintMode={ui === 'drawing'}
         drawColor={paintColor}
-        previewBlob={
-          ui === 'form' && newBlobPath && drawingZone
-            ? { path: newBlobPath, color: paintColor, zone: drawingZone }
-            : null
-        }
+        previewBlob={ui === 'form' && newBlobPath ? { path: newBlobPath } : null}
         isStaff={true}
         onBlobComplete={handleBlobComplete}
         onRouteClick={route => { if (ui === 'idle') setSelectedRoute(route) }}
+        onActiveZoneChange={setActiveZoneId}
       />
 
-      {/* ── Minimap overlay (top-right) ── */}
+      {/* Minimap */}
       <ZoneMap
-        zones={zones}
+        zones={allZones}
         routes={routes}
-        onZoneSelect={handleZoneSelect}
+        onZoneSelect={() => {}}
         mini={true}
-        selectedZoneIds={groupIds}
+        selectedZoneIds={activeZoneId ? [activeZoneId] : []}
       />
 
-      {/* Zone name (top-left) */}
+      {/* Badge zona activa */}
       <div className="absolute top-3 left-3 z-30 flex items-center gap-2 bg-zinc-900/95 backdrop-blur-sm border border-zinc-700/60 rounded-xl px-3.5 py-2.5 pointer-events-none">
         <span className="text-white text-sm font-semibold truncate max-w-36">
-          {getGroupDisplayName(zoneGroup)}
+          {activeZone?.name ?? '—'}
         </span>
-        <span className="text-zinc-500 text-xs font-medium">{groupRoutes.length} rutas</span>
+        <span className="text-zinc-500 text-xs font-medium">{routes.length} rutas</span>
       </div>
 
       {/* QR assignment banner */}
@@ -167,12 +174,13 @@ export default function WallPage() {
       )}
 
       {/* Route form */}
-      {ui === 'form' && newBlobPath && (
+      {ui === 'form' && newBlobPath && newBlobZoneId && (
         <RouteForm
           blobPath={newBlobPath}
-          zones={zones}
+          zones={allZones}
           initialColor={paintColor}
-          initialZoneId={drawingZone?.id ?? selectedZone.id}
+          initialZoneId={newBlobZoneId}
+          initialChainId={newBlobChainId ?? undefined}
           assignQrId={assignQrId}
           onSave={() => { cancelAll(); refetch() }}
           onCancel={cancelAll}
@@ -183,7 +191,7 @@ export default function WallPage() {
       {selectedRoute && (
         <RouteDetail
           route={selectedRoute}
-          zones={zones}
+          zones={allZones}
           onClose={() => setSelectedRoute(null)}
           onUpdate={() => { setSelectedRoute(null); refetch() }}
           onRetire={() => { setSelectedRoute(null); refetch() }}

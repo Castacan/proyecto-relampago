@@ -8,6 +8,8 @@ export interface Zone {
   canvas_x_start: number
   canvas_x_end: number
   image_url: string | null
+  chain_id: string | null
+  chain_position: number
 }
 
 export interface Route {
@@ -16,6 +18,7 @@ export interface Route {
   grade: string
   setter_id: string | null
   zone_id: string
+  chain_id: string | null
   status: 'active' | 'retired'
   placed_at: string
   retired_at: string | null
@@ -28,4 +31,22 @@ export interface Profile {
   name: string
   role: 'staff' | 'admin'
   created_at: string
+}
+
+export interface Chain {
+  id: string
+  name: string
+  axis: 'horizontal' | 'vertical'
+  entry_from: string | null
+}
+
+export interface ZoneAnchor {
+  id: string
+  chain_id: string
+  zone_a_id: string
+  zone_b_id: string
+  a_overlap_start: number
+  a_overlap_end: number
+  b_overlap_start: number
+  b_overlap_end: number
 }

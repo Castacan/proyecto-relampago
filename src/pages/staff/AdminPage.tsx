@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import QRCode from 'react-qr-code'
 import { supabase } from '../../lib/supabase'
 
@@ -8,6 +9,7 @@ interface GeneratedQr {
 }
 
 export default function AdminPage() {
+  const navigate = useNavigate()
   const [qrCount, setQrCount] = useState(10)
   const [generatedQrs, setGeneratedQrs] = useState<GeneratedQr[]>([])
   const [generating, setGenerating] = useState(false)
@@ -115,6 +117,18 @@ export default function AdminPage() {
               </div>
             </>
           )}
+        </div>
+
+        {/* Calibración de cadenas */}
+        <div className="bg-zinc-900 rounded-2xl p-4 border border-zinc-800/80 mb-4">
+          <h2 className="text-white font-bold text-base mb-1">Calibración de Cadenas</h2>
+          <p className="text-zinc-500 text-xs font-medium mb-4">Configura los overlaps entre fotos de cada cadena panorámica</p>
+          <button
+            onClick={() => navigate('/staff/calibration')}
+            className="w-full bg-zinc-800 text-zinc-200 font-bold text-sm py-2.5 rounded-xl hover:bg-zinc-700 border border-zinc-700 transition-all"
+          >
+            Abrir Calibración
+          </button>
         </div>
 
         {/* CSV Export */}
