@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { supabase } from '../lib/supabase'
 import type { Chain, Zone, ZoneAnchor } from '../types'
 
@@ -7,9 +7,10 @@ const db = supabase as unknown as any
 
 interface UseChainResult {
   chain: Chain | null
-  zones: Zone[]       // ordenadas por chain_position
+  zones: Zone[]
   anchors: ZoneAnchor[]
   loading: boolean
+  refetch: () => void
 }
 
 export function useChain(chainId: string | null): UseChainResult {
@@ -17,14 +18,13 @@ export function useChain(chainId: string | null): UseChainResult {
   const [zones, setZones] = useState<Zone[]>([])
   const [anchors, setAnchors] = useState<ZoneAnchor[]>([])
   const [loading, setLoading] = useState(true)
+  const [tick, setTick] = useState(0)
+
+  const refetch = useCallback(() => setTick(t => t + 1), [])
 
   useEffect(() => {
-    if (!chainId) {
-      setLoading(false)
-      return
-    }
+    if (!chainId) { setLoading(false); return }
     setLoading(true)
-
     Promise.all([
       db.from('chains').select('*').eq('id', chainId).single(),
       db.from('zones').select('*').eq('chain_id', chainId).order('chain_position'),
@@ -36,20 +36,17 @@ export function useChain(chainId: string | null): UseChainResult {
       if (anchorsRes.data) setAnchors(anchorsRes.data as ZoneAnchor[])
       setLoading(false)
     })
-  }, [chainId])
+  }, [chainId, tick])
 
-  return { chain, zones, anchors, loading }
+  return { chain, zones, anchors, loading, refetch }
 }
 
-// Carga todas las cadenas disponibles (para la UI de calibración)
 export function useAllChains() {
   const [chains, setChains] = useState<Chain[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    db.from('chains')
-      .select('*')
-      .order('name')
+    db.from('chains').select('*').order('name')
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       .then(({ data }: any) => {
         if (data) setChains(data as Chain[])

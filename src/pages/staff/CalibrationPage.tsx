@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState } from 'react'
 import { supabase } from '../../lib/supabase'
 import { useAllChains, useChain } from '../../hooks/useChain'
 import { CHAIN_H } from '../../lib/chain'
@@ -9,20 +9,22 @@ const db = supabase as unknown as any
 
 type Pt = { x: number; y: number }
 
+type Step = 1 | 2 | 3 | 4 | 5
+
 interface TwoPointState {
-  step: 1 | 2 | 3 | 4 | 5   // 1=greenA, 2=redA, 3=greenB, 4=redB, 5=done
+  step: Step
   greenA: Pt | null
   redA: Pt | null
   greenB: Pt | null
   redB: Pt | null
 }
 
-const STEP_LABELS: Record<number, string> = {
-  1: 'Toca un punto de referencia en la foto IZQUIERDA (punto verde)',
-  2: 'Toca otro punto de referencia en la foto IZQUIERDA (punto rojo)',
+const STEP_HINTS: Record<Step, string> = {
+  1: 'Toca un punto reconocible en la foto IZQUIERDA — aparecerá verde',
+  2: 'Toca otro punto diferente en la foto IZQUIERDA — aparecerá rojo',
   3: 'Toca el mismo punto verde en la foto DERECHA',
   4: 'Toca el mismo punto rojo en la foto DERECHA',
-  5: 'Puntos colocados — revisa y guarda',
+  5: '4 puntos colocados — ya puedes guardar',
 }
 
 function compute2Point(
@@ -55,13 +57,11 @@ interface PhotoClickProps {
   label: string
   greenDot: Pt | null
   redDot: Pt | null
-  active: boolean      // está esperando un click en esta foto
+  active: boolean
   onClickPhoto: (pt: Pt) => void
 }
 
 function PhotoClick({ zone, label, greenDot, redDot, active, onClickPhoto }: PhotoClickProps) {
-  const imgRef = useRef<HTMLImageElement>(null)
-
   function handleClick(e: React.MouseEvent<HTMLDivElement>) {
     if (!active) return
     const rect = e.currentTarget.getBoundingClientRect()
@@ -72,29 +72,24 @@ function PhotoClick({ zone, label, greenDot, redDot, active, onClickPhoto }: Pho
   }
 
   return (
-    <div className="flex-1 flex flex-col gap-1.5 min-w-0">
-      <p className="text-zinc-400 text-[10px] font-semibold uppercase tracking-widest truncate">{label}</p>
+    <div className="flex flex-col gap-2">
+      <p className="text-zinc-400 text-xs font-semibold uppercase tracking-widest">{label}</p>
       <div
-        className={`relative w-full rounded-xl overflow-hidden border-2 transition-colors ${
-          active ? 'border-yellow-400 cursor-crosshair' : 'border-zinc-700/50 cursor-default'
+        className={`relative w-full rounded-xl overflow-hidden border-2 transition-all ${
+          active
+            ? 'border-yellow-400 shadow-lg shadow-yellow-400/10 cursor-crosshair'
+            : 'border-zinc-700/40 cursor-default'
         }`}
         onClick={handleClick}
       >
         {zone.image_url ? (
-          <img
-            ref={imgRef}
-            src={zone.image_url}
-            alt={zone.name}
-            className="w-full block"
-            draggable={false}
-          />
+          <img src={zone.image_url} alt={zone.name} className="w-full block" draggable={false} />
         ) : (
           <div className="w-full aspect-video bg-zinc-800 flex items-center justify-center">
             <span className="text-zinc-600 text-xs">Sin foto</span>
           </div>
         )}
 
-        {/* Puntos de referencia */}
         {greenDot && (
           <div
             className="absolute w-5 h-5 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white shadow-lg pointer-events-none"
@@ -109,10 +104,10 @@ function PhotoClick({ zone, label, greenDot, redDot, active, onClickPhoto }: Pho
         )}
 
         {active && (
-          <div className="absolute top-2 left-2 right-2 flex justify-center pointer-events-none">
-            <div className="bg-yellow-400 text-zinc-950 text-[10px] font-bold px-2 py-1 rounded-full">
+          <div className="absolute top-2 inset-x-2 flex justify-center pointer-events-none">
+            <span className="bg-yellow-400 text-zinc-950 text-[10px] font-bold px-2.5 py-1 rounded-full shadow">
               Toca aquí
-            </div>
+            </span>
           </div>
         )}
       </div>
@@ -120,23 +115,21 @@ function PhotoClick({ zone, label, greenDot, redDot, active, onClickPhoto }: Pho
   )
 }
 
-interface TwoPointModalProps {
+interface CalibModalProps {
   zoneA: Zone
   zoneB: Zone
-  anchor: Omit<ZoneAnchor, 'id' | 'chain_id'>
+  chainId: string
+  existingAnchor: ZoneAnchor | null
   onClose: () => void
-  onSave: (
-    result: { a_overlap_start: number; a_overlap_end: number; b_overlap_start: number; b_overlap_end: number },
-    scaleB: number,
-    yOffsetB: number
-  ) => Promise<void>
+  onSaved: () => void
 }
 
-function TwoPointModal({ zoneA, zoneB, onClose, onSave }: TwoPointModalProps) {
+function CalibModal({ zoneA, zoneB, chainId, existingAnchor, onClose, onSaved }: CalibModalProps) {
   const [state, setState] = useState<TwoPointState>({
     step: 1, greenA: null, redA: null, greenB: null, redB: null,
   })
   const [saving, setSaving] = useState(false)
+  const [error, setError] = useState('')
 
   function handleClickA(pt: Pt) {
     if (state.step === 1) setState(s => ({ ...s, step: 2, greenA: pt }))
@@ -149,50 +142,74 @@ function TwoPointModal({ zoneA, zoneB, onClose, onSave }: TwoPointModalProps) {
   }
 
   async function handleSave() {
-    if (!state.greenA || !state.redA || !state.greenB || !state.redB) return
+    const { greenA, redA, greenB, redB } = state
+    if (!greenA || !redA || !greenB || !redB) return
     setSaving(true)
+    setError('')
+
     const { render_scale, render_y_offset, a_overlap_start, b_overlap_end } = compute2Point(
-      state.greenA, state.redA, state.greenB, state.redB,
+      greenA, redA, greenB, redB,
       zoneA.render_scale ?? 1, zoneA.render_y_offset ?? 0
     )
-    await onSave(
-      { a_overlap_start, a_overlap_end: 1.0, b_overlap_start: 0.0, b_overlap_end },
-      render_scale,
-      render_y_offset
-    )
+
+    const anchorData = {
+      zone_a_id: zoneA.id,
+      zone_b_id: zoneB.id,
+      a_overlap_start,
+      a_overlap_end: 1.0,
+      b_overlap_start: 0.0,
+      b_overlap_end,
+    }
+
+    const [anchorRes, zoneRes] = await Promise.all([
+      existingAnchor
+        ? db.from('zone_anchors').update(anchorData).eq('id', existingAnchor.id)
+        : db.from('zone_anchors').insert({ chain_id: chainId, ...anchorData }),
+      db.from('zones').update({ render_scale, render_y_offset }).eq('id', zoneB.id),
+    ])
+
     setSaving(false)
+    if (anchorRes.error || zoneRes.error) {
+      setError('Error al guardar. Verifica que corriste el SQL de las columnas render_scale/render_y_offset.')
+      return
+    }
+
+    onSaved()
     onClose()
   }
 
   const activeA = state.step === 1 || state.step === 2
   const activeB = state.step === 3 || state.step === 4
+  const progress = state.step - 1  // 0-4
 
   return (
-    <div className="fixed inset-0 bg-zinc-950/95 z-50 flex flex-col">
+    <div className="fixed inset-0 bg-zinc-950 z-50 flex flex-col">
       {/* Header */}
-      <div className="shrink-0 flex items-center justify-between px-4 py-3 border-b border-zinc-800">
-        <span className="text-white font-bold text-sm">{zoneA.name} → {zoneB.name}</span>
-        <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-full bg-zinc-800 text-zinc-400 hover:text-white text-xl">×</button>
+      <div className="shrink-0 flex items-center justify-between px-4 py-3 border-b border-zinc-800/80">
+        <div>
+          <p className="text-white font-bold text-sm">{zoneA.name} → {zoneB.name}</p>
+          <p className="text-zinc-500 text-xs">Calibración de 2 puntos</p>
+        </div>
+        <button
+          onClick={onClose}
+          className="w-8 h-8 flex items-center justify-center rounded-full bg-zinc-800 text-zinc-400 hover:text-white text-xl leading-none"
+        >×</button>
       </div>
 
-      {/* Step indicator */}
-      <div className="shrink-0 px-4 py-3 bg-zinc-900 border-b border-zinc-800">
-        <div className="flex items-center gap-2 mb-1.5">
+      {/* Progress + hint */}
+      <div className="shrink-0 px-4 py-3 bg-zinc-900/80 border-b border-zinc-800/60">
+        <div className="flex gap-1.5 mb-2">
           {[1, 2, 3, 4].map(s => (
-            <div
-              key={s}
-              className={`h-1.5 flex-1 rounded-full transition-colors ${
-                state.step > s ? 'bg-yellow-400' :
-                state.step === s ? 'bg-yellow-400/60' : 'bg-zinc-700'
-              }`}
-            />
+            <div key={s} className={`h-1 flex-1 rounded-full transition-colors duration-300 ${
+              progress >= s ? 'bg-yellow-400' : progress === s - 1 ? 'bg-yellow-400/40' : 'bg-zinc-700'
+            }`} />
           ))}
         </div>
-        <p className="text-yellow-400 text-xs font-semibold">{STEP_LABELS[state.step]}</p>
+        <p className="text-yellow-400 text-xs font-semibold leading-snug">{STEP_HINTS[state.step]}</p>
       </div>
 
       {/* Fotos */}
-      <div className="flex-1 overflow-y-auto px-3 py-3 flex flex-col gap-3">
+      <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4">
         <PhotoClick
           zone={zoneA}
           label={zoneA.name}
@@ -211,217 +228,135 @@ function TwoPointModal({ zoneA, zoneB, onClose, onSave }: TwoPointModalProps) {
         />
       </div>
 
-      {/* Actions */}
-      <div className="shrink-0 px-4 py-4 border-t border-zinc-800 flex gap-3">
-        <button
-          onClick={() => setState({ step: 1, greenA: null, redA: null, greenB: null, redB: null })}
-          className="flex-1 py-3 rounded-2xl bg-zinc-800 text-zinc-300 font-semibold text-sm hover:bg-zinc-700 transition-all"
-        >
-          Reiniciar
-        </button>
-        <button
-          onClick={handleSave}
-          disabled={state.step !== 5 || saving}
-          className="flex-1 py-3 rounded-2xl bg-yellow-400 text-zinc-950 font-bold text-sm disabled:opacity-40 hover:bg-yellow-300 transition-all"
-        >
-          {saving ? 'Guardando...' : 'Calcular y Guardar'}
-        </button>
+      {/* Footer */}
+      <div className="shrink-0 px-4 py-4 border-t border-zinc-800/80 space-y-2">
+        {error && <p className="text-red-400 text-xs text-center">{error}</p>}
+        <div className="flex gap-3">
+          <button
+            onClick={() => setState({ step: 1, greenA: null, redA: null, greenB: null, redB: null })}
+            className="flex-1 py-3 rounded-2xl bg-zinc-800 text-zinc-300 font-semibold text-sm hover:bg-zinc-700 transition-all"
+          >
+            Reiniciar
+          </button>
+          <button
+            onClick={handleSave}
+            disabled={state.step !== 5 || saving}
+            className="flex-1 py-3 rounded-2xl bg-yellow-400 text-zinc-950 font-bold text-sm disabled:opacity-40 hover:bg-yellow-300 active:scale-[0.98] transition-all"
+          >
+            {saving ? 'Guardando...' : 'Calcular y Guardar'}
+          </button>
+        </div>
       </div>
     </div>
   )
 }
 
-// ────────────────────────────────────────────────────────────
-// Slider calibration view (existing)
-// ────────────────────────────────────────────────────────────
-
-interface SliderPhotoProps {
-  zone: Zone
-  overlapX: number
-  side: 'left' | 'right'
-  label: string
-  onChange: (v: number) => void
-}
-
-function SliderPhoto({ zone, overlapX, side, label, onChange }: SliderPhotoProps) {
-  return (
-    <div className="flex-1 flex flex-col gap-2 min-w-0">
-      <p className="text-zinc-400 text-[10px] font-semibold uppercase tracking-widest truncate text-center">{label}</p>
-      <div className="relative w-full aspect-video bg-zinc-800 rounded-xl overflow-hidden border border-zinc-700/50">
-        {zone.image_url ? (
-          <img src={zone.image_url} alt={zone.name} className="w-full h-full object-cover" draggable={false} />
-        ) : (
-          <div className="w-full h-full flex items-center justify-center text-zinc-600 text-xs">Sin foto</div>
-        )}
-        <div className="absolute top-0 bottom-0 w-0.5 bg-yellow-400/80" style={{ left: `${overlapX * 100}%` }} />
-        {side === 'left' && <div className="absolute top-0 bottom-0 bg-yellow-400/10" style={{ left: `${overlapX * 100}%`, right: 0 }} />}
-        {side === 'right' && <div className="absolute top-0 bottom-0 bg-yellow-400/10" style={{ left: 0, width: `${overlapX * 100}%` }} />}
-        <div className="absolute left-0 right-0 border-t border-dashed border-white/20" style={{ top: '50%' }} />
-      </div>
-      <div className="flex items-center gap-2">
-        <span className="text-zinc-500 text-xs w-8 text-right">{Math.round(overlapX * 100)}%</span>
-        <input type="range" min={0} max={100} value={Math.round(overlapX * 100)}
-          onChange={e => onChange(Number(e.target.value) / 100)}
-          className="flex-1 accent-yellow-400" />
-      </div>
-    </div>
-  )
-}
-
-// ────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────
 // Main page
-// ────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────
 
 export default function CalibrationPage() {
   const { chains, loading: chainsLoading } = useAllChains()
   const [selectedChainId, setSelectedChainId] = useState<string | null>(null)
-  const { zones, anchors: existingAnchors, loading: chainLoading } = useChain(selectedChainId)
-
-  const [localAnchors, setLocalAnchors] = useState<Record<string, Omit<ZoneAnchor, 'id' | 'chain_id'>>>({})
-  const [saving, setSaving] = useState<string | null>(null)
-  const [saved, setSaved] = useState<string | null>(null)
-  const [twoPointPair, setTwoPointPair] = useState<string | null>(null)
-
-  useEffect(() => {
-    const init: Record<string, Omit<ZoneAnchor, 'id' | 'chain_id'>> = {}
-    for (let i = 0; i < zones.length - 1; i++) {
-      const za = zones[i]; const zb = zones[i + 1]
-      const key = `${za.id}-${zb.id}`
-      const existing = existingAnchors.find(a => a.zone_a_id === za.id && a.zone_b_id === zb.id)
-      init[key] = existing
-        ? { zone_a_id: za.id, zone_b_id: zb.id, a_overlap_start: existing.a_overlap_start, a_overlap_end: existing.a_overlap_end, b_overlap_start: existing.b_overlap_start, b_overlap_end: existing.b_overlap_end }
-        : { zone_a_id: za.id, zone_b_id: zb.id, a_overlap_start: 0.8, a_overlap_end: 1.0, b_overlap_start: 0.0, b_overlap_end: 0.2 }
-    }
-    setLocalAnchors(init)
-  }, [zones, existingAnchors])
-
-  async function saveAnchor(za: Zone, zb: Zone, anchorData?: Omit<ZoneAnchor, 'id' | 'chain_id'>) {
-    if (!selectedChainId) return
-    const key = `${za.id}-${zb.id}`
-    const data = anchorData ?? localAnchors[key]
-    if (!data) return
-    setSaving(key)
-    const existing = existingAnchors.find(a => a.zone_a_id === za.id && a.zone_b_id === zb.id)
-    if (existing) {
-      await db.from('zone_anchors').update(data).eq('id', existing.id)
-    } else {
-      await db.from('zone_anchors').insert({ chain_id: selectedChainId, ...data })
-    }
-    setSaving(null)
-    setSaved(key)
-    setTimeout(() => setSaved(null), 2000)
-  }
-
-  async function handle2PointSave(
-    za: Zone, zb: Zone,
-    anchorResult: { a_overlap_start: number; a_overlap_end: number; b_overlap_start: number; b_overlap_end: number },
-    scaleB: number,
-    yOffsetB: number
-  ) {
-    const key = `${za.id}-${zb.id}`
-    const fullAnchor: Omit<ZoneAnchor, 'id' | 'chain_id'> = {
-      zone_a_id: za.id,
-      zone_b_id: zb.id,
-      a_overlap_start: anchorResult.a_overlap_start,
-      a_overlap_end: anchorResult.a_overlap_end,
-      b_overlap_start: anchorResult.b_overlap_start,
-      b_overlap_end: anchorResult.b_overlap_end,
-    }
-    setLocalAnchors(prev => ({ ...prev, [key]: fullAnchor }))
-
-    await Promise.all([
-      saveAnchor(za, zb, fullAnchor),
-      db.from('zones').update({ render_scale: scaleB, render_y_offset: yOffsetB }).eq('id', zb.id),
-    ])
-  }
+  const { zones, anchors, loading: chainLoading, refetch } = useChain(selectedChainId)
+  const [activePair, setActivePair] = useState<string | null>(null)
+  const [justSaved, setJustSaved] = useState<string | null>(null)
 
   const sortedZones = [...zones].sort((a, b) => a.chain_position - b.chain_position)
+
+  function handleSaved(key: string) {
+    refetch()
+    setJustSaved(key)
+    setTimeout(() => setJustSaved(null), 3000)
+  }
 
   return (
     <div className="h-full overflow-y-auto bg-zinc-950">
       <div className="px-4 pt-5 pb-8">
         <h1 className="text-white font-black text-2xl tracking-tight mb-1">Calibración</h1>
-        <p className="text-zinc-500 text-sm mb-6">Ajusta los overlaps y la escala entre fotos consecutivas.</p>
+        <p className="text-zinc-500 text-sm mb-6">
+          Marca 2 puntos en cada foto para que el sistema calcule escala, alineación vertical y overlap automáticamente.
+        </p>
 
         {chainsLoading ? (
-          <div className="flex justify-center py-8">
+          <div className="flex justify-center py-10">
             <div className="w-5 h-5 rounded-full border-2 border-yellow-400 border-t-transparent animate-spin" />
           </div>
         ) : chains.length === 0 ? (
-          <div className="bg-zinc-900 rounded-2xl p-5 border border-zinc-800/80 text-center">
+          <div className="bg-zinc-900 rounded-2xl p-5 border border-zinc-800 text-center">
             <p className="text-zinc-500 text-sm">No hay cadenas creadas.</p>
           </div>
         ) : (
           <>
+            {/* Selector de cadena */}
             <div className="flex gap-2 mb-6 flex-wrap">
               {chains.map(c => (
-                <button key={c.id} onClick={() => setSelectedChainId(c.id)}
+                <button
+                  key={c.id}
+                  onClick={() => setSelectedChainId(c.id)}
                   className={`px-4 py-2 rounded-xl text-sm font-bold transition-all ${
-                    selectedChainId === c.id ? 'bg-yellow-400 text-zinc-950' : 'bg-zinc-800 text-zinc-300 hover:bg-zinc-700 border border-zinc-700'
-                  }`}>{c.name}</button>
+                    selectedChainId === c.id
+                      ? 'bg-yellow-400 text-zinc-950'
+                      : 'bg-zinc-800 text-zinc-300 hover:bg-zinc-700 border border-zinc-700'
+                  }`}
+                >
+                  {c.name}
+                </button>
               ))}
             </div>
 
             {selectedChainId && (
               chainLoading ? (
-                <div className="flex justify-center py-8">
+                <div className="flex justify-center py-10">
                   <div className="w-5 h-5 rounded-full border-2 border-yellow-400 border-t-transparent animate-spin" />
                 </div>
               ) : sortedZones.length < 2 ? (
-                <div className="bg-zinc-900 rounded-2xl p-5 border border-zinc-800/80 text-center">
-                  <p className="text-zinc-500 text-sm">Necesitas al menos 2 zonas para calibrar.</p>
+                <div className="bg-zinc-900 rounded-2xl p-5 border border-zinc-800 text-center">
+                  <p className="text-zinc-500 text-sm">Necesitas al menos 2 zonas en esta cadena.</p>
                 </div>
               ) : (
-                <div className="space-y-6">
+                <div className="space-y-4">
                   {sortedZones.slice(0, -1).map((za, i) => {
                     const zb = sortedZones[i + 1]
                     const key = `${za.id}-${zb.id}`
-                    const anchor = localAnchors[key] ?? { zone_a_id: za.id, zone_b_id: zb.id, a_overlap_start: 0.8, a_overlap_end: 1.0, b_overlap_start: 0.0, b_overlap_end: 0.2 }
-                    const isSaving = saving === key
-                    const wasSaved = saved === key
+                    const existingAnchor = anchors.find(a => a.zone_a_id === za.id && a.zone_b_id === zb.id) ?? null
+                    const isSaved = justSaved === key
+                    const isCalibrated = !!existingAnchor
 
                     return (
                       <div key={key} className="bg-zinc-900 rounded-2xl p-4 border border-zinc-800/80">
                         <div className="flex items-center justify-between mb-3">
-                          <p className="text-white font-bold text-sm">{za.name} → {zb.name}</p>
-                          <div className="flex gap-2">
-                            <button
-                              onClick={() => setTwoPointPair(key)}
-                              className="px-3 py-1.5 rounded-xl text-xs font-bold bg-zinc-700 text-zinc-200 hover:bg-zinc-600 transition-all border border-zinc-600"
-                            >
-                              2 puntos
-                            </button>
-                            <button
-                              onClick={() => saveAnchor(za, zb)}
-                              disabled={isSaving}
-                              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
-                                wasSaved ? 'bg-green-500/20 text-green-400 border border-green-500/30' : 'bg-yellow-400 text-zinc-950 hover:bg-yellow-300 disabled:opacity-50'
-                              }`}
-                            >
-                              {isSaving ? '...' : wasSaved ? '✓' : 'Guardar'}
-                            </button>
+                          <div>
+                            <p className="text-white font-bold text-sm">{za.name} → {zb.name}</p>
+                            <p className={`text-xs font-medium mt-0.5 ${isCalibrated ? 'text-green-400' : 'text-zinc-500'}`}>
+                              {isSaved ? '✓ Guardado' : isCalibrated ? 'Calibrado' : 'Sin calibrar'}
+                            </p>
                           </div>
+                          <button
+                            onClick={() => setActivePair(key)}
+                            className="px-4 py-2 rounded-xl text-sm font-bold bg-yellow-400 text-zinc-950 hover:bg-yellow-300 active:scale-95 transition-all"
+                          >
+                            Calibrar
+                          </button>
                         </div>
 
-                        <div className="flex gap-3">
-                          <SliderPhoto
-                            zone={za}
-                            overlapX={anchor.a_overlap_start}
-                            side="left"
-                            label={za.name}
-                            onChange={v => setLocalAnchors(prev => ({ ...prev, [key]: { ...anchor, a_overlap_start: v } }))}
-                          />
-                          <SliderPhoto
-                            zone={zb}
-                            overlapX={anchor.b_overlap_end}
-                            side="right"
-                            label={zb.name}
-                            onChange={v => setLocalAnchors(prev => ({ ...prev, [key]: { ...anchor, b_overlap_end: v } }))}
-                          />
+                        {/* Mini preview de las dos fotos */}
+                        <div className="flex gap-2">
+                          {[za, zb].map(z => (
+                            <div key={z.id} className="flex-1 aspect-video rounded-lg overflow-hidden bg-zinc-800 border border-zinc-700/40">
+                              {z.image_url
+                                ? <img src={z.image_url} alt={z.name} className="w-full h-full object-cover" />
+                                : <div className="w-full h-full flex items-center justify-center"><span className="text-zinc-600 text-[10px]">Sin foto</span></div>
+                              }
+                            </div>
+                          ))}
                         </div>
-                        <p className="text-zinc-600 text-xs mt-2.5 text-center">
-                          Mueve las líneas hasta que el contenido del overlap coincida — o usa "2 puntos" para ajuste automático de escala.
-                        </p>
+
+                        {isCalibrated && (
+                          <p className="text-zinc-600 text-[10px] mt-2">
+                            overlap: {Math.round(existingAnchor.a_overlap_start * 100)}% · escala: {((zb.render_scale ?? 1) * 100).toFixed(0)}% · offset: {Math.round(zb.render_y_offset ?? 0)}px
+                          </p>
+                        )}
                       </div>
                     )
                   })}
@@ -432,19 +367,20 @@ export default function CalibrationPage() {
         )}
       </div>
 
-      {/* Modal de 2 puntos */}
-      {twoPointPair && (() => {
-        const za = sortedZones.find(z => twoPointPair.startsWith(z.id))
-        const zb = sortedZones.find(z => twoPointPair.endsWith(z.id) && z.id !== za?.id)
+      {/* Modal de calibración */}
+      {activePair && selectedChainId && (() => {
+        const za = sortedZones.find(z => activePair.startsWith(z.id))
+        const zb = sortedZones.find(z => activePair.endsWith(z.id) && z.id !== za?.id)
         if (!za || !zb) return null
-        const anchor = localAnchors[twoPointPair] ?? { zone_a_id: za.id, zone_b_id: zb.id, a_overlap_start: 0.8, a_overlap_end: 1.0, b_overlap_start: 0.0, b_overlap_end: 0.2 }
+        const existingAnchor = anchors.find(a => a.zone_a_id === za.id && a.zone_b_id === zb.id) ?? null
         return (
-          <TwoPointModal
+          <CalibModal
             zoneA={za}
             zoneB={zb}
-            anchor={anchor}
-            onClose={() => setTwoPointPair(null)}
-            onSave={(anchorResult, scaleB, yOffsetB) => handle2PointSave(za, zb, anchorResult, scaleB, yOffsetB)}
+            chainId={selectedChainId}
+            existingAnchor={existingAnchor}
+            onClose={() => setActivePair(null)}
+            onSaved={() => handleSaved(activePair)}
           />
         )
       })()}
