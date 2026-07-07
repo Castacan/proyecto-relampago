@@ -98,29 +98,18 @@ export default function ChainCanvas({
       const w = el.offsetWidth
       const h = el.offsetHeight
       if (w === 0 || h === 0) return
-      const cw = layoutRef.current.totalW || CHAIN_H * (4 / 3)
-      const initScale = w / cw
+      const initScale = h / CHAIN_H   // foto llena la altura de la pantalla
       scaleRef.current = initScale
       setSize({ w, h })
       setScale(initScale)
-      setPos({ x: 0, y: Math.max(0, (h - CHAIN_H * initScale) / 2) })
+      setPos({ x: 0, y: 0 })
     })
     ro.observe(el)
     return () => ro.disconnect()
   }, [])
 
-  // Reset view when chain layout changes (e.g. images finish loading)
-  useEffect(() => {
-    const el = containerRef.current
-    if (!el || layout.totalW === 0) return
-    const w = el.offsetWidth
-    const h = el.offsetHeight
-    if (w === 0 || h === 0) return
-    const initScale = w / layout.totalW
-    scaleRef.current = initScale
-    setScale(initScale)
-    setPos({ x: 0, y: Math.max(0, (h - CHAIN_H * initScale) / 2) })
-  }, [layout.totalW])
+  // No reseteamos la vista cuando cambia el layout — el usuario ya puede estar navegando
+  // Solo actualizamos el size para que el Stage tenga las dimensiones correctas
 
   // Update active zone whenever position changes
   const updateActiveZone = useCallback((stageX: number, screenW: number) => {
@@ -335,13 +324,11 @@ export default function ChainCanvas({
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
       >
-        {/* Layer 1: Background — solo la foto activa */}
+        {/* Layer 1: Background — todas las fotos en su posición virtual */}
         <Layer listening={false}>
           {layout.zones.map(zl => {
             const zone = zones.find(z => z.id === zl.id)
             if (!zone) return null
-            const isActive = zl.id === activeZoneId
-            if (!isActive) return null
 
             const img = zoneImages[zl.id]
             if (img) {
@@ -365,9 +352,9 @@ export default function ChainCanvas({
           })}
         </Layer>
 
-        {/* Layer 2: Route blobs */}
+        {/* Layer 2: Route blobs — solo rutas con chain_id (coordenadas de cadena) */}
         <Layer>
-          {routes.map(route => {
+          {routes.filter(r => r.chain_id).map(route => {
             if (!route.blob_path || route.blob_path.length < 2) return null
 
             // Convert chain coords to virtual canvas coords
