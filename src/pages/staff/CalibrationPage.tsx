@@ -7,8 +7,8 @@ import { supabase } from '../../lib/supabase'
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const db = supabase as unknown as any
 
-const PAIR_COLORS = ['#ef4444', '#3b82f6', '#22c55e', '#f59e0b', '#a855f7', '#ec4899']
-const MAX_PAIRS = 6
+const PAIR_COLORS = ['#ef4444', '#3b82f6', '#22c55e', '#f59e0b', '#a855f7', '#ec4899', '#06b6d4', '#f97316']
+const MAX_PAIRS = 8
 
 // Calcula el rect de display de la imagen dentro del container (object-contain con letterboxing)
 function getDisplayRect(cw: number, ch: number, nw: number, nh: number) {

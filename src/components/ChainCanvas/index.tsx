@@ -144,7 +144,9 @@ export default function ChainCanvas({
     const transform = computeAnchorTransform(anchor?.point_pairs ?? [])
     const nextDW = displayWForIdx(activeIdx + 1)
     const entryPanX = Math.max(0, Math.min(transform.bEntryX * nextDW * zoomRef.current, Math.max(0, nextDW * zoomRef.current - size.w)))
-    animate(0, size.w, TRANSITION_MS, v => { transXRef.current = v; setTransX(v) }, () => {
+    // Comienza desde el transX actual (puede ser > 0 si viene del peek en vivo)
+    const fromTx = transXRef.current
+    animate(fromTx, size.w, TRANSITION_MS, v => { transXRef.current = v; setTransX(v) }, () => {
       isTransitioning.current = false
       transXRef.current = 0; setTransX(0)
       panXRef.current = entryPanX; setPanX(entryPanX)
@@ -163,7 +165,9 @@ export default function ChainCanvas({
       transform.aTransitionX * prevDW * zoomRef.current - size.w * 0.3,
       maxPanXForIdx(activeIdx - 1)
     ))
-    animate(0, -size.w, TRANSITION_MS, v => { transXRef.current = v; setTransX(v) }, () => {
+    // Comienza desde el transX actual (puede ser < 0 si viene del peek en vivo)
+    const fromTx = transXRef.current
+    animate(fromTx, -size.w, TRANSITION_MS, v => { transXRef.current = v; setTransX(v) }, () => {
       isTransitioning.current = false
       transXRef.current = 0; setTransX(0)
       panXRef.current = exitPanX; setPanX(exitPanX)
@@ -232,7 +236,6 @@ export default function ChainCanvas({
   const touchStartX = useRef(0)
   const touchStartPanX = useRef(0)
   const isTouching = useRef(false)
-  const overshoot = useRef(0)
   const touchMoved = useRef(false)
 
   const handleTouchStart = useCallback((e: KonvaEventObject<TouchEvent>) => {
@@ -241,7 +244,8 @@ export default function ChainCanvas({
     const touches = e.evt.touches
 
     if (touches.length === 2) {
-      // Pinch start
+      // Pinch start — cancela cualquier peek en curso
+      if (transXRef.current !== 0) { transXRef.current = 0; setTransX(0) }
       isPinching.current = true
       isTouching.current = false
       isDrawing.current = false
@@ -265,7 +269,6 @@ export default function ChainCanvas({
       addDrawPoint(t.clientX - rect.left, t.clientY - rect.top)
     } else {
       isTouching.current = true
-      overshoot.current = 0
       touchStartX.current = t.clientX
       touchStartPanX.current = panXRef.current
       lastVelX.current = t.clientX
@@ -316,11 +319,22 @@ export default function ChainCanvas({
 
     const dx = t.clientX - touchStartX.current
     const rawPanX = touchStartPanX.current - dx
-    const limitPanX = transitionPanXForIdx(activeIdx)
-    const clampedPanX = Math.max(0, Math.min(rawPanX, limitPanX))
-    const excess = rawPanX - clampedPanX
-    overshoot.current = rawPanX - limitPanX
-    panXRef.current = clampedPanX + excess * 0.25
+    const limitNext = transitionPanXForIdx(activeIdx)
+
+    if (rawPanX > limitNext && activeIdx < sorted.length - 1) {
+      // Más allá del límite → bloquea foto actual, peek foto siguiente en tiempo real
+      panXRef.current = limitNext
+      const peek = rawPanX - limitNext
+      transXRef.current = peek; setTransX(peek)
+    } else if (rawPanX < 0 && activeIdx > 0) {
+      // Antes del inicio → bloquea en 0, peek foto anterior en tiempo real
+      panXRef.current = 0
+      transXRef.current = rawPanX; setTransX(rawPanX)  // negativo
+    } else {
+      // Pan normal: limpia cualquier peek previo
+      panXRef.current = Math.max(0, Math.min(rawPanX, limitNext))
+      if (transXRef.current !== 0) { transXRef.current = 0; setTransX(0) }
+    }
     setPanX(panXRef.current)
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [paintMode, activeIdx, sorted.length, size, anchors, zoom])
@@ -348,17 +362,21 @@ export default function ChainCanvas({
       lastTapTime.current = now
     }
 
-    const over = overshoot.current
-    const vel = velocityX.current   // negativo = hacia siguiente, positivo = hacia anterior
-    const fastSwipeNext = vel < -0.4 && activeIdx < sorted.length - 1
-    const fastSwipePrev = vel > 0.4 && activeIdx > 0
-    if ((over > TRANSITION_OVERSHOOT || fastSwipeNext) && activeIdx < sorted.length - 1) {
+    const tx = transXRef.current
+    const vel = velocityX.current  // negativo = hacia siguiente, positivo = hacia anterior
+    const fastSwipeNext = vel < -0.35 && activeIdx < sorted.length - 1
+    const fastSwipePrev = vel > 0.35 && activeIdx > 0
+
+    if ((tx > TRANSITION_OVERSHOOT || (tx > 5 && fastSwipeNext)) && activeIdx < sorted.length - 1) {
       startTransitionToNext()
-    } else if ((over < -TRANSITION_OVERSHOOT || fastSwipePrev) && activeIdx > 0) {
+    } else if ((tx < -TRANSITION_OVERSHOOT || (tx < -5 && fastSwipePrev)) && activeIdx > 0) {
       startTransitionToPrev()
-    } else {
-      const target = Math.max(0, Math.min(panXRef.current, transitionPanXForIdx(activeIdx)))
-      animate(panXRef.current, target, 180, v => { panXRef.current = v; setPanX(v) }, () => {})
+    } else if (tx !== 0) {
+      // Snap-back: cancela el peek y vuelve al límite
+      const from = tx
+      animate(from, 0, 180, v => { transXRef.current = v; setTransX(v) }, () => {
+        transXRef.current = 0; setTransX(0)
+      })
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [paintMode, activeIdx, sorted.length, size, anchors, zoom])
