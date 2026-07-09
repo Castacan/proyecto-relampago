@@ -331,26 +331,23 @@ export default function ChainCanvas({
             if (!zone) return null
 
             const img = zoneImages[zl.id]
-            const renderScale = zone.render_scale ?? 1
-            const renderH = CHAIN_H * renderScale
-            const renderY = zone.render_y_offset ?? 0
 
             if (img) {
               return (
                 <KonvaImage
                   key={zl.id}
                   x={zl.virtualX}
-                  y={renderY}
+                  y={0}
                   width={zl.virtualW}
-                  height={renderH}
+                  height={CHAIN_H}
                   image={img}
                 />
               )
             }
             return (
               <Group key={zl.id}>
-                <Rect x={zl.virtualX} y={renderY} width={zl.virtualW} height={renderH} fill={FALLBACK_COLOR} />
-                <Text x={zl.virtualX + 24} y={renderY + 24} text={zone.name} fontSize={22} fill="rgba(255,255,255,0.2)" fontFamily="sans-serif" />
+                <Rect x={zl.virtualX} y={0} width={zl.virtualW} height={CHAIN_H} fill={FALLBACK_COLOR} />
+                <Text x={zl.virtualX + 24} y={24} text={zone.name} fontSize={22} fill="rgba(255,255,255,0.2)" fontFamily="sans-serif" />
               </Group>
             )
           })}
