@@ -445,13 +445,6 @@ export default function ChainCanvas({
 
   // ── Render helpers ────────────────────────────────────────────
 
-  // Ordena puntos en sentido horario alrededor del centroide (para polígono sin auto-intersección)
-  function sortPolygon(pts: { x: number; y: number }[]): { x: number; y: number }[] {
-    const cx = pts.reduce((s, p) => s + p.x, 0) / pts.length
-    const cy = pts.reduce((s, p) => s + p.y, 0) / pts.length
-    return [...pts].sort((a, b) => Math.atan2(a.y - cy, a.x - cx) - Math.atan2(b.y - cy, b.x - cx))
-  }
-
   function renderPhoto(idx: number, screenOffsetX: number) {
     const zone = sorted[idx]
     if (!zone) return null
@@ -487,35 +480,11 @@ export default function ChainCanvas({
     const zl = layout.zones.find(z => z.id === zone?.id)
     if (!zone || !zl) return null
 
-    // Polígono de clip para rutas cruzadas — se calcula ANTES del filtro
-    const prevZone = sorted[idx - 1]
-    const prevAnchor = prevZone
-      ? anchors.find(a => a.zone_a_id === prevZone.id && a.zone_b_id === zone.id)
-      : null
-    const bPtsRaw = prevAnchor?.point_pairs?.slice(0, 4).map(pp => pp.b) ?? []
-    const dw = displayWForIdx(idx)
-    const clipPolyFromPrev = bPtsRaw.length >= 3
-      ? sortPolygon(bPtsRaw).map(b => ({
-          x: b.x * dw * zoom - localPanX,
-          y: yOffset + b.y * size.h * zoom,
-        }))
-      : null
-
-    // Filtro de rutas:
-    // - Zona propia: siempre mostrar
-    // - Zona anterior (ruta cruzada): SOLO si hay calibración (polígono B define la zona válida)
-    //   Sin calibración, la ruta no "se cuela" en la zona adyacente
-    const zoneRoutes = routes.filter(r => {
-      if (!r.chain_id || !r.blob_path?.length) return false
-      if (r.zone_id === zone.id) return true
-      if (r.zone_id === prevZone?.id && clipPolyFromPrev !== null) {
-        return r.blob_path.some(p => {
-          const vx = p.x * layout.totalW
-          return vx >= zl.virtualX && vx < zl.virtualX + zl.virtualW
-        })
-      }
-      return false
-    })
+    // Solo muestra rutas pintadas en esta zona exacta.
+    // Las rutas de zonas adyacentes no se muestran aunque coordenadas se solapen.
+    const zoneRoutes = routes.filter(r =>
+      r.chain_id && r.blob_path?.length && r.zone_id === zone.id
+    )
 
     function renderSingleRoute(route: Route) {
       if (!route.blob_path || route.blob_path.length < 2) return null
@@ -549,30 +518,7 @@ export default function ChainCanvas({
       )
     }
 
-    // Separa rutas: "propias" de esta zona vs. "extranjeras" (iniciadas en zona anterior)
-    const fromPrevRoutes = prevZone ? zoneRoutes.filter(r => r.zone_id === prevZone.id) : []
-    const ownRoutes = zoneRoutes.filter(r => !fromPrevRoutes.includes(r))
-
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const prevClipFunc = clipPolyFromPrev
-      ? (ctx: any) => {
-          ctx.beginPath()
-          ctx.moveTo(clipPolyFromPrev[0].x, clipPolyFromPrev[0].y)
-          clipPolyFromPrev.slice(1).forEach(p => ctx.lineTo(p.x, p.y))
-          ctx.closePath()
-        }
-      : undefined
-
-    return (
-      <>
-        {ownRoutes.map(renderSingleRoute)}
-        {fromPrevRoutes.length > 0 && (
-          prevClipFunc
-            ? <Group clipFunc={prevClipFunc}>{fromPrevRoutes.map(renderSingleRoute)}</Group>
-            : fromPrevRoutes.map(renderSingleRoute)
-        )}
-      </>
-    )
+    return <>{zoneRoutes.map(renderSingleRoute)}</>
   }
 
   const effectivePanX = panX + transX
