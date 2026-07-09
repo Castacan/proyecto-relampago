@@ -6,7 +6,6 @@ import type { Zone, Route, ZoneAnchor } from '../../types'
 import { getColorHex } from '../../lib/colors'
 import { getFreshnessLevel, getFreshnessColor, getDaysOnWall, getPublicLabel } from '../../lib/freshness'
 import { CHAIN_H, computeChainLayout, computeAnchorTransform } from '../../lib/chain'
-import type { AnchorTransform } from '../../lib/chain'
 
 const TRANSITION_OVERSHOOT = 40
 const TRANSITION_MS = 240
@@ -531,60 +530,95 @@ export default function ChainCanvas({
     )
     const ownConverter = (p: { x: number; y: number }) => chainToScreen(p, idx, localPanX)
 
-    // Cross-zone: routes from prevZone shown in this zone via aToB transform + B-polygon clip
+    // Helper: builds a clipFunc from a set of normalized photo points
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    function makeClipFunc(photoPts: { x: number; y: number }[]): ((ctx: any) => void) | undefined {
+      if (photoPts.length < 3) return undefined
+      const poly = sortPolygon(photoPts).map(p => ({
+        x: p.x * dw * zoom - localPanX,
+        y: yOffset + p.y * size.h * zoom,
+      }))
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      return (ctx: any) => {
+        ctx.beginPath()
+        ctx.moveTo(poly[0].x, poly[0].y)
+        for (let i = 1; i < poly.length; i++) ctx.lineTo(poly[i].x, poly[i].y)
+        ctx.closePath()
+      }
+    }
+
+    // Helper: render a cross-zone route group with optional clip
+    function renderCrossGroup(
+      xRoutes: Route[],
+      converter: (p: { x: number; y: number }) => { x: number; y: number },
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      clipFn: ((ctx: any) => void) | undefined,
+      keySuffix: string
+    ) {
+      if (!xRoutes.length) return null
+      const nodes = xRoutes.map(r => renderRoute(r, converter, keySuffix))
+      return clipFn
+        ? <Group clipFunc={clipFn}>{nodes}</Group>
+        : <>{nodes}</>
+    }
+
+    // Cross-zone from prev (A→B): prevZone routes shown here via aToB, clipped to B-polygon
     const prevZone = sorted[idx - 1]
     const prevAnchor = prevZone
       ? anchors.find(a => a.zone_a_id === prevZone.id && a.zone_b_id === zone.id)
       : null
-    const pairs = prevAnchor?.point_pairs ?? []
-    const zl_A = prevZone ? layout.zones.find(z => z.id === prevZone.id) : null
+    const prevPairs = prevAnchor?.point_pairs ?? []
+    const zl_prev = prevZone ? layout.zones.find(z => z.id === prevZone.id) : null
 
-    let crossZoneRoutes: Route[] = []
-    let crossConverter: ((p: { x: number; y: number }) => { x: number; y: number }) | null = null
+    let prevCrossRoutes: Route[] = []
+    let prevCrossConverter: ((p: { x: number; y: number }) => { x: number; y: number }) | null = null
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    let crossClipFunc: ((ctx: any) => void) | undefined = undefined
+    let prevClipFunc: ((ctx: any) => void) | undefined = undefined
 
-    if (pairs.length >= 3 && zl_A) {
-      const transform: AnchorTransform = computeAnchorTransform(pairs)
-      crossZoneRoutes = routes.filter(r =>
+    if (prevPairs.length >= 3 && zl_prev) {
+      const t = computeAnchorTransform(prevPairs)
+      prevCrossRoutes = routes.filter(r =>
         r.chain_id && r.blob_path?.length && r.zone_id === prevZone!.id
       )
-      crossConverter = (p: { x: number; y: number }) => {
-        const relX_A = (p.x * layout.totalW - zl_A.virtualX) / zl_A.virtualW
-        const { x: relX_B, y: relY_B } = transform.aToB({ x: relX_A, y: p.y })
-        return {
-          x: relX_B * dw * zoom - localPanX,
-          y: yOffset + relY_B * size.h * zoom,
-        }
+      prevCrossConverter = (p: { x: number; y: number }) => {
+        const relX_A = (p.x * layout.totalW - zl_prev.virtualX) / zl_prev.virtualW
+        const { x: relX_B, y: relY_B } = t.aToB({ x: relX_A, y: p.y })
+        return { x: relX_B * dw * zoom - localPanX, y: yOffset + relY_B * size.h * zoom }
       }
-      const bPts = pairs.map(p => p.b)
-      if (bPts.length >= 3) {
-        const bPoly = sortPolygon(bPts).map(b => ({
-          x: b.x * dw * zoom - localPanX,
-          y: yOffset + b.y * size.h * zoom,
-        }))
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        crossClipFunc = (ctx: any) => {
-          ctx.beginPath()
-          ctx.moveTo(bPoly[0].x, bPoly[0].y)
-          for (let i = 1; i < bPoly.length; i++) ctx.lineTo(bPoly[i].x, bPoly[i].y)
-          ctx.closePath()
-        }
+      prevClipFunc = makeClipFunc(prevPairs.map(p => p.b))
+    }
+
+    // Cross-zone from next (B→A): nextZone routes shown here via bToA, clipped to A-polygon
+    const nextZone = sorted[idx + 1]
+    const nextAnchor = nextZone
+      ? anchors.find(a => a.zone_a_id === zone.id && a.zone_b_id === nextZone.id)
+      : null
+    const nextPairs = nextAnchor?.point_pairs ?? []
+    const zl_next = nextZone ? layout.zones.find(z => z.id === nextZone.id) : null
+
+    let nextCrossRoutes: Route[] = []
+    let nextCrossConverter: ((p: { x: number; y: number }) => { x: number; y: number }) | null = null
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let nextClipFunc: ((ctx: any) => void) | undefined = undefined
+
+    if (nextPairs.length >= 3 && zl_next) {
+      const t = computeAnchorTransform(nextPairs)
+      nextCrossRoutes = routes.filter(r =>
+        r.chain_id && r.blob_path?.length && r.zone_id === nextZone!.id
+      )
+      nextCrossConverter = (p: { x: number; y: number }) => {
+        const relX_B = (p.x * layout.totalW - zl_next.virtualX) / zl_next.virtualW
+        const { x: relX_A, y: relY_A } = t.bToA({ x: relX_B, y: p.y })
+        return { x: relX_A * dw * zoom - localPanX, y: yOffset + relY_A * size.h * zoom }
       }
+      nextClipFunc = makeClipFunc(nextPairs.map(p => p.a))
     }
 
     return (
       <>
         {ownRoutes.map(r => renderRoute(r, ownConverter))}
-        {crossConverter && crossZoneRoutes.length > 0 && (
-          crossClipFunc
-            ? (
-              <Group clipFunc={crossClipFunc}>
-                {crossZoneRoutes.map(r => renderRoute(r, crossConverter!, '_cross'))}
-              </Group>
-            )
-            : crossZoneRoutes.map(r => renderRoute(r, crossConverter!, '_cross'))
-        )}
+        {prevCrossConverter && renderCrossGroup(prevCrossRoutes, prevCrossConverter, prevClipFunc, '_prev')}
+        {nextCrossConverter && renderCrossGroup(nextCrossRoutes, nextCrossConverter, nextClipFunc, '_next')}
       </>
     )
   }
