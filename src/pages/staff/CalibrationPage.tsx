@@ -51,6 +51,24 @@ function PhotoPanel({ zone, pairs, side, waitingForClick, onPhotoClick }: PhotoP
     return getDisplayRect(containerSize.w, containerSize.h, img.naturalWidth, img.naturalHeight)
   }, [containerSize])()
 
+  // Ordena puntos del polígono por ángulo desde el centroide (evita auto-intersecciones)
+  function sortPoly(pts: { x: number; y: number }[]) {
+    const cx = pts.reduce((s, p) => s + p.x, 0) / pts.length
+    const cy = pts.reduce((s, p) => s + p.y, 0) / pts.length
+    return [...pts].sort((a, b) => Math.atan2(a.y - cy, a.x - cx) - Math.atan2(b.y - cy, b.x - cx))
+  }
+
+  function polyScreenPoints(pairGroup: PointPair[]): string {
+    const pts = pairGroup.map(pp => side === 'a' ? pp.a : pp.b)
+    if (pts.length < 3 || !dr.dw) return ''
+    return sortPoly(pts)
+      .map(p => `${(dr.ox + p.x * dr.dw).toFixed(1)},${(dr.oy + p.y * dr.dh).toFixed(1)}`)
+      .join(' ')
+  }
+
+  const group1 = pairs.slice(0, 4)
+  const group2 = pairs.slice(4, 8)
+
   function dotStyle(p: { x: number; y: number }) {
     if (!containerSize.w || !containerSize.h || !dr.dw || !dr.dh) return {}
     return {
@@ -119,6 +137,34 @@ function PhotoPanel({ zone, pairs, side, waitingForClick, onPhotoClick }: PhotoP
             </div>
           )
         })}
+
+        {/* Polígono sombreado: grupo 1 (pares 1-4) y grupo 2 (pares 5-8) */}
+        {containerSize.w > 0 && (
+          <svg
+            className="absolute inset-0 pointer-events-none"
+            width={containerSize.w}
+            height={containerSize.h}
+          >
+            {group1.length >= 3 && (
+              <polygon
+                points={polyScreenPoints(group1)}
+                fill="rgba(250,204,21,0.15)"
+                stroke="rgba(250,204,21,0.6)"
+                strokeWidth={2}
+                strokeDasharray="6 4"
+              />
+            )}
+            {group2.length >= 3 && (
+              <polygon
+                points={polyScreenPoints(group2)}
+                fill="rgba(59,130,246,0.15)"
+                stroke="rgba(59,130,246,0.6)"
+                strokeWidth={2}
+                strokeDasharray="6 4"
+              />
+            )}
+          </svg>
+        )}
 
         {/* Indicador cuando está esperando click */}
         {waitingForClick && (
