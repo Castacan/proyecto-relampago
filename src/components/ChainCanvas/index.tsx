@@ -5,27 +5,13 @@ import type { KonvaEventObject } from 'konva/lib/Node'
 import type { Zone, Route, ZoneAnchor } from '../../types'
 import { getColorHex } from '../../lib/colors'
 import { getFreshnessLevel, getFreshnessColor, getDaysOnWall, getPublicLabel } from '../../lib/freshness'
-import { CHAIN_H, computeChainLayout, type ChainLayout } from '../../lib/chain'
+import { CHAIN_H, computeChainLayout, computeAnchorTransform } from '../../lib/chain'
 
-const SWIPE_THRESHOLD = 0.32   // fracción del ancho de pantalla para disparar transición
+const TRANSITION_OVERSHOOT = 70  // px extra para disparar transición
+const TRANSITION_MS = 240
 const STROKE_W = 8
 const MIN_POINT_GAP = 4
 const FALLBACK_COLOR = '#1a2433'
-
-interface PhotoRect { x: number; y: number; w: number; h: number }
-
-function computePhotoRect(cw: number, ch: number, nw: number, nh: number): PhotoRect {
-  if (!nw || !nh) return { x: 0, y: 0, w: cw, h: ch }
-  const cAR = cw / ch
-  const pAR = nw / nh
-  if (cAR > pAR) {
-    const h = ch; const w = h * pAR
-    return { x: (cw - w) / 2, y: 0, w, h }
-  } else {
-    const w = cw; const h = w / pAR
-    return { x: 0, y: (ch - h) / 2, w, h }
-  }
-}
 
 interface Props {
   zones: Zone[]
@@ -48,15 +34,11 @@ export default function ChainCanvas({
   const stageRef = useRef<Konva.Stage>(null)
   const [size, setSize] = useState({ w: 300, h: 500 })
 
-  // Zonas ordenadas
-  const sorted = useMemo(
-    () => [...zones].sort((a, b) => a.chain_position - b.chain_position),
-    [zones]
-  )
+  const sorted = useMemo(() => [...zones].sort((a, b) => a.chain_position - b.chain_position), [zones])
+  const zonesKey = zones.map(z => z.id).join(',')
 
   // Imágenes cargadas
   const [zoneImages, setZoneImages] = useState<Record<string, HTMLImageElement>>({})
-  const zonesKey = zones.map(z => z.id).join(',')
   useEffect(() => {
     zones.forEach(zone => {
       if (!zone.image_url || zoneImages[zone.id]) return
@@ -68,91 +50,162 @@ export default function ChainCanvas({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [zonesKey])
 
-  // Layout — solo necesario para coordenadas de rutas
-  const layout: ChainLayout = useMemo(
+  // Layout virtual (necesario para coordenadas de rutas)
+  const layout = useMemo(
     () => computeChainLayout(zones, anchors, zoneImages),
   // eslint-disable-next-line react-hooks/exhaustive-deps
     [zonesKey, anchors, zoneImages]
   )
 
-  // Zona activa (índice)
+  // Zona activa
   const [activeIdx, setActiveIdx] = useState(0)
   useEffect(() => {
-    const zone = sorted[activeIdx]
-    if (zone) onActiveZoneChange?.(zone.id)
+    onActiveZoneChange?.(sorted[activeIdx]?.id ?? null)
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeIdx, sorted.length])
 
-  // Swipe state
-  const [swipeX, setSwipeX] = useState(0)
-  const swipeXRef = useRef(0)
-  const swipeStartX = useRef(0)
-  const isSwiping = useRef(false)
+  // panX: cuánto hemos scrolleado dentro de la foto activa (0 = borde izq)
+  const [panX, setPanX] = useState(0)
+  const panXRef = useRef(0)
+
+  // Estado de transición animada
+  // transX: offset extra aplicado sobre panX durante la animación de salida/entrada
+  const [transX, setTransX] = useState(0)
+  const transXRef = useRef(0)
+  const isTransitioning = useRef(false)
   const animFrameRef = useRef<number | null>(null)
 
-  // Medir contenedor
+  // Medición del contenedor
   useEffect(() => {
     const el = containerRef.current
     if (!el) return
-    const ro = new ResizeObserver(() => {
-      setSize({ w: el.offsetWidth, h: el.offsetHeight })
-    })
+    const ro = new ResizeObserver(() => setSize({ w: el.offsetWidth, h: el.offsetHeight }))
     ro.observe(el)
     return () => ro.disconnect()
   }, [])
 
-  // Animación de swipe hacia target
-  function animateTo(target: number, onDone?: () => void) {
+  // Dimensiones de cada foto en el modelo "fit by height"
+  function displayWForIdx(idx: number): number {
+    const zone = sorted[idx]
+    const img = zone && zoneImages[zone.id]
+    if (img && img.naturalWidth > 0 && img.naturalHeight > 0) {
+      return size.h * (img.naturalWidth / img.naturalHeight)
+    }
+    return size.h * (4 / 3)
+  }
+
+  function maxPanXForIdx(idx: number): number {
+    return Math.max(0, displayWForIdx(idx) - size.w)
+  }
+
+  // Transforms de calibración para el par activo
+  function getTransform(fromIdx: number) {
+    const za = sorted[fromIdx]
+    const zb = sorted[fromIdx + 1]
+    if (!za || !zb) return null
+    const anchor = anchors.find(a => a.zone_a_id === za.id && a.zone_b_id === zb.id)
+    return computeAnchorTransform(anchor?.point_pairs ?? [])
+  }
+
+  // Cuánto se puede panear antes de llegar al punto de transición
+  function transitionPanXForIdx(idx: number): number {
+    if (idx >= sorted.length - 1) return maxPanXForIdx(idx)
+    const transform = getTransform(idx)
+    if (!transform || transform.aTransitionX >= 1) return maxPanXForIdx(idx)
+    const dw = displayWForIdx(idx)
+    // El punto de transición en A: cuando aTransitionX llega al BORDE DERECHO de la pantalla
+    return Math.max(0, transform.aTransitionX * dw - size.w)
+  }
+
+  // ── Animación ────────────────────────────────────────────────
+  function animate(from: number, to: number, ms: number, onTick: (v: number) => void, onDone: () => void) {
     if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current)
-    const start = swipeXRef.current
-    const duration = 220
-    const startTime = performance.now()
+    const start = performance.now()
     function tick(now: number) {
-      const t = Math.min(1, (now - startTime) / duration)
-      const ease = 1 - Math.pow(1 - t, 3)  // cubic ease out
-      const val = start + (target - start) * ease
-      swipeXRef.current = val
-      setSwipeX(val)
+      const t = Math.min(1, (now - start) / ms)
+      const ease = 1 - Math.pow(1 - t, 3)
+      const val = from + (to - from) * ease
+      onTick(val)
       if (t < 1) {
         animFrameRef.current = requestAnimationFrame(tick)
       } else {
-        swipeXRef.current = target
-        setSwipeX(target)
-        onDone?.()
+        onTick(to)
+        onDone()
       }
     }
     animFrameRef.current = requestAnimationFrame(tick)
   }
 
-  function triggerTransition(dir: 1 | -1) {
-    const target = dir === 1 ? -size.w : size.w
-    animateTo(target, () => {
-      setActiveIdx(i => {
-        const next = Math.max(0, Math.min(sorted.length - 1, i + dir))
-        return next
-      })
-      swipeXRef.current = 0
-      setSwipeX(0)
+  function startTransitionToNext() {
+    if (isTransitioning.current || activeIdx >= sorted.length - 1) return
+    isTransitioning.current = true
+
+    const transform = getTransform(activeIdx)
+    const nextDisplayW = displayWForIdx(activeIdx + 1)
+    const entryPanX = transform
+      ? Math.max(0, Math.min(transform.bEntryX * nextDisplayW, maxPanXForIdx(activeIdx + 1)))
+      : 0
+
+    // Animamos transX de 0 → size.w (desliza foto actual hacia la izquierda)
+    animate(0, size.w, TRANSITION_MS, v => {
+      transXRef.current = v
+      setTransX(v)
+    }, () => {
+      isTransitioning.current = false
+      transXRef.current = 0
+      setTransX(0)
+      panXRef.current = entryPanX
+      setPanX(entryPanX)
+      setActiveIdx(i => i + 1)
     })
   }
 
-  // ── Dibujo ────────────────────────────────────────────────
+  function startTransitionToPrev() {
+    if (isTransitioning.current || activeIdx <= 0) return
+    isTransitioning.current = true
+
+    const transform = getTransform(activeIdx - 1)
+    const prevDisplayW = displayWForIdx(activeIdx - 1)
+    // Entramos en la zona anterior cerca del punto de transición (para ver el overlap)
+    const exitPanX = transform
+      ? Math.max(0, Math.min(transform.aTransitionX * prevDisplayW - size.w * 0.3, maxPanXForIdx(activeIdx - 1)))
+      : maxPanXForIdx(activeIdx - 1)
+
+    // Animamos transX de 0 → -size.w (desliza foto actual hacia la derecha)
+    animate(0, -size.w, TRANSITION_MS, v => {
+      transXRef.current = v
+      setTransX(v)
+    }, () => {
+      isTransitioning.current = false
+      transXRef.current = 0
+      setTransX(0)
+      panXRef.current = exitPanX
+      setPanX(exitPanX)
+      setActiveIdx(i => i - 1)
+    })
+  }
+
+  // ── Touch: panning y transición ───────────────────────────────
+  const touchStartX = useRef(0)
+  const touchStartPanX = useRef(0)
+  const isTouching = useRef(false)
+  const overshoot = useRef(0)
+
+  // ── Dibujo ────────────────────────────────────────────────────
   const drawPointsRef = useRef<number[]>([])
   const [drawPoints, setDrawPoints] = useState<number[]>([])
   const isDrawing = useRef(false)
   const lastDrawPt = useRef({ x: 0, y: 0 })
-
   const onBlobCompleteRef = useRef(onBlobComplete)
   onBlobCompleteRef.current = onBlobComplete
 
   function screenToChain(sx: number, sy: number): { x: number; y: number } {
     const zone = sorted[activeIdx]
     const zl = layout.zones.find(z => z.id === zone?.id)
-    const img = zone && zoneImages[zone.id]
-    const pr = computePhotoRect(size.w, size.h, img?.naturalWidth ?? 4, img?.naturalHeight ?? 3)
-    if (!zl || !pr.w || !pr.h) return { x: 0, y: 0 }
-    const photoRelX = (sx - swipeXRef.current - pr.x) / pr.w
-    const photoRelY = (sy - pr.y) / pr.h
+    const dw = displayWForIdx(activeIdx)
+    if (!zl || !dw) return { x: 0, y: 0 }
+    const photoRelX = (sx + panXRef.current) / dw
+    const photoRelY = sy / size.h
     const virtualX = zl.virtualX + photoRelX * zl.virtualW
     return {
       x: layout.totalW > 0 ? virtualX / layout.totalW : 0,
@@ -186,45 +239,54 @@ export default function ChainCanvas({
     onBlobCompleteRef.current(path, zone.id, zone.chain_id)
   }
 
-  // ── Touch handlers ────────────────────────────────────────
+  // ── Konva event handlers ──────────────────────────────────────
   const handleTouchStart = useCallback((e: KonvaEventObject<TouchEvent>) => {
     e.evt.preventDefault()
+    if (isTransitioning.current) return
     const touches = e.evt.touches
     if (touches.length !== 1) return
-
     const t = touches[0]
-    const rect = stageRef.current!.container().getBoundingClientRect()
-
     if (paintMode) {
       isDrawing.current = true
+      const rect = stageRef.current!.container().getBoundingClientRect()
       addDrawPoint(t.clientX - rect.left, t.clientY - rect.top)
     } else {
-      isSwiping.current = true
-      swipeStartX.current = t.clientX
-      if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current)
+      isTouching.current = true
+      overshoot.current = 0
+      touchStartX.current = t.clientX
+      touchStartPanX.current = panXRef.current
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [paintMode, size, layout, activeIdx, sorted])
+  }, [paintMode, activeIdx, sorted.length])
 
   const handleTouchMove = useCallback((e: KonvaEventObject<TouchEvent>) => {
     e.evt.preventDefault()
+    if (isTransitioning.current) return
     const touches = e.evt.touches
     if (touches.length !== 1) return
     const t = touches[0]
-    const rect = stageRef.current!.container().getBoundingClientRect()
 
     if (paintMode && isDrawing.current) {
+      const rect = stageRef.current!.container().getBoundingClientRect()
       addDrawPoint(t.clientX - rect.left, t.clientY - rect.top)
-    } else if (!paintMode && isSwiping.current) {
-      let dx = t.clientX - swipeStartX.current
-      // Limitar: no swipe derecha en primera zona, no izquierda en última
-      if (dx > 0 && activeIdx === 0) dx = dx * 0.2
-      if (dx < 0 && activeIdx === sorted.length - 1) dx = dx * 0.2
-      swipeXRef.current = dx
-      setSwipeX(dx)
+      return
     }
+
+    if (!isTouching.current) return
+    const dx = t.clientX - touchStartX.current  // positivo = dedo se movió a la derecha
+    // Mover dedo a la IZQUIERDA (dx < 0) → aumentar panX (ver más a la derecha de la foto)
+    const rawPanX = touchStartPanX.current - dx
+    const limitedPanX = Math.max(0, Math.min(rawPanX, transitionPanXForIdx(activeIdx)))
+
+    // Overshoot (más allá del límite) → resistencia
+    const excess = rawPanX - limitedPanX
+    const resistedPanX = limitedPanX + excess * 0.25
+    overshoot.current = rawPanX - transitionPanXForIdx(activeIdx)  // positivo si pasa el límite derecho, negativo si pasa el izquierdo
+
+    panXRef.current = Math.min(resistedPanX, transitionPanXForIdx(activeIdx) + size.w * 0.4)
+    setPanX(panXRef.current)
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [paintMode, activeIdx, sorted.length, size, layout])
+  }, [paintMode, activeIdx, sorted.length, size, anchors])
 
   const handleTouchEnd = useCallback((_e: KonvaEventObject<TouchEvent>) => {
     if (paintMode && isDrawing.current) {
@@ -232,20 +294,24 @@ export default function ChainCanvas({
       finishDrawing()
       return
     }
-    if (!isSwiping.current) return
-    isSwiping.current = false
-    const dx = swipeXRef.current
-    const threshold = size.w * SWIPE_THRESHOLD
+    if (!isTouching.current) return
+    isTouching.current = false
 
-    if (dx < -threshold && activeIdx < sorted.length - 1) {
-      triggerTransition(1)
-    } else if (dx > threshold && activeIdx > 0) {
-      triggerTransition(-1)
+    const over = overshoot.current
+    if (over > TRANSITION_OVERSHOOT && activeIdx < sorted.length - 1) {
+      startTransitionToNext()
+    } else if (over < -TRANSITION_OVERSHOOT && activeIdx > 0) {
+      startTransitionToPrev()
     } else {
-      animateTo(0)
+      // Snap back al rango válido
+      const target = Math.max(0, Math.min(panXRef.current, transitionPanXForIdx(activeIdx)))
+      animate(panXRef.current, target, 180, v => {
+        panXRef.current = v
+        setPanX(v)
+      }, () => {})
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [paintMode, activeIdx, sorted.length, size.w])
+  }, [paintMode, activeIdx, sorted.length, size, anchors])
 
   const handleMouseDown = useCallback((_e: KonvaEventObject<MouseEvent>) => {
     if (!paintMode) return
@@ -253,94 +319,78 @@ export default function ChainCanvas({
     const p = stageRef.current!.getPointerPosition()!
     addDrawPoint(p.x, p.y)
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [paintMode, size, layout, activeIdx, sorted])
+  }, [paintMode, activeIdx, sorted.length, size, layout])
 
   const handleMouseMove = useCallback((_e: KonvaEventObject<MouseEvent>) => {
     if (!paintMode || !isDrawing.current) return
     const p = stageRef.current!.getPointerPosition()!
     addDrawPoint(p.x, p.y)
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [paintMode, size, layout, activeIdx])
+  }, [paintMode, activeIdx])
 
-  const handleMouseUp = useCallback(() => {
+  const handleMouseUp = useCallback((_e: KonvaEventObject<MouseEvent>) => {
     if (!paintMode || !isDrawing.current) return
     isDrawing.current = false
     finishDrawing()
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [paintMode, activeIdx, sorted])
 
-  // ── Helpers de render ─────────────────────────────────────
-  function photoRectForIdx(idx: number): PhotoRect {
+  // ── Renderizado ───────────────────────────────────────────────
+  function renderPhoto(idx: number, offsetX: number) {
     const zone = sorted[idx]
-    const img = zone && zoneImages[zone.id]
-    return computePhotoRect(size.w, size.h, img?.naturalWidth ?? 4, img?.naturalHeight ?? 3)
+    if (!zone) return null
+    const img = zoneImages[zone.id]
+    const dw = displayWForIdx(idx)
+    const x = offsetX
+    if (img) {
+      return (
+        <KonvaImage key={zone.id} x={x} y={0} width={dw} height={size.h} image={img} />
+      )
+    }
+    return (
+      <Group key={zone.id}>
+        <Rect x={x} y={0} width={dw} height={size.h} fill={FALLBACK_COLOR} />
+        <Text x={x + 24} y={24} text={zone.name} fontSize={22} fill="rgba(255,255,255,0.2)" fontFamily="sans-serif" />
+      </Group>
+    )
   }
 
-  function chainToScreen(p: { x: number; y: number }, idx: number, offsetX: number): { x: number; y: number } {
+  function chainToScreen(p: { x: number; y: number }, idx: number, localPanX: number): { x: number; y: number } {
     const zone = sorted[idx]
     const zl = layout.zones.find(z => z.id === zone?.id)
-    const pr = photoRectForIdx(idx)
-    if (!zl) return { x: 0, y: 0 }
+    const dw = displayWForIdx(idx)
+    if (!zl || !dw) return { x: 0, y: 0 }
     const virtualX = p.x * layout.totalW
     const relX = (virtualX - zl.virtualX) / zl.virtualW
-    const relY = p.y
     return {
-      x: pr.x + relX * pr.w + offsetX,
-      y: pr.y + relY * pr.h,
+      x: relX * dw - localPanX,
+      y: p.y * size.h,
     }
   }
 
-  function routesForIdx(idx: number) {
+  function renderRoutes(idx: number, localPanX: number) {
     const zone = sorted[idx]
-    if (!zone) return []
-    const zl = layout.zones.find(z => z.id === zone.id)
-    if (!zl) return []
-    return routes.filter(r => {
+    const zl = layout.zones.find(z => z.id === zone?.id)
+    if (!zone || !zl) return null
+
+    const zoneRoutes = routes.filter(r => {
       if (!r.chain_id || !r.blob_path?.length) return false
-      // Mostrar ruta si algún punto pertenece a este zone
       return r.blob_path.some(p => {
         const vx = p.x * layout.totalW
         return vx >= zl.virtualX && vx < zl.virtualX + zl.virtualW
       })
     })
-  }
 
-  function renderPhoto(idx: number, offsetX: number) {
-    const zone = sorted[idx]
-    if (!zone) return null
-    const img = zoneImages[zone.id]
-    const pr = photoRectForIdx(idx)
-    if (img) {
-      return (
-        <KonvaImage
-          key={zone.id}
-          x={pr.x + offsetX}
-          y={pr.y}
-          width={pr.w}
-          height={pr.h}
-          image={img}
-        />
-      )
-    }
-    return (
-      <Group key={zone.id}>
-        <Rect x={offsetX} y={0} width={size.w} height={size.h} fill={FALLBACK_COLOR} />
-        <Text x={offsetX + 24} y={24} text={zone.name} fontSize={22} fill="rgba(255,255,255,0.2)" fontFamily="sans-serif" />
-      </Group>
-    )
-  }
-
-  function renderRoutes(idx: number, offsetX: number) {
-    return routesForIdx(idx).map(route => {
+    return zoneRoutes.map(route => {
       if (!route.blob_path || route.blob_path.length < 2) return null
       const flat = route.blob_path.flatMap(p => {
-        const s = chainToScreen(p, idx, offsetX)
+        const s = chainToScreen(p, idx, localPanX)
         return [s.x, s.y]
       })
       const centS = chainToScreen({
         x: route.blob_path.reduce((s, p) => s + p.x, 0) / route.blob_path.length,
         y: route.blob_path.reduce((s, p) => s + p.y, 0) / route.blob_path.length,
-      }, idx, offsetX)
+      }, idx, localPanX)
 
       const colorHex = getColorHex(route.color)
       const level = getFreshnessLevel(route.placed_at)
@@ -369,11 +419,41 @@ export default function ChainCanvas({
     })
   }
 
+  // panX efectivo durante animación de transición
+  // transX > 0 → deslizando hacia siguiente (foto activa va a la izquierda)
+  // transX < 0 → deslizando hacia anterior (foto activa va a la derecha)
+  const effectivePanX = panX + transX
+
+  // Foto previa (visible durante transición a la izquierda)
+  const showPrevPeek = transX < 0 && activeIdx > 0
+  // Foto siguiente (visible durante transición a la derecha)
+  const showNextPeek = transX > 0 && activeIdx < sorted.length - 1
+
+  const prevPanX = transX < 0
+    ? (() => {
+        const transform = getTransform(activeIdx - 1)
+        const prevDW = displayWForIdx(activeIdx - 1)
+        return transform
+          ? Math.max(0, transform.aTransitionX * prevDW - size.w * 0.3)
+          : maxPanXForIdx(activeIdx - 1)
+      })()
+    : 0
+
+  const nextEntryPanX = transX > 0
+    ? (() => {
+        const transform = getTransform(activeIdx)
+        const nextDW = displayWForIdx(activeIdx + 1)
+        return transform
+          ? Math.max(0, Math.min(transform.bEntryX * nextDW, maxPanXForIdx(activeIdx + 1)))
+          : 0
+      })()
+    : 0
+
   const drawScreenPts = drawPoints.length >= 4
     ? (() => {
         const flat: number[] = []
         for (let i = 0; i < drawPoints.length; i += 2) {
-          const s = chainToScreen({ x: drawPoints[i], y: drawPoints[i + 1] }, activeIdx, swipeX)
+          const s = chainToScreen({ x: drawPoints[i], y: drawPoints[i + 1] }, activeIdx, panX)
           flat.push(s.x, s.y)
         }
         return flat
@@ -382,14 +462,10 @@ export default function ChainCanvas({
 
   const previewScreenPts = previewBlob && previewBlob.path.length >= 2
     ? previewBlob.path.flatMap(p => {
-        const s = chainToScreen(p, activeIdx, 0)
+        const s = chainToScreen(p, activeIdx, panX)
         return [s.x, s.y]
       })
     : []
-
-  // Zona vecina que se muestra durante el swipe
-  const showNext = swipeX < 0 && activeIdx < sorted.length - 1
-  const showPrev = swipeX > 0 && activeIdx > 0
 
   return (
     <div ref={containerRef} className="w-full h-full overflow-hidden touch-none select-none">
@@ -407,22 +483,22 @@ export default function ChainCanvas({
       >
         {/* Layer 1: Fotos */}
         <Layer listening={false}>
-          {/* Foto previa (peek cuando swipe derecha) */}
-          {showPrev && renderPhoto(activeIdx - 1, -size.w + swipeX)}
-          {/* Foto siguiente (peek cuando swipe izquierda) */}
-          {showNext && renderPhoto(activeIdx + 1, size.w + swipeX)}
+          {/* Foto previa durante transición hacia atrás */}
+          {showPrevPeek && renderPhoto(activeIdx - 1, -displayWForIdx(activeIdx - 1) + prevPanX + size.w + Math.abs(transX))}
+          {/* Foto siguiente durante transición hacia adelante */}
+          {showNextPeek && renderPhoto(activeIdx + 1, displayWForIdx(activeIdx) - effectivePanX - nextEntryPanX)}
           {/* Foto activa */}
-          {renderPhoto(activeIdx, swipeX)}
+          {renderPhoto(activeIdx, -effectivePanX)}
         </Layer>
 
         {/* Layer 2: Rutas */}
         <Layer>
-          {showPrev && renderRoutes(activeIdx - 1, -size.w + swipeX)}
-          {showNext && renderRoutes(activeIdx + 1, size.w + swipeX)}
-          {renderRoutes(activeIdx, swipeX)}
+          {showPrevPeek && renderRoutes(activeIdx - 1, prevPanX - (size.w + Math.abs(transX)))}
+          {showNextPeek && renderRoutes(activeIdx + 1, nextEntryPanX - (displayWForIdx(activeIdx) - effectivePanX))}
+          {renderRoutes(activeIdx, effectivePanX)}
         </Layer>
 
-        {/* Layer 3: Dibujo activo + preview */}
+        {/* Layer 3: Dibujo */}
         <Layer listening={false}>
           {previewScreenPts.length >= 4 && (
             <Line points={previewScreenPts} stroke={getColorHex(drawColor)} strokeWidth={STROKE_W}
@@ -435,7 +511,7 @@ export default function ChainCanvas({
         </Layer>
       </Stage>
 
-      {/* Indicador de zona (dots) */}
+      {/* Dots indicadores de zona */}
       {sorted.length > 1 && (
         <div className="absolute bottom-3 left-0 right-0 flex justify-center pointer-events-none z-10">
           <div className="flex items-center gap-1.5">

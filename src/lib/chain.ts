@@ -1,4 +1,4 @@
-import type { Zone, ZoneAnchor } from '../types'
+import type { Zone, ZoneAnchor, PointPair } from '../types'
 
 export const CHAIN_H = 900
 
@@ -115,6 +115,71 @@ export function virtualToChain(
   return {
     x: layout.totalW > 0 ? vx / layout.totalW : 0,
     y: CHAIN_H > 0 ? vy / CHAIN_H : 0,
+  }
+}
+
+// ── Transforms de calibración por puntos ─────────────────────────────────────
+
+export interface AnchorTransform {
+  /** X normalizado (0-1) en foto A donde empieza la zona de transición */
+  aTransitionX: number
+  /** X normalizado (0-1) en foto B donde entramos al venir de A */
+  bEntryX: number
+  /** Convierte coordenadas normalizadas de foto A a foto B */
+  aToB: (p: { x: number; y: number }) => { x: number; y: number }
+  /** Convierte coordenadas normalizadas de foto B a foto A */
+  bToA: (p: { x: number; y: number }) => { x: number; y: number }
+}
+
+function linearRegress(xs: number[], ys: number[]): { slope: number; intercept: number } {
+  const n = xs.length
+  if (n === 0) return { slope: 1, intercept: 0 }
+  if (n === 1) return { slope: 1, intercept: ys[0] - xs[0] }
+  const mx = xs.reduce((s, x) => s + x, 0) / n
+  const my = ys.reduce((s, y) => s + y, 0) / n
+  const num = xs.reduce((s, x, i) => s + (x - mx) * (ys[i] - my), 0)
+  const den = xs.reduce((s, x) => s + (x - mx) ** 2, 0)
+  const slope = den > 1e-9 ? num / den : 1
+  return { slope, intercept: my - slope * mx }
+}
+
+export function computeAnchorTransform(pairs: PointPair[]): AnchorTransform {
+  if (pairs.length === 0) {
+    return {
+      aTransitionX: 1,   // sin calibración: no hay límite en A
+      bEntryX: 0,
+      aToB: p => p,
+      bToA: p => p,
+    }
+  }
+
+  // El par con menor a.x define el límite de panning en A y el punto de entrada en B
+  const sorted = [...pairs].sort((p, q) => p.a.x - q.a.x)
+  const aTransitionX = sorted[0].a.x
+  const bEntryX = sorted[0].b.x
+
+  const axs = pairs.map(p => p.a.x)
+  const bxs = pairs.map(p => p.b.x)
+  const ays = pairs.map(p => p.a.y)
+  const bys = pairs.map(p => p.b.y)
+
+  const xReg = linearRegress(axs, bxs)
+  const yReg = linearRegress(ays, bys)
+
+  const xRegInv = linearRegress(bxs, axs)
+  const yRegInv = linearRegress(bys, ays)
+
+  return {
+    aTransitionX,
+    bEntryX,
+    aToB: p => ({
+      x: xReg.slope * p.x + xReg.intercept,
+      y: yReg.slope * p.y + yReg.intercept,
+    }),
+    bToA: p => ({
+      x: xRegInv.slope * p.x + xRegInv.intercept,
+      y: yRegInv.slope * p.y + yRegInv.intercept,
+    }),
   }
 }
 

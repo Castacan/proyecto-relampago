@@ -1,62 +1,114 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useAllChains, useChain } from '../../hooks/useChain'
-import type { ZoneAnchor, Zone } from '../../types'
+import type { Zone, ZoneAnchor, PointPair } from '../../types'
+import { computeAnchorTransform } from '../../lib/chain'
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 import { supabase } from '../../lib/supabase'
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const db = supabase as unknown as any
 
-interface SliderPhotoProps {
-  zone: Zone
-  overlapX: number
-  side: 'left' | 'right'
-  onChange: (v: number) => void
+const PAIR_COLORS = ['#ef4444', '#3b82f6', '#22c55e', '#f59e0b', '#a855f7', '#ec4899']
+const MAX_PAIRS = 6
+
+// Dado un click en un <img> con object-contain, devuelve coords normalizadas (0-1)
+function clickToNorm(
+  e: React.MouseEvent<HTMLDivElement>,
+  imgEl: HTMLImageElement
+): { x: number; y: number } | null {
+  const rect = e.currentTarget.getBoundingClientRect()
+  const cx = e.clientX - rect.left
+  const cy = e.clientY - rect.top
+  const cw = rect.width
+  const ch = rect.height
+  const nw = imgEl.naturalWidth
+  const nh = imgEl.naturalHeight
+  if (!nw || !nh) return null
+
+  // Display rect dentro del contenedor (object-contain)
+  let dw: number, dh: number, ox: number, oy: number
+  if (cw / ch > nw / nh) {
+    dh = ch; dw = ch * (nw / nh); ox = (cw - dw) / 2; oy = 0
+  } else {
+    dw = cw; dh = cw * (nh / nw); ox = 0; oy = (ch - dh) / 2
+  }
+
+  const px = (cx - ox) / dw
+  const py = (cy - oy) / dh
+  if (px < 0 || px > 1 || py < 0 || py > 1) return null
+  return { x: px, y: py }
 }
 
-function SliderPhoto({ zone, overlapX, side, onChange }: SliderPhotoProps) {
+interface PhotoPanelProps {
+  zone: Zone
+  pairs: PointPair[]
+  side: 'a' | 'b'
+  waitingForClick: boolean
+  onPhotoClick: (p: { x: number; y: number }) => void
+}
+
+function PhotoPanel({ zone, pairs, side, waitingForClick, onPhotoClick }: PhotoPanelProps) {
+  const imgRef = useRef<HTMLImageElement>(null)
+
+  function handleClick(e: React.MouseEvent<HTMLDivElement>) {
+    if (!waitingForClick || !imgRef.current) return
+    const p = clickToNorm(e, imgRef.current)
+    if (p) onPhotoClick(p)
+  }
+
   return (
     <div className="flex-1 flex flex-col gap-2 min-w-0">
-      <p className="text-zinc-400 text-xs font-semibold uppercase tracking-widest truncate text-center">
+      <p className="text-zinc-400 text-xs font-semibold uppercase tracking-widest text-center truncate">
         {zone.name}
       </p>
-      <div className="relative w-full aspect-video bg-zinc-800 rounded-xl overflow-hidden border border-zinc-700/50">
+      <div
+        className={`relative w-full aspect-video bg-zinc-800 rounded-xl overflow-hidden border transition-all ${
+          waitingForClick
+            ? 'border-yellow-400 cursor-crosshair shadow-[0_0_0_2px_rgba(250,204,21,0.3)]'
+            : 'border-zinc-700/50 cursor-default'
+        }`}
+        onClick={handleClick}
+      >
         {zone.image_url ? (
-          <img src={zone.image_url} alt={zone.name} className="w-full h-full object-cover" draggable={false} />
+          <img
+            ref={imgRef}
+            src={zone.image_url}
+            alt={zone.name}
+            className="w-full h-full object-contain"
+            draggable={false}
+          />
         ) : (
           <div className="w-full h-full flex items-center justify-center text-zinc-600 text-xs">Sin foto</div>
         )}
 
-        {/* Línea de corte */}
-        <div
-          className="absolute top-0 bottom-0 w-0.5 bg-yellow-400"
-          style={{ left: `${overlapX * 100}%` }}
-        />
+        {/* Puntos de calibración */}
+        {pairs.map((pair, i) => {
+          const p = side === 'a' ? pair.a : pair.b
+          return (
+            <div
+              key={i}
+              className="absolute w-4 h-4 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-zinc-950 pointer-events-none"
+              style={{
+                left: `${p.x * 100}%`,
+                top: `${p.y * 100}%`,
+                backgroundColor: PAIR_COLORS[i % PAIR_COLORS.length],
+              }}
+            >
+              <span className="absolute inset-0 flex items-center justify-center text-[8px] font-black text-white leading-none">
+                {i + 1}
+              </span>
+            </div>
+          )
+        })}
 
-        {/* Área de overlap sombreada */}
-        {side === 'left' && (
-          <div className="absolute top-0 bottom-0 bg-yellow-400/15" style={{ left: `${overlapX * 100}%`, right: 0 }} />
+        {/* Indicador cuando está esperando click */}
+        {waitingForClick && (
+          <div className="absolute top-2 left-0 right-0 flex justify-center pointer-events-none">
+            <div className="bg-yellow-400 text-zinc-950 text-[10px] font-black px-2 py-0.5 rounded-full">
+              Toca un punto
+            </div>
+          </div>
         )}
-        {side === 'right' && (
-          <div className="absolute top-0 bottom-0 bg-yellow-400/15" style={{ left: 0, width: `${overlapX * 100}%` }} />
-        )}
-
-        {/* Porcentaje */}
-        <div
-          className="absolute bottom-1.5 text-yellow-400 text-[10px] font-bold pointer-events-none"
-          style={{ left: side === 'left' ? `${overlapX * 100 + 1}%` : undefined, right: side === 'right' ? `${(1 - overlapX) * 100 + 1}%` : undefined }}
-        >
-          {Math.round(overlapX * 100)}%
-        </div>
       </div>
-
-      <input
-        type="range"
-        min={0}
-        max={100}
-        value={Math.round(overlapX * 100)}
-        onChange={e => onChange(Number(e.target.value) / 100)}
-        className="w-full accent-yellow-400"
-      />
     </div>
   )
 }
@@ -66,39 +118,74 @@ export default function CalibrationPage() {
   const [selectedChainId, setSelectedChainId] = useState<string | null>(null)
   const { zones, anchors: existingAnchors, loading: chainLoading, refetch } = useChain(selectedChainId)
 
-  const [localAnchors, setLocalAnchors] = useState<Record<string, Omit<ZoneAnchor, 'id' | 'chain_id'>>>({})
+  const sortedZones = [...zones].sort((a, b) => a.chain_position - b.chain_position)
+
+  // Por cada par de zonas: estado de pares de puntos
+  const [pairsMap, setPairsMap] = useState<Record<string, PointPair[]>>({})
+  const [pendingA, setPendingA] = useState<Record<string, { x: number; y: number } | null>>({})
   const [saving, setSaving] = useState<string | null>(null)
   const [saved, setSaved] = useState<string | null>(null)
 
-  const sortedZones = [...zones].sort((a, b) => a.chain_position - b.chain_position)
-
   useEffect(() => {
-    const init: Record<string, Omit<ZoneAnchor, 'id' | 'chain_id'>> = {}
+    const init: Record<string, PointPair[]> = {}
     for (let i = 0; i < sortedZones.length - 1; i++) {
       const za = sortedZones[i]
       const zb = sortedZones[i + 1]
       const key = `${za.id}-${zb.id}`
       const ex = existingAnchors.find(a => a.zone_a_id === za.id && a.zone_b_id === zb.id)
-      init[key] = ex
-        ? { zone_a_id: za.id, zone_b_id: zb.id, a_overlap_start: ex.a_overlap_start, a_overlap_end: ex.a_overlap_end, b_overlap_start: ex.b_overlap_start, b_overlap_end: ex.b_overlap_end }
-        : { zone_a_id: za.id, zone_b_id: zb.id, a_overlap_start: 0.75, a_overlap_end: 1.0, b_overlap_start: 0.0, b_overlap_end: 0.25 }
+      init[key] = ex?.point_pairs ?? []
     }
-    setLocalAnchors(init)
+    setPairsMap(init)
+    setPendingA({})
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [zones, existingAnchors])
+
+  function handleClickA(key: string, p: { x: number; y: number }) {
+    setPendingA(prev => ({ ...prev, [key]: p }))
+  }
+
+  function handleClickB(key: string, p: { x: number; y: number }) {
+    const a = pendingA[key]
+    if (!a) return
+    const currentPairs = pairsMap[key] ?? []
+    if (currentPairs.length >= MAX_PAIRS) return
+    setPairsMap(prev => ({ ...prev, [key]: [...(prev[key] ?? []), { a, b: p }] }))
+    setPendingA(prev => ({ ...prev, [key]: null }))
+  }
+
+  function removePair(key: string, idx: number) {
+    setPairsMap(prev => ({ ...prev, [key]: (prev[key] ?? []).filter((_, i) => i !== idx) }))
+  }
+
+  function cancelPending(key: string) {
+    setPendingA(prev => ({ ...prev, [key]: null }))
+  }
 
   async function handleSave(za: Zone, zb: Zone) {
     if (!selectedChainId) return
     const key = `${za.id}-${zb.id}`
-    const data = localAnchors[key]
-    if (!data) return
+    const pairs = pairsMap[key] ?? []
+    const transform = computeAnchorTransform(pairs)
     setSaving(key)
+
     const existing = existingAnchors.find(a => a.zone_a_id === za.id && a.zone_b_id === zb.id)
+    const data: Partial<ZoneAnchor> & { point_pairs: PointPair[] } = {
+      zone_a_id: za.id,
+      zone_b_id: zb.id,
+      // Mantener backward compat con columnas antiguas
+      a_overlap_start: transform.aTransitionX,
+      a_overlap_end: 1.0,
+      b_overlap_start: 0.0,
+      b_overlap_end: transform.bEntryX,
+      point_pairs: pairs,
+    }
+
     if (existing) {
       await db.from('zone_anchors').update(data).eq('id', existing.id)
     } else {
       await db.from('zone_anchors').insert({ chain_id: selectedChainId, ...data })
     }
+
     refetch()
     setSaving(null)
     setSaved(key)
@@ -110,7 +197,7 @@ export default function CalibrationPage() {
       <div className="px-4 pt-5 pb-8">
         <h1 className="text-white font-black text-2xl tracking-tight mb-1">Calibración</h1>
         <p className="text-zinc-500 text-sm mb-6">
-          Mueve las líneas amarillas para definir dónde empieza y termina la zona de transición entre fotos.
+          Toca el mismo punto físico en ambas fotos para crear un par. Añade 3-6 pares para mayor precisión.
         </p>
 
         {chainsLoading ? (
@@ -149,49 +236,108 @@ export default function CalibrationPage() {
                   <p className="text-zinc-500 text-sm">Necesitas al menos 2 zonas en esta cadena.</p>
                 </div>
               ) : (
-                <div className="space-y-6">
+                <div className="space-y-8">
                   {sortedZones.slice(0, -1).map((za, i) => {
                     const zb = sortedZones[i + 1]
                     const key = `${za.id}-${zb.id}`
-                    const anchor = localAnchors[key] ?? { zone_a_id: za.id, zone_b_id: zb.id, a_overlap_start: 0.75, a_overlap_end: 1.0, b_overlap_start: 0.0, b_overlap_end: 0.25 }
+                    const pairs = pairsMap[key] ?? []
+                    const pending = pendingA[key] ?? null
+                    const transform = computeAnchorTransform(pairs)
                     const isSaving = saving === key
                     const wasSaved = saved === key
+                    const waitingA = !pending && pairs.length < MAX_PAIRS
+                    const waitingB = !!pending
 
                     return (
                       <div key={key} className="bg-zinc-900 rounded-2xl p-4 border border-zinc-800/80">
                         <div className="flex items-center justify-between mb-4">
-                          <p className="text-white font-bold text-sm">{za.name} → {zb.name}</p>
+                          <div>
+                            <p className="text-white font-bold text-sm">{za.name} → {zb.name}</p>
+                            {pairs.length > 0 && (
+                              <p className="text-zinc-500 text-xs mt-0.5">
+                                {pairs.length} par{pairs.length !== 1 ? 'es' : ''} ·
+                                transición A en {Math.round(transform.aTransitionX * 100)}% ·
+                                entrada B en {Math.round(transform.bEntryX * 100)}%
+                              </p>
+                            )}
+                          </div>
                           <button
                             onClick={() => handleSave(za, zb)}
-                            disabled={isSaving}
+                            disabled={isSaving || pairs.length === 0}
                             className={`px-4 py-1.5 rounded-xl text-xs font-bold transition-all ${
                               wasSaved
                                 ? 'bg-green-500/20 text-green-400 border border-green-500/30'
-                                : 'bg-yellow-400 text-zinc-950 hover:bg-yellow-300 disabled:opacity-50'
+                                : 'bg-yellow-400 text-zinc-950 hover:bg-yellow-300 disabled:opacity-40'
                             }`}
                           >
-                            {isSaving ? 'Guardando...' : wasSaved ? '✓ Guardado' : 'Guardar'}
+                            {isSaving ? 'Guardando…' : wasSaved ? '✓ Guardado' : 'Guardar'}
                           </button>
                         </div>
 
-                        <div className="flex gap-4">
-                          <SliderPhoto
+                        {/* Instrucción de paso actual */}
+                        <div className="mb-3 text-center">
+                          {pending ? (
+                            <div className="flex items-center justify-center gap-2">
+                              <span className="text-yellow-400 text-xs font-bold">
+                                Paso 2: toca el mismo punto en {zb.name}
+                              </span>
+                              <button
+                                onClick={() => cancelPending(key)}
+                                className="text-zinc-500 text-xs underline"
+                              >
+                                cancelar
+                              </button>
+                            </div>
+                          ) : pairs.length < MAX_PAIRS ? (
+                            <span className="text-zinc-500 text-xs">
+                              Paso 1: toca un punto reconocible en {za.name}
+                            </span>
+                          ) : (
+                            <span className="text-zinc-500 text-xs">Máximo de pares alcanzado</span>
+                          )}
+                        </div>
+
+                        {/* Fotos */}
+                        <div className="flex gap-3">
+                          <PhotoPanel
                             zone={za}
-                            overlapX={anchor.a_overlap_start}
-                            side="left"
-                            onChange={v => setLocalAnchors(prev => ({ ...prev, [key]: { ...anchor, a_overlap_start: v } }))}
+                            pairs={pairs}
+                            side="a"
+                            waitingForClick={waitingA}
+                            onPhotoClick={p => handleClickA(key, p)}
                           />
-                          <SliderPhoto
+                          <PhotoPanel
                             zone={zb}
-                            overlapX={anchor.b_overlap_end}
-                            side="right"
-                            onChange={v => setLocalAnchors(prev => ({ ...prev, [key]: { ...anchor, b_overlap_end: v } }))}
+                            pairs={pairs}
+                            side="b"
+                            waitingForClick={waitingB}
+                            onPhotoClick={p => handleClickB(key, p)}
                           />
                         </div>
 
-                        <p className="text-zinc-600 text-xs mt-3 text-center">
-                          Línea izquierda: dónde empieza la transición en esta foto. Línea derecha: dónde termina en la siguiente.
-                        </p>
+                        {/* Lista de pares */}
+                        {pairs.length > 0 && (
+                          <div className="mt-4 flex flex-wrap gap-2">
+                            {pairs.map((_, pi) => (
+                              <div
+                                key={pi}
+                                className="flex items-center gap-1.5 bg-zinc-800 rounded-full px-2.5 py-1"
+                              >
+                                <div
+                                  className="w-2.5 h-2.5 rounded-full"
+                                  style={{ backgroundColor: PAIR_COLORS[pi % PAIR_COLORS.length] }}
+                                />
+                                <span className="text-zinc-300 text-xs font-bold">Par {pi + 1}</span>
+                                <button
+                                  onClick={() => removePair(key, pi)}
+                                  className="text-zinc-500 hover:text-red-400 text-xs ml-0.5 leading-none"
+                                >
+                                  ×
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        )}
                       </div>
                     )
                   })}

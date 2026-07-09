@@ -42,6 +42,11 @@ export interface Chain {
   entry_from: string | null
 }
 
+export interface PointPair {
+  a: { x: number; y: number }
+  b: { x: number; y: number }
+}
+
 export interface ZoneAnchor {
   id: string
   chain_id: string
@@ -51,4 +56,5 @@ export interface ZoneAnchor {
   a_overlap_end: number
   b_overlap_start: number
   b_overlap_end: number
+  point_pairs: PointPair[]
 }
