@@ -15,11 +15,6 @@ const FALLBACK_COLOR = '#1a2433'
 const MIN_ZOOM = 0.8
 const MAX_ZOOM = 5
 
-function sortPolygon(pts: { x: number; y: number }[]) {
-  const cx = pts.reduce((s, p) => s + p.x, 0) / pts.length
-  const cy = pts.reduce((s, p) => s + p.y, 0) / pts.length
-  return [...pts].sort((a, b) => Math.atan2(a.y - cy, a.x - cx) - Math.atan2(b.y - cy, b.x - cx))
-}
 
 interface Props {
   zones: Zone[]
@@ -530,21 +525,10 @@ export default function ChainCanvas({
     )
     const ownConverter = (p: { x: number; y: number }) => chainToScreen(p, idx, localPanX)
 
-    // Helper: builds a clipFunc from a set of normalized photo points
+    // Clip al rect exacto de la foto (sin el negro de letterbox)
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    function makeClipFunc(photoPts: { x: number; y: number }[]): ((ctx: any) => void) | undefined {
-      if (photoPts.length < 3) return undefined
-      const poly = sortPolygon(photoPts).map(p => ({
-        x: p.x * dw * zoom - localPanX,
-        y: yOffset + p.y * size.h * zoom,
-      }))
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      return (ctx: any) => {
-        ctx.beginPath()
-        ctx.moveTo(poly[0].x, poly[0].y)
-        for (let i = 1; i < poly.length; i++) ctx.lineTo(poly[i].x, poly[i].y)
-        ctx.closePath()
-      }
+    const photoClipFunc = (ctx: any) => {
+      ctx.rect(-localPanX, yOffset, dw * zoom, size.h * zoom)
     }
 
     // Helper: render a cross-zone route group with optional clip
@@ -585,7 +569,7 @@ export default function ChainCanvas({
         const { x: relX_B, y: relY_B } = t.aToB({ x: relX_A, y: p.y })
         return { x: relX_B * dw * zoom - localPanX, y: yOffset + relY_B * size.h * zoom }
       }
-      prevClipFunc = makeClipFunc(prevPairs.map(p => p.b))
+      prevClipFunc = photoClipFunc
     }
 
     // Cross-zone from next (B→A): nextZone routes shown here via bToA, clipped to A-polygon
@@ -611,7 +595,7 @@ export default function ChainCanvas({
         const { x: relX_A, y: relY_A } = t.bToA({ x: relX_B, y: p.y })
         return { x: relX_A * dw * zoom - localPanX, y: yOffset + relY_A * size.h * zoom }
       }
-      nextClipFunc = makeClipFunc(nextPairs.map(p => p.a))
+      nextClipFunc = photoClipFunc
     }
 
     return (
