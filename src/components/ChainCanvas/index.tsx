@@ -487,15 +487,7 @@ export default function ChainCanvas({
     const zl = layout.zones.find(z => z.id === zone?.id)
     if (!zone || !zl) return null
 
-    const zoneRoutes = routes.filter(r => {
-      if (!r.chain_id || !r.blob_path?.length) return false
-      return r.blob_path.some(p => {
-        const vx = p.x * layout.totalW
-        return vx >= zl.virtualX && vx < zl.virtualX + zl.virtualW
-      })
-    })
-
-    // Polígono de clip para rutas que vienen de la zona anterior (rutas cruzadas)
+    // Polígono de clip para rutas cruzadas — se calcula ANTES del filtro
     const prevZone = sorted[idx - 1]
     const prevAnchor = prevZone
       ? anchors.find(a => a.zone_a_id === prevZone.id && a.zone_b_id === zone.id)
@@ -508,6 +500,22 @@ export default function ChainCanvas({
           y: yOffset + b.y * size.h * zoom,
         }))
       : null
+
+    // Filtro de rutas:
+    // - Zona propia: siempre mostrar
+    // - Zona anterior (ruta cruzada): SOLO si hay calibración (polígono B define la zona válida)
+    //   Sin calibración, la ruta no "se cuela" en la zona adyacente
+    const zoneRoutes = routes.filter(r => {
+      if (!r.chain_id || !r.blob_path?.length) return false
+      if (r.zone_id === zone.id) return true
+      if (r.zone_id === prevZone?.id && clipPolyFromPrev !== null) {
+        return r.blob_path.some(p => {
+          const vx = p.x * layout.totalW
+          return vx >= zl.virtualX && vx < zl.virtualX + zl.virtualW
+        })
+      }
+      return false
+    })
 
     function renderSingleRoute(route: Route) {
       if (!route.blob_path || route.blob_path.length < 2) return null
