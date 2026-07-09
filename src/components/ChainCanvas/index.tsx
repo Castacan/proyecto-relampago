@@ -6,6 +6,7 @@ import type { Zone, Route, ZoneAnchor } from '../../types'
 import { getColorHex } from '../../lib/colors'
 import { getFreshnessLevel, getFreshnessColor, getDaysOnWall, getPublicLabel } from '../../lib/freshness'
 import { CHAIN_H, computeChainLayout, computeAnchorTransform } from '../../lib/chain'
+import type { AnchorTransform } from '../../lib/chain'
 
 const TRANSITION_OVERSHOOT = 40
 const TRANSITION_MS = 240
@@ -14,6 +15,12 @@ const MIN_POINT_GAP = 4
 const FALLBACK_COLOR = '#1a2433'
 const MIN_ZOOM = 0.8
 const MAX_ZOOM = 5
+
+function sortPolygon(pts: { x: number; y: number }[]) {
+  const cx = pts.reduce((s, p) => s + p.x, 0) / pts.length
+  const cy = pts.reduce((s, p) => s + p.y, 0) / pts.length
+  return [...pts].sort((a, b) => Math.atan2(a.y - cy, a.x - cx) - Math.atan2(b.y - cy, b.x - cx))
+}
 
 interface Props {
   zones: Zone[]
@@ -480,25 +487,25 @@ export default function ChainCanvas({
     const zl = layout.zones.find(z => z.id === zone?.id)
     if (!zone || !zl) return null
 
-    // Solo muestra rutas pintadas en esta zona exacta.
-    // Las rutas de zonas adyacentes no se muestran aunque coordenadas se solapen.
-    const zoneRoutes = routes.filter(r =>
-      r.chain_id && r.blob_path?.length && r.zone_id === zone.id
-    )
+    const dw = displayWForIdx(idx)
 
-    function renderSingleRoute(route: Route) {
+    function renderRoute(
+      route: Route,
+      converter: (p: { x: number; y: number }) => { x: number; y: number },
+      keySuffix = ''
+    ) {
       if (!route.blob_path || route.blob_path.length < 2) return null
-      const flat = route.blob_path.flatMap(p => { const s = chainToScreen(p, idx, localPanX); return [s.x, s.y] })
-      const centS = chainToScreen({
+      const flat = route.blob_path.flatMap(p => { const s = converter(p); return [s.x, s.y] })
+      const centS = converter({
         x: route.blob_path.reduce((s, p) => s + p.x, 0) / route.blob_path.length,
         y: route.blob_path.reduce((s, p) => s + p.y, 0) / route.blob_path.length,
-      }, idx, localPanX)
+      })
       const colorHex = getColorHex(route.color)
       const level = getFreshnessLevel(route.placed_at)
       const freshnessHex = getFreshnessColor(level)
       const days = getDaysOnWall(route.placed_at)
       return (
-        <Group key={route.id} onClick={() => onRouteClick(route)} onTap={() => onRouteClick(route)}>
+        <Group key={route.id + keySuffix} onClick={() => onRouteClick(route)} onTap={() => onRouteClick(route)}>
           <Line points={flat} stroke={freshnessHex} strokeWidth={STROKE_W + 6} tension={0.5} lineCap="round" lineJoin="round" opacity={0.35} listening={false} />
           <Line points={flat} stroke={colorHex} strokeWidth={STROKE_W} tension={0.5} lineCap="round" lineJoin="round" opacity={0.92} hitStrokeWidth={32} />
           {isStaff ? (
@@ -518,7 +525,68 @@ export default function ChainCanvas({
       )
     }
 
-    return <>{zoneRoutes.map(renderSingleRoute)}</>
+    // Own-zone routes
+    const ownRoutes = routes.filter(r =>
+      r.chain_id && r.blob_path?.length && r.zone_id === zone.id
+    )
+    const ownConverter = (p: { x: number; y: number }) => chainToScreen(p, idx, localPanX)
+
+    // Cross-zone: routes from prevZone shown in this zone via aToB transform + B-polygon clip
+    const prevZone = sorted[idx - 1]
+    const prevAnchor = prevZone
+      ? anchors.find(a => a.zone_a_id === prevZone.id && a.zone_b_id === zone.id)
+      : null
+    const pairs = prevAnchor?.point_pairs ?? []
+    const zl_A = prevZone ? layout.zones.find(z => z.id === prevZone.id) : null
+
+    let crossZoneRoutes: Route[] = []
+    let crossConverter: ((p: { x: number; y: number }) => { x: number; y: number }) | null = null
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let crossClipFunc: ((ctx: any) => void) | undefined = undefined
+
+    if (pairs.length >= 3 && zl_A) {
+      const transform: AnchorTransform = computeAnchorTransform(pairs)
+      crossZoneRoutes = routes.filter(r =>
+        r.chain_id && r.blob_path?.length && r.zone_id === prevZone!.id
+      )
+      crossConverter = (p: { x: number; y: number }) => {
+        const relX_A = (p.x * layout.totalW - zl_A.virtualX) / zl_A.virtualW
+        const { x: relX_B, y: relY_B } = transform.aToB({ x: relX_A, y: p.y })
+        return {
+          x: relX_B * dw * zoom - localPanX,
+          y: yOffset + relY_B * size.h * zoom,
+        }
+      }
+      const bPts = pairs.slice(0, 4).map(p => p.b)
+      if (bPts.length >= 3) {
+        const bPoly = sortPolygon(bPts).map(b => ({
+          x: b.x * dw * zoom - localPanX,
+          y: yOffset + b.y * size.h * zoom,
+        }))
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        crossClipFunc = (ctx: any) => {
+          ctx.beginPath()
+          ctx.moveTo(bPoly[0].x, bPoly[0].y)
+          for (let i = 1; i < bPoly.length; i++) ctx.lineTo(bPoly[i].x, bPoly[i].y)
+          ctx.closePath()
+        }
+      }
+    }
+
+    return (
+      <>
+        {ownRoutes.map(r => renderRoute(r, ownConverter))}
+        {crossConverter && crossZoneRoutes.length > 0 && (
+          crossClipFunc
+            ? (
+              <Group clipFunc={crossClipFunc}>
+                {crossZoneRoutes.map(r => renderRoute(r, crossConverter!, '_cross'))}
+              </Group>
+            )
+            : crossZoneRoutes.map(r => renderRoute(r, crossConverter!, '_cross'))
+        )}
+      </>
+    )
   }
 
   const effectivePanX = panX + transX
