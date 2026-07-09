@@ -24,6 +24,7 @@ export default function WallPage() {
   const { zones: chainZones, anchors, loading: chainLoading } = useChain(defaultChainId)
 
   const [activeZoneId, setActiveZoneId] = useState<string | null>(null)
+  const [jumpZoneId, setJumpZoneId] = useState<string | null>(null)
   const [selectedRoute, setSelectedRoute] = useState<Route | null>(null)
   const [ui, setUi] = useState<UIState>('idle')
   const [paintColor, setPaintColor] = useState('amarillo')
@@ -83,13 +84,18 @@ export default function WallPage() {
         onBlobComplete={handleBlobComplete}
         onRouteClick={route => { if (ui === 'idle') setSelectedRoute(route) }}
         onActiveZoneChange={setActiveZoneId}
+        jumpToZoneId={jumpZoneId}
       />
 
       {/* Minimap */}
       <ZoneMap
         zones={allZones}
         routes={routes}
-        onZoneSelect={() => {}}
+        onZoneSelect={zone => {
+          // Solo zonas de la cadena activa tienen efecto
+          const inChain = chainZones.find(z => z.id === zone.id)
+          if (inChain) setJumpZoneId(zone.id)
+        }}
         mini={true}
         selectedZoneIds={activeZoneId ? [activeZoneId] : []}
       />
