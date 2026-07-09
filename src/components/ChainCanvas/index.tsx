@@ -557,7 +557,7 @@ export default function ChainCanvas({
           y: yOffset + relY_B * size.h * zoom,
         }
       }
-      const bPts = pairs.slice(0, 4).map(p => p.b)
+      const bPts = pairs.map(p => p.b)
       if (bPts.length >= 3) {
         const bPoly = sortPolygon(bPts).map(b => ({
           x: b.x * dw * zoom - localPanX,
