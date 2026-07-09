@@ -1,11 +1,21 @@
-import { useState } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import QRCode from 'react-qr-code'
 import { supabase } from '../../lib/supabase'
+import type { Zone, Chain } from '../../types'
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const db = supabase as unknown as any
 
 interface GeneratedQr {
   id: string
   url: string
+}
+
+interface ChainState {
+  chain: Chain | null
+  chainZones: Zone[]
+  freeZones: Zone[]
 }
 
 export default function AdminPage() {
@@ -15,6 +25,62 @@ export default function AdminPage() {
   const [generating, setGenerating] = useState(false)
   const [genError, setGenError] = useState<string | null>(null)
   const [exportingCsv, setExportingCsv] = useState(false)
+
+  const [chainState, setChainState] = useState<ChainState>({ chain: null, chainZones: [], freeZones: [] })
+  const [chainLoading, setChainLoading] = useState(true)
+  const [chainError, setChainError] = useState<string | null>(null)
+
+  const loadChainData = useCallback(async () => {
+    setChainLoading(true)
+    setChainError(null)
+    const [{ data: chains }, { data: zones }] = await Promise.all([
+      db.from('chains').select('*').order('name').limit(1),
+      db.from('zones').select('*').order('order_index'),
+    ])
+    const chain: Chain | null = chains?.[0] ?? null
+    const allZones: Zone[] = (zones ?? []) as Zone[]
+    const chainZones = chain
+      ? allZones.filter(z => z.chain_id === chain.id).sort((a, b) => a.chain_position - b.chain_position)
+      : []
+    const freeZones = allZones.filter(z => !z.chain_id || z.chain_id !== chain?.id)
+    setChainState({ chain, chainZones, freeZones })
+    setChainLoading(false)
+  }, [])
+
+  useEffect(() => { loadChainData() }, [loadChainData])
+
+  async function addToChain(zone: Zone) {
+    const { chain, chainZones } = chainState
+    if (!chain) return
+    const nextPos = chainZones.length
+    const { error: zErr } = await db.from('zones')
+      .update({ chain_id: chain.id, chain_position: nextPos })
+      .eq('id', zone.id)
+    if (zErr) { setChainError(zErr.message); return }
+    if (chainZones.length > 0) {
+      const prevZone = chainZones[chainZones.length - 1]
+      const { error: aErr } = await db.from('zone_anchors').insert({
+        chain_id: chain.id,
+        zone_a_id: prevZone.id,
+        zone_b_id: zone.id,
+        a_overlap_start: 0.8,
+        a_overlap_end: 1.0,
+        b_overlap_start: 0.0,
+        b_overlap_end: 0.2,
+        point_pairs: [],
+      })
+      if (aErr) { setChainError(aErr.message); return }
+    }
+    await loadChainData()
+  }
+
+  async function removeFromChain(zone: Zone) {
+    if (!window.confirm(`¿Quitar "${zone.name}" de la cadena? Se perderán sus calibraciones.`)) return
+    await db.from('zones').update({ chain_id: null, chain_position: 0 }).eq('id', zone.id)
+    await db.from('zone_anchors').delete()
+      .or(`zone_a_id.eq.${zone.id},zone_b_id.eq.${zone.id}`)
+    await loadChainData()
+  }
 
   async function handleGenerateQrs() {
     setGenerating(true)
@@ -68,6 +134,84 @@ export default function AdminPage() {
       <div className="px-4 pt-5 pb-6">
         <h1 className="text-white font-black text-2xl tracking-tight mb-6">Admin</h1>
 
+        {/* Cadena Panorámica */}
+        <div className="bg-zinc-900 rounded-2xl p-4 border border-zinc-800/80 mb-4">
+          <h2 className="text-white font-bold text-base mb-1">Cadena Panorámica</h2>
+          <p className="text-zinc-500 text-xs font-medium mb-4">Zonas activas en la cadena y su orden</p>
+
+          {chainLoading ? (
+            <div className="flex justify-center py-4">
+              <div className="w-5 h-5 rounded-full border-2 border-yellow-400 border-t-transparent animate-spin" />
+            </div>
+          ) : !chainState.chain ? (
+            <p className="text-zinc-500 text-xs">No hay cadenas configuradas en la base de datos.</p>
+          ) : (
+            <>
+              <p className="text-yellow-400/70 text-[11px] font-bold uppercase tracking-wider mb-2">
+                {chainState.chain.name}
+              </p>
+
+              {/* Zonas en cadena */}
+              <div className="space-y-1.5 mb-4">
+                {chainState.chainZones.length === 0 ? (
+                  <p className="text-zinc-600 text-xs italic py-2">Sin zonas</p>
+                ) : chainState.chainZones.map((z, i) => (
+                  <div key={z.id} className="flex items-center gap-2.5 bg-zinc-800 rounded-xl px-3 py-2.5">
+                    <span className="text-zinc-600 text-xs font-mono w-4 shrink-0">{i}</span>
+                    <div className="w-1.5 h-1.5 rounded-full bg-yellow-400 shrink-0" />
+                    <span className="text-white text-sm font-medium flex-1 truncate">{z.name}</span>
+                    <button
+                      onClick={() => removeFromChain(z)}
+                      className="text-zinc-600 hover:text-red-400 text-xs font-bold transition-colors px-1.5 py-1 rounded"
+                    >
+                      Quitar
+                    </button>
+                  </div>
+                ))}
+              </div>
+
+              {/* Zonas sin cadena */}
+              {chainState.freeZones.length > 0 && (
+                <>
+                  <p className="text-zinc-600 text-[11px] font-bold uppercase tracking-wider mb-2">
+                    Sin cadena
+                  </p>
+                  <div className="space-y-1.5">
+                    {chainState.freeZones.map(z => (
+                      <div key={z.id} className="flex items-center gap-2.5 bg-zinc-800/40 border border-zinc-700/50 border-dashed rounded-xl px-3 py-2.5">
+                        <div className="w-1.5 h-1.5 rounded-full bg-zinc-600 shrink-0" />
+                        <span className="text-zinc-400 text-sm font-medium flex-1 truncate">{z.name}</span>
+                        <button
+                          onClick={() => addToChain(z)}
+                          className="text-yellow-400 hover:text-yellow-300 text-xs font-black transition-colors px-1.5 py-1 rounded"
+                        >
+                          + Agregar
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              )}
+
+              {chainError && (
+                <p className="text-red-400 text-xs font-medium mt-3">{chainError}</p>
+              )}
+            </>
+          )}
+        </div>
+
+        {/* Calibración de cadenas */}
+        <div className="bg-zinc-900 rounded-2xl p-4 border border-zinc-800/80 mb-4">
+          <h2 className="text-white font-bold text-base mb-1">Calibración de Cadenas</h2>
+          <p className="text-zinc-500 text-xs font-medium mb-4">Configura los overlaps entre fotos de cada cadena panorámica</p>
+          <button
+            onClick={() => navigate('/staff/calibration')}
+            className="w-full bg-zinc-800 text-zinc-200 font-bold text-sm py-2.5 rounded-xl hover:bg-zinc-700 border border-zinc-700 transition-all"
+          >
+            Abrir Calibración
+          </button>
+        </div>
+
         {/* QR Generation */}
         <div className="bg-zinc-900 rounded-2xl p-4 border border-zinc-800/80 mb-4">
           <h2 className="text-white font-bold text-base mb-3">Generar QR Codes</h2>
@@ -117,18 +261,6 @@ export default function AdminPage() {
               </div>
             </>
           )}
-        </div>
-
-        {/* Calibración de cadenas */}
-        <div className="bg-zinc-900 rounded-2xl p-4 border border-zinc-800/80 mb-4">
-          <h2 className="text-white font-bold text-base mb-1">Calibración de Cadenas</h2>
-          <p className="text-zinc-500 text-xs font-medium mb-4">Configura los overlaps entre fotos de cada cadena panorámica</p>
-          <button
-            onClick={() => navigate('/staff/calibration')}
-            className="w-full bg-zinc-800 text-zinc-200 font-bold text-sm py-2.5 rounded-xl hover:bg-zinc-700 border border-zinc-700 transition-all"
-          >
-            Abrir Calibración
-          </button>
         </div>
 
         {/* CSV Export */}
