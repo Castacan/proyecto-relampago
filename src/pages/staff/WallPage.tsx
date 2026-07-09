@@ -10,7 +10,7 @@ import { useChain } from '../../hooks/useChain'
 import { ROUTE_COLORS, getColorHex } from '../../lib/colors'
 import type { Route, Zone } from '../../types'
 
-type UIState = 'idle' | 'color-pick' | 'drawing' | 'form'
+type UIState = 'idle' | 'color-pick' | 'drawing' | 'review' | 'form'
 
 export default function WallPage() {
   const [searchParams] = useSearchParams()
@@ -44,7 +44,7 @@ export default function WallPage() {
     setNewBlobPath(path)
     setNewBlobZoneId(zoneId)
     setNewBlobChainId(chainId)
-    setUi('form')
+    setUi('review')
   }
 
   function cancelAll() {
@@ -79,7 +79,7 @@ export default function WallPage() {
         routes={routes}
         paintMode={ui === 'drawing'}
         drawColor={paintColor}
-        previewBlob={ui === 'form' && newBlobPath ? { path: newBlobPath } : null}
+        previewBlob={(ui === 'review' || ui === 'form') && newBlobPath ? { path: newBlobPath } : null}
         isStaff={true}
         onBlobComplete={handleBlobComplete}
         onRouteClick={route => { if (ui === 'idle') setSelectedRoute(route) }}
@@ -117,6 +117,16 @@ export default function WallPage() {
         </div>
       )}
 
+      {/* Review hint */}
+      {ui === 'review' && (
+        <div className="absolute top-14 left-0 right-0 flex justify-center pointer-events-none z-20">
+          <div className="flex items-center gap-2.5 bg-zinc-950/95 backdrop-blur-sm px-5 py-2.5 rounded-full border border-zinc-800/60 shadow-xl">
+            <div className="w-3 h-3 rounded-full border border-white/30 shrink-0" style={{ backgroundColor: getColorHex(paintColor) }} />
+            <span className="text-white text-xs font-semibold">¿Se ve bien?</span>
+          </div>
+        </div>
+      )}
+
       {/* Draw hint */}
       {ui === 'drawing' && (
         <div className="absolute top-14 left-0 right-0 flex justify-center pointer-events-none z-20">
@@ -128,7 +138,7 @@ export default function WallPage() {
       )}
 
       {/* Bottom action bar */}
-      {(ui === 'idle' || ui === 'color-pick' || ui === 'drawing') && (
+      {(ui === 'idle' || ui === 'color-pick' || ui === 'drawing' || ui === 'review') && (
         <div className="absolute bottom-5 left-4 right-4 flex justify-end pointer-events-none z-20">
           {ui === 'idle' ? (
             <button
@@ -138,6 +148,21 @@ export default function WallPage() {
               <span className="text-xl leading-none font-black">+</span>
               Nueva ruta
             </button>
+          ) : ui === 'review' ? (
+            <div className="flex gap-3 pointer-events-auto">
+              <button
+                onClick={() => { setNewBlobPath(null); setUi('drawing') }}
+                className="px-5 py-3.5 rounded-2xl font-bold text-sm shadow-xl bg-zinc-800 text-zinc-300 border-2 border-zinc-700 hover:bg-zinc-700 hover:text-white active:scale-95 transition-all"
+              >
+                Rehacer
+              </button>
+              <button
+                onClick={() => setUi('form')}
+                className="px-6 py-3.5 rounded-2xl font-bold text-sm shadow-2xl shadow-yellow-400/30 bg-yellow-400 text-zinc-950 hover:bg-yellow-300 active:scale-95 transition-all border-2 border-yellow-300/40"
+              >
+                Continuar →
+              </button>
+            </div>
           ) : (
             <button
               onClick={cancelAll}

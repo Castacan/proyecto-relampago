@@ -7,7 +7,7 @@ import { getColorHex } from '../../lib/colors'
 import { getFreshnessLevel, getFreshnessColor, getDaysOnWall, getPublicLabel } from '../../lib/freshness'
 import { CHAIN_H, computeChainLayout, computeAnchorTransform } from '../../lib/chain'
 
-const TRANSITION_OVERSHOOT = 70
+const TRANSITION_OVERSHOOT = 40
 const TRANSITION_MS = 240
 const STROKE_W = 8
 const MIN_POINT_GAP = 4
@@ -171,13 +171,16 @@ export default function ChainCanvas({
     })
   }
 
-  // ── Pinch state ───────────────────────────────────────────────
+  // ── Pinch & velocity state ────────────────────────────────────
   const startPinchDist = useRef(0)
   const startPinchZoom = useRef(1)
   const startPinchMidX = useRef(0)
   const startPinchPanX = useRef(0)
   const isPinching = useRef(false)
   const lastTapTime = useRef(0)
+  const velocityX = useRef(0)      // px/ms, negativo = swipe hacia siguiente
+  const lastVelX = useRef(0)
+  const lastVelTime = useRef(0)
 
   // ── Dibujo ────────────────────────────────────────────────────
   const drawPointsRef = useRef<number[]>([])
@@ -265,6 +268,9 @@ export default function ChainCanvas({
       overshoot.current = 0
       touchStartX.current = t.clientX
       touchStartPanX.current = panXRef.current
+      lastVelX.current = t.clientX
+      lastVelTime.current = performance.now()
+      velocityX.current = 0
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [paintMode, activeIdx, sorted.length, size, layout, anchors])
@@ -300,6 +306,14 @@ export default function ChainCanvas({
     }
 
     if (!isTouching.current) return
+    const now = performance.now()
+    const dt = now - lastVelTime.current
+    if (dt > 0) {
+      velocityX.current = (t.clientX - lastVelX.current) / dt  // px/ms
+    }
+    lastVelX.current = t.clientX
+    lastVelTime.current = now
+
     const dx = t.clientX - touchStartX.current
     const rawPanX = touchStartPanX.current - dx
     const limitPanX = transitionPanXForIdx(activeIdx)
@@ -335,9 +349,12 @@ export default function ChainCanvas({
     }
 
     const over = overshoot.current
-    if (over > TRANSITION_OVERSHOOT && activeIdx < sorted.length - 1) {
+    const vel = velocityX.current   // negativo = hacia siguiente, positivo = hacia anterior
+    const fastSwipeNext = vel < -0.4 && activeIdx < sorted.length - 1
+    const fastSwipePrev = vel > 0.4 && activeIdx > 0
+    if ((over > TRANSITION_OVERSHOOT || fastSwipeNext) && activeIdx < sorted.length - 1) {
       startTransitionToNext()
-    } else if (over < -TRANSITION_OVERSHOOT && activeIdx > 0) {
+    } else if ((over < -TRANSITION_OVERSHOOT || fastSwipePrev) && activeIdx > 0) {
       startTransitionToPrev()
     } else {
       const target = Math.max(0, Math.min(panXRef.current, transitionPanXForIdx(activeIdx)))
@@ -537,14 +554,14 @@ export default function ChainCanvas({
         onTouchEnd={handleTouchEnd}
       >
         <Layer listening={false}>
-          {showPrevPeek && renderPhoto(activeIdx - 1, -displayWForIdx(activeIdx - 1) * zoom + prevExitPanX + size.w + Math.abs(transX))}
-          {showNextPeek && renderPhoto(activeIdx + 1, displayWForIdx(activeIdx) * zoom - effectivePanX - nextEntryPanX)}
+          {showPrevPeek && renderPhoto(activeIdx - 1, -prevExitPanX - size.w - transX)}
+          {showNextPeek && renderPhoto(activeIdx + 1, size.w - nextEntryPanX - transX)}
           {renderPhoto(activeIdx, -effectivePanX)}
         </Layer>
 
         <Layer>
-          {showPrevPeek && renderRoutes(activeIdx - 1, prevExitPanX - (size.w + Math.abs(transX)))}
-          {showNextPeek && renderRoutes(activeIdx + 1, nextEntryPanX - (displayWForIdx(activeIdx) * zoom - effectivePanX))}
+          {showPrevPeek && renderRoutes(activeIdx - 1, prevExitPanX + size.w + transX)}
+          {showNextPeek && renderRoutes(activeIdx + 1, nextEntryPanX + transX - size.w)}
           {renderRoutes(activeIdx, effectivePanX)}
         </Layer>
 

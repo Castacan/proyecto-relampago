@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { useAllChains, useChain } from '../../hooks/useChain'
 import type { Zone, ZoneAnchor, PointPair } from '../../types'
 import { computeAnchorTransform } from '../../lib/chain'
@@ -10,32 +10,16 @@ const db = supabase as unknown as any
 const PAIR_COLORS = ['#ef4444', '#3b82f6', '#22c55e', '#f59e0b', '#a855f7', '#ec4899']
 const MAX_PAIRS = 6
 
-// Dado un click en un <img> con object-contain, devuelve coords normalizadas (0-1)
-function clickToNorm(
-  e: React.MouseEvent<HTMLDivElement>,
-  imgEl: HTMLImageElement
-): { x: number; y: number } | null {
-  const rect = e.currentTarget.getBoundingClientRect()
-  const cx = e.clientX - rect.left
-  const cy = e.clientY - rect.top
-  const cw = rect.width
-  const ch = rect.height
-  const nw = imgEl.naturalWidth
-  const nh = imgEl.naturalHeight
-  if (!nw || !nh) return null
-
-  // Display rect dentro del contenedor (object-contain)
-  let dw: number, dh: number, ox: number, oy: number
+// Calcula el rect de display de la imagen dentro del container (object-contain con letterboxing)
+function getDisplayRect(cw: number, ch: number, nw: number, nh: number) {
+  if (!nw || !nh || !cw || !ch) return { ox: 0, oy: 0, dw: cw, dh: ch }
   if (cw / ch > nw / nh) {
-    dh = ch; dw = ch * (nw / nh); ox = (cw - dw) / 2; oy = 0
+    const dh = ch; const dw = dh * nw / nh
+    return { ox: (cw - dw) / 2, oy: 0, dw, dh }
   } else {
-    dw = cw; dh = cw * (nh / nw); ox = 0; oy = (ch - dh) / 2
+    const dw = cw; const dh = dw * nh / nw
+    return { ox: 0, oy: (ch - dh) / 2, dw, dh }
   }
-
-  const px = (cx - ox) / dw
-  const py = (cy - oy) / dh
-  if (px < 0 || px > 1 || py < 0 || py > 1) return null
-  return { x: px, y: py }
 }
 
 interface PhotoPanelProps {
@@ -48,11 +32,46 @@ interface PhotoPanelProps {
 
 function PhotoPanel({ zone, pairs, side, waitingForClick, onPhotoClick }: PhotoPanelProps) {
   const imgRef = useRef<HTMLImageElement>(null)
+  const containerRef = useRef<HTMLDivElement>(null)
+  const [containerSize, setContainerSize] = useState({ w: 0, h: 0 })
+
+  // Observa el tamaño del container para calcular el letterboxing en tiempo real
+  useEffect(() => {
+    const el = containerRef.current
+    if (!el) return
+    const ro = new ResizeObserver(() => setContainerSize({ w: el.offsetWidth, h: el.offsetHeight }))
+    ro.observe(el)
+    setContainerSize({ w: el.offsetWidth, h: el.offsetHeight })
+    return () => ro.disconnect()
+  }, [])
+
+  const dr = useCallback(() => {
+    const img = imgRef.current
+    if (!img) return { ox: 0, oy: 0, dw: containerSize.w, dh: containerSize.h }
+    return getDisplayRect(containerSize.w, containerSize.h, img.naturalWidth, img.naturalHeight)
+  }, [containerSize])()
+
+  function dotStyle(p: { x: number; y: number }) {
+    if (!containerSize.w || !containerSize.h || !dr.dw || !dr.dh) return {}
+    return {
+      left: `${((dr.ox + p.x * dr.dw) / containerSize.w) * 100}%`,
+      top: `${((dr.oy + p.y * dr.dh) / containerSize.h) * 100}%`,
+    }
+  }
 
   function handleClick(e: React.MouseEvent<HTMLDivElement>) {
-    if (!waitingForClick || !imgRef.current) return
-    const p = clickToNorm(e, imgRef.current)
-    if (p) onPhotoClick(p)
+    if (!waitingForClick) return
+    const rect = e.currentTarget.getBoundingClientRect()
+    const cx = e.clientX - rect.left
+    const cy = e.clientY - rect.top
+    const img = imgRef.current
+    const { ox, oy, dw, dh } = img
+      ? getDisplayRect(rect.width, rect.height, img.naturalWidth, img.naturalHeight)
+      : { ox: 0, oy: 0, dw: rect.width, dh: rect.height }
+    const px = (cx - ox) / dw
+    const py = (cy - oy) / dh
+    if (px < 0 || px > 1 || py < 0 || py > 1) return
+    onPhotoClick({ x: px, y: py })
   }
 
   return (
@@ -61,6 +80,7 @@ function PhotoPanel({ zone, pairs, side, waitingForClick, onPhotoClick }: PhotoP
         {zone.name}
       </p>
       <div
+        ref={containerRef}
         className={`relative w-full aspect-video bg-zinc-800 rounded-xl overflow-hidden border transition-all ${
           waitingForClick
             ? 'border-yellow-400 cursor-crosshair shadow-[0_0_0_2px_rgba(250,204,21,0.3)]'
@@ -75,12 +95,13 @@ function PhotoPanel({ zone, pairs, side, waitingForClick, onPhotoClick }: PhotoP
             alt={zone.name}
             className="w-full h-full object-contain"
             draggable={false}
+            onLoad={() => setContainerSize(s => ({ ...s }))}
           />
         ) : (
           <div className="w-full h-full flex items-center justify-center text-zinc-600 text-xs">Sin foto</div>
         )}
 
-        {/* Puntos de calibración */}
+        {/* Puntos de calibración — posicionados con offset de letterboxing */}
         {pairs.map((pair, i) => {
           const p = side === 'a' ? pair.a : pair.b
           return (
@@ -88,8 +109,7 @@ function PhotoPanel({ zone, pairs, side, waitingForClick, onPhotoClick }: PhotoP
               key={i}
               className="absolute w-4 h-4 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-zinc-950 pointer-events-none"
               style={{
-                left: `${p.x * 100}%`,
-                top: `${p.y * 100}%`,
+                ...dotStyle(p),
                 backgroundColor: PAIR_COLORS[i % PAIR_COLORS.length],
               }}
             >
