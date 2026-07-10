@@ -4,6 +4,7 @@ export const ROUTE_COLORS: { key: string; hex: string; label: string }[] = [
   { key: 'rojo',        hex: '#EF4444', label: 'Rojo' },
   { key: 'verde',       hex: '#22C55E', label: 'Verde' },
   { key: 'naranja',     hex: '#F97316', label: 'Naranja' },
+  { key: 'fosfo',       hex: '#FF5C6E', label: 'Fosfo' },
   { key: 'rosa',        hex: '#EC4899', label: 'Rosa' },
   { key: 'rosa-palido', hex: '#F9A8D4', label: 'Rosa Pálido' },
   { key: 'morado',      hex: '#A855F7', label: 'Morado' },
