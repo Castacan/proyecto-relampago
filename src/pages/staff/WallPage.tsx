@@ -117,15 +117,9 @@ export default function WallPage() {
 
   function handleVolumeClick(vol: Volume, displayZoneId: string) {
     if (ui !== 'idle') return
-    if (displayZoneId === vol.zone_id) {
-      // Zona propia → detalle/retirar
-      setSelectedVolume(vol)
-    } else {
-      // Zona cruzada → action sheet para reposicionar
-      setActionVol(vol)
-      setActionDisplayZoneId(displayZoneId)
-      setUi('vol-action')
-    }
+    setActionVol(vol)
+    setActionDisplayZoneId(displayZoneId)
+    setUi('vol-action')
   }
 
   function startReposition() {
@@ -419,15 +413,12 @@ export default function WallPage() {
         </div>
       )}
 
-      {/* Volume action sheet (cross-zone tap) */}
+      {/* Volume action sheet */}
       {ui === 'vol-action' && actionVol && (
         <div className="fixed inset-0 bg-black/75 backdrop-blur-sm flex items-end z-50" onClick={cancelAll}>
           <div className="w-full bg-zinc-900 rounded-t-3xl px-6 pt-6 pb-24 border-t border-zinc-800/80" onClick={e => e.stopPropagation()}>
             <div className="w-10 h-1 bg-zinc-700 rounded-full mx-auto mb-5" />
-            <h2 className="text-white font-bold text-lg tracking-tight mb-2">Volumen</h2>
-            <p className="text-zinc-500 text-xs mb-6">
-              Este volumen pertenece a otra zona. Puedes ajustar su posición en la zona actual sin modificar el original.
-            </p>
+            <h2 className="text-white font-bold text-lg tracking-tight mb-6">Volumen</h2>
             <button
               onClick={startReposition}
               className="w-full py-4 rounded-2xl bg-zinc-700 hover:bg-zinc-600 text-white font-bold text-sm flex items-center justify-center gap-2.5 transition-all mb-3"
@@ -436,10 +427,17 @@ export default function WallPage() {
               Mover en esta zona
             </button>
             <button
-              onClick={cancelAll}
-              className="w-full py-3.5 rounded-2xl bg-zinc-800 hover:bg-zinc-700 text-zinc-400 font-semibold text-sm transition-all"
+              onClick={() => { setSelectedVolume(actionVol); cancelAll() }}
+              className="w-full py-4 rounded-2xl bg-zinc-800 hover:bg-zinc-700 text-zinc-300 font-bold text-sm flex items-center justify-center gap-2.5 transition-all mb-3"
             >
-              Cerrar
+              <span className="text-base">···</span>
+              Ver detalles / Retirar
+            </button>
+            <button
+              onClick={cancelAll}
+              className="w-full py-3.5 rounded-2xl text-zinc-500 font-semibold text-sm transition-all hover:text-zinc-300"
+            >
+              Cancelar
             </button>
           </div>
         </div>

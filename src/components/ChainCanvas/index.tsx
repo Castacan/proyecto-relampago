@@ -636,7 +636,7 @@ export default function ChainCanvas({
       vol: Volume,
       converter: (p: { x: number; y: number }) => { x: number; y: number },
       displayZoneId: string,
-      isOwnZone: boolean,
+      _isOwnZone: boolean,
       keySuffix = ''
     ) {
       if (!vol.perimeter || vol.perimeter.length < 3) return null
@@ -644,19 +644,17 @@ export default function ChainCanvas({
       const repo = repositionModeRef.current
       const isRepositioning = repo?.volumeId === vol.id && repo?.zoneId === displayZoneId
 
-      // Aplica offset almacenado o el live offset de reposicionamiento (solo en cross-zone)
+      // Aplica offset almacenado o el live offset de reposicionamiento (todas las zonas)
       let effectiveConverter = converter
-      if (!isOwnZone) {
-        const storedOffset = vol.zone_offsets?.[displayZoneId]
-        const activeOffset = isRepositioning ? repo!.offset : storedOffset
-        if (activeOffset && (activeOffset.dx !== 0 || activeOffset.dy !== 0)) {
-          const off = activeOffset
-          effectiveConverter = (p) => {
-            const raw = converter(p)
-            return {
-              x: raw.x + off.dx * dw * zoom,
-              y: raw.y + off.dy * size.h * zoom,
-            }
+      const storedOffset = vol.zone_offsets?.[displayZoneId]
+      const activeOffset = isRepositioning ? repo!.offset : storedOffset
+      if (activeOffset && (activeOffset.dx !== 0 || activeOffset.dy !== 0)) {
+        const off = activeOffset
+        effectiveConverter = (p) => {
+          const raw = converter(p)
+          return {
+            x: raw.x + off.dx * dw * zoom,
+            y: raw.y + off.dy * size.h * zoom,
           }
         }
       }
