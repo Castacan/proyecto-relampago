@@ -256,8 +256,21 @@ export default function ChainCanvas({
     onVolumeDetailStrokeRef.current?.(path)
   }
 
+  // Refs para tap detection a nivel Stage
+  const routesRef = useRef(routes)
+  routesRef.current = routes
+  const volumesRef = useRef(volumes)
+  volumesRef.current = volumes
+  const onRouteClickRef = useRef(onRouteClick)
+  onRouteClickRef.current = onRouteClick
+  const onVolumeClickRef = useRef(onVolumeClick)
+  onVolumeClickRef.current = onVolumeClick
+
   // ── Touch handlers ────────────────────────────────────────────
   const touchStartX = useRef(0)
+  const touchStartY = useRef(0)
+  const touchLastX = useRef(0)
+  const touchLastY = useRef(0)
   const touchStartPanX = useRef(0)
   const isTouching = useRef(false)
   const touchMoved = useRef(false)
@@ -303,6 +316,9 @@ export default function ChainCanvas({
     } else {
       isTouching.current = true
       touchStartX.current = t.clientX
+      touchStartY.current = t.clientY
+      touchLastX.current = t.clientX
+      touchLastY.current = t.clientY
       touchStartPanX.current = panXRef.current
       lastVelX.current = t.clientX
       lastVelTime.current = performance.now()
@@ -332,6 +348,8 @@ export default function ChainCanvas({
 
     if (touches.length !== 1 || isPinching.current) return
     const t = touches[0]
+    touchLastX.current = t.clientX
+    touchLastY.current = t.clientY
     touchMoved.current = true
 
     // Reposicionamiento
@@ -401,7 +419,38 @@ export default function ChainCanvas({
     if (!isTouching.current) return
     isTouching.current = false
 
-    if (!touchMoved.current) {
+    // Detección de tap: toleramos hasta 12px de movimiento (micro-movimiento táctil normal)
+    const tapDx = Math.abs(touchLastX.current - touchStartX.current)
+    const tapDy = Math.abs(touchLastY.current - touchStartY.current)
+    const isTap = tapDx < 12 && tapDy < 12
+
+    if (isTap && !paintMode && !volumePaintMode && !repositionModeRef.current && stageRef.current) {
+      const rect = stageRef.current.container().getBoundingClientRect()
+      const tapPos = { x: touchStartX.current - rect.left, y: touchStartY.current - rect.top }
+      const shapes = stageRef.current.getAllIntersections(tapPos)
+
+      // Rutas tienen prioridad (están arriba visualmente)
+      const rteShape = shapes.find(s => s.id().startsWith('RTE:'))
+      if (rteShape) {
+        const route = routesRef.current.find(r => r.id === rteShape.id().slice(4))
+        if (route) { onRouteClickRef.current(route); return }
+      }
+
+      // Volúmenes
+      const volShape = shapes.find(s => s.id().startsWith('VOL:'))
+      if (volShape) {
+        const raw = volShape.id().slice(4) // quita 'VOL:'
+        const sep = raw.lastIndexOf(':')   // último ':' separa volId del zoneId
+        const volId = raw.slice(0, sep)
+        const displayZoneId = raw.slice(sep + 1)
+        const vol = volumesRef.current.find(v => v.id === volId)
+        if (vol && onVolumeClickRef.current) {
+          onVolumeClickRef.current(vol, displayZoneId)
+          return
+        }
+      }
+
+      // Doble tap → reset zoom
       const now = Date.now()
       if (now - lastTapTime.current < 300) {
         animate(zoomRef.current, 1, 180, v => { zoomRef.current = v; setZoom(v) }, () => {})
@@ -467,11 +516,34 @@ export default function ChainCanvas({
       isRepoDragging.current = false
       return
     }
-    if ((!paintMode && !volumePaintMode) || !isDrawing.current) return
-    isDrawing.current = false
-    if (paintMode) finishDrawing()
-    else if (volumePaintMode === 'perimeter') finishVolumePerimeter()
-    else finishVolumeDetail()
+    if ((paintMode || volumePaintMode) && isDrawing.current) {
+      isDrawing.current = false
+      if (paintMode) finishDrawing()
+      else if (volumePaintMode === 'perimeter') finishVolumePerimeter()
+      else finishVolumeDetail()
+      return
+    }
+    // Click idle en desktop → detectar ruta/volumen
+    if (!paintMode && !volumePaintMode && !repositionModeRef.current && stageRef.current) {
+      const pos = stageRef.current.getPointerPosition()
+      if (pos) {
+        const shapes = stageRef.current.getAllIntersections(pos)
+        const rteShape = shapes.find(s => s.id().startsWith('RTE:'))
+        if (rteShape) {
+          const route = routesRef.current.find(r => r.id === rteShape.id().slice(4))
+          if (route) { onRouteClickRef.current(route); return }
+        }
+        const volShape = shapes.find(s => s.id().startsWith('VOL:'))
+        if (volShape) {
+          const raw = volShape.id().slice(4)
+          const sep = raw.lastIndexOf(':')
+          const vol = volumesRef.current.find(v => v.id === raw.slice(0, sep))
+          if (vol && onVolumeClickRef.current) {
+            onVolumeClickRef.current(vol, raw.slice(sep + 1)); return
+          }
+        }
+      }
+    }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [paintMode, volumePaintMode, activeIdx, sorted])
 
@@ -590,16 +662,12 @@ export default function ChainCanvas({
       }
 
       const perimeterPts = vol.perimeter.flatMap(p => { const s = effectiveConverter(p); return [s.x, s.y] })
-      const clickable = !!onVolumeClick && !repo
+      const hasClickHandler = !!onVolumeClickRef.current && !repo
 
       return (
-        <Group
-          key={vol.id + keySuffix}
-          onClick={clickable ? () => onVolumeClick!(vol, displayZoneId) : undefined}
-          onTap={clickable ? () => onVolumeClick!(vol, displayZoneId) : undefined}
-          listening={clickable}
-        >
+        <Group key={vol.id + keySuffix}>
           <Line
+            id={hasClickHandler ? `VOL:${vol.id}:${displayZoneId}` : ''}
             points={perimeterPts}
             closed={true}
             fill={isRepositioning ? 'rgba(110,110,110,0.60)' : 'rgba(110,110,110,0.38)'}
@@ -607,7 +675,8 @@ export default function ChainCanvas({
             strokeWidth={isRepositioning ? 3 : 2}
             tension={0.3}
             lineCap="round"
-            hitStrokeWidth={clickable ? 20 : 0}
+            hitStrokeWidth={hasClickHandler ? 20 : 0}
+            listening={hasClickHandler}
           />
           {(vol.details ?? []).map((stroke, i) => {
             const pts = stroke.flatMap(p => { const s = effectiveConverter(p); return [s.x, s.y] })
@@ -708,9 +777,9 @@ export default function ChainCanvas({
       const freshnessHex = getFreshnessColor(level)
       const days = getDaysOnWall(route.placed_at)
       return (
-        <Group key={route.id + keySuffix} onClick={() => onRouteClick(route)} onTap={() => onRouteClick(route)}>
+        <Group key={route.id + keySuffix}>
           <Line points={flat} stroke={freshnessHex} strokeWidth={STROKE_W + 6} tension={0.5} lineCap="round" lineJoin="round" opacity={0.35} listening={false} />
-          <Line points={flat} stroke={colorHex} strokeWidth={STROKE_W} tension={0.5} lineCap="round" lineJoin="round" opacity={0.92} hitStrokeWidth={32} />
+          <Line id={`RTE:${route.id}`} points={flat} stroke={colorHex} strokeWidth={STROKE_W} tension={0.5} lineCap="round" lineJoin="round" opacity={0.92} hitStrokeWidth={32} />
           {isStaff ? (
             <Group x={centS.x} y={centS.y - 28} listening={false}>
               <Line points={[0, 4, 0, 18]} stroke={freshnessHex} strokeWidth={2} />
