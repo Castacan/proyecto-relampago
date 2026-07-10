@@ -23,7 +23,7 @@ function getZoneGroup(zone: Zone): string {
 }
 
 // Rutas retiradas ANTES de esta fecha = rutas de prueba, no contar en históricas
-const HISTORICAL_CUTOFF = '2026-07-10'
+const HISTORICAL_CUTOFF = '2026-07-11'
 
 // ── Stat card ────────────────────────────────────────────────────────────────
 function StatCard({ value, label, sub }: { value: string | number; label: string; sub?: string }) {
