@@ -20,6 +20,7 @@ type UIState =
   | 'idle'
   | 'color-pick' | 'drawing' | 'review' | 'form'
   | 'vol-perimeter' | 'vol-perimeter-review' | 'vol-details'
+  | 'vol-action' | 'vol-reposition'
 
 export default function WallPage() {
   const [searchParams] = useSearchParams()
@@ -50,6 +51,15 @@ export default function WallPage() {
   const [volZoneId, setVolZoneId] = useState<string | null>(null)
   const [volChainId, setVolChainId] = useState<string | null>(null)
 
+  // Volume action sheet (cross-zone tap)
+  const [actionVol, setActionVol] = useState<Volume | null>(null)
+  const [actionDisplayZoneId, setActionDisplayZoneId] = useState<string | null>(null)
+
+  // Volume reposition state
+  const [repoVolume, setRepoVolume] = useState<Volume | null>(null)
+  const [repoZoneId, setRepoZoneId] = useState<string | null>(null)
+  const [repoOffset, setRepoOffset] = useState<{ dx: number; dy: number }>({ dx: 0, dy: 0 })
+
   useEffect(() => {
     if (chainZones.length > 0 && !activeZoneId) {
       setActiveZoneId(chainZones[0].id)
@@ -68,6 +78,11 @@ export default function WallPage() {
     setVolDetails([])
     setVolZoneId(null)
     setVolChainId(null)
+    setActionVol(null)
+    setActionDisplayZoneId(null)
+    setRepoVolume(null)
+    setRepoZoneId(null)
+    setRepoOffset({ dx: 0, dy: 0 })
   }
 
   function handleBlobComplete(path: { x: number; y: number }[], zoneId: string, chainId: string) {
@@ -96,6 +111,37 @@ export default function WallPage() {
       perimeter: volPerimeter,
       details: withDetails ? volDetails : [],
     })
+    cancelAll()
+    refetchVolumes()
+  }
+
+  function handleVolumeClick(vol: Volume, displayZoneId: string) {
+    if (ui !== 'idle') return
+    if (displayZoneId === vol.zone_id) {
+      // Zona propia → detalle/retirar
+      setSelectedVolume(vol)
+    } else {
+      // Zona cruzada → action sheet para reposicionar
+      setActionVol(vol)
+      setActionDisplayZoneId(displayZoneId)
+      setUi('vol-action')
+    }
+  }
+
+  function startReposition() {
+    if (!actionVol || !actionDisplayZoneId) return
+    setRepoVolume(actionVol)
+    setRepoZoneId(actionDisplayZoneId)
+    setRepoOffset(actionVol.zone_offsets?.[actionDisplayZoneId] ?? { dx: 0, dy: 0 })
+    setActionVol(null)
+    setActionDisplayZoneId(null)
+    setUi('vol-reposition')
+  }
+
+  async function saveReposition() {
+    if (!repoVolume || !repoZoneId) return
+    const newOffsets = { ...(repoVolume.zone_offsets ?? {}), [repoZoneId]: repoOffset }
+    await db.from('volumes').update({ zone_offsets: newOffsets }).eq('id', repoVolume.id)
     cancelAll()
     refetchVolumes()
   }
@@ -140,7 +186,11 @@ export default function WallPage() {
         onRouteClick={route => { if (ui === 'idle') setSelectedRoute(route) }}
         onVolumePerimeterComplete={handleVolumePerimeterComplete}
         onVolumeDetailStroke={handleVolumeDetailStroke}
-        onVolumeClick={vol => { if (ui === 'idle') setSelectedVolume(vol) }}
+        onVolumeClick={handleVolumeClick}
+        repositionMode={ui === 'vol-reposition' && repoVolume && repoZoneId
+          ? { volumeId: repoVolume.id, zoneId: repoZoneId, offset: repoOffset }
+          : null}
+        onRepositionOffsetChange={setRepoOffset}
         onActiveZoneChange={setActiveZoneId}
         jumpToZoneId={jumpZoneId}
       />
@@ -224,9 +274,20 @@ export default function WallPage() {
         </div>
       )}
 
+      {/* Reposition hint */}
+      {ui === 'vol-reposition' && (
+        <div className="absolute top-14 left-0 right-0 flex justify-center pointer-events-none z-20">
+          <div className="flex items-center gap-2.5 bg-zinc-950/95 backdrop-blur-sm px-5 py-2.5 rounded-full border border-yellow-400/40 shadow-xl">
+            <div className="w-3 h-3 rounded-full bg-yellow-400 shrink-0" />
+            <span className="text-yellow-400 text-xs font-semibold">Arrastra el volumen a su posición correcta</span>
+          </div>
+        </div>
+      )}
+
       {/* Bottom action bar */}
       {(ui === 'idle' || ui === 'color-pick' || ui === 'drawing' || ui === 'review'
-        || ui === 'vol-perimeter' || ui === 'vol-perimeter-review' || ui === 'vol-details') && (
+        || ui === 'vol-perimeter' || ui === 'vol-perimeter-review' || ui === 'vol-details'
+        || ui === 'vol-reposition') && (
         <div className="absolute bottom-5 left-4 right-4 flex justify-end pointer-events-none z-20">
 
           {ui === 'idle' ? (
@@ -301,6 +362,22 @@ export default function WallPage() {
               </button>
             </div>
 
+          ) : ui === 'vol-reposition' ? (
+            <div className="flex gap-3 pointer-events-auto">
+              <button
+                onClick={cancelAll}
+                className="px-4 py-3.5 rounded-2xl font-bold text-sm shadow-xl bg-zinc-800 text-zinc-300 border-2 border-zinc-700 hover:bg-zinc-700 hover:text-white active:scale-95 transition-all"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={saveReposition}
+                className="px-6 py-3.5 rounded-2xl font-bold text-sm shadow-2xl bg-yellow-400 text-zinc-950 hover:bg-yellow-300 active:scale-95 transition-all border-2 border-yellow-300/40"
+              >
+                Guardar posición
+              </button>
+            </div>
+
           ) : (
             <button
               onClick={cancelAll}
@@ -337,6 +414,32 @@ export default function WallPage() {
             >
               <div className="w-5 h-5 rounded-full border-2 border-zinc-950/30 shrink-0" style={{ backgroundColor: getColorHex(paintColor) }} />
               Listo, a dibujar
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Volume action sheet (cross-zone tap) */}
+      {ui === 'vol-action' && actionVol && (
+        <div className="fixed inset-0 bg-black/75 backdrop-blur-sm flex items-end z-50" onClick={cancelAll}>
+          <div className="w-full bg-zinc-900 rounded-t-3xl px-6 pt-6 pb-24 border-t border-zinc-800/80" onClick={e => e.stopPropagation()}>
+            <div className="w-10 h-1 bg-zinc-700 rounded-full mx-auto mb-5" />
+            <h2 className="text-white font-bold text-lg tracking-tight mb-2">Volumen</h2>
+            <p className="text-zinc-500 text-xs mb-6">
+              Este volumen pertenece a otra zona. Puedes ajustar su posición en la zona actual sin modificar el original.
+            </p>
+            <button
+              onClick={startReposition}
+              className="w-full py-4 rounded-2xl bg-zinc-700 hover:bg-zinc-600 text-white font-bold text-sm flex items-center justify-center gap-2.5 transition-all mb-3"
+            >
+              <span className="text-base">↔</span>
+              Mover en esta zona
+            </button>
+            <button
+              onClick={cancelAll}
+              className="w-full py-3.5 rounded-2xl bg-zinc-800 hover:bg-zinc-700 text-zinc-400 font-semibold text-sm transition-all"
+            >
+              Cerrar
             </button>
           </div>
         </div>

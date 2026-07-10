@@ -68,4 +68,5 @@ export interface Volume {
   retired_at: string | null
   perimeter: { x: number; y: number }[]
   details: { x: number; y: number }[][]
+  zone_offsets?: Record<string, { dx: number; dy: number }>
 }

@@ -27,12 +27,14 @@ interface Props {
   volumePaintMode?: 'perimeter' | 'details' | null
   previewVolumePerimeter?: { x: number; y: number }[] | null
   previewVolumeDetails?: { x: number; y: number }[][]
+  repositionMode?: { volumeId: string; zoneId: string; offset: { dx: number; dy: number } } | null
   isStaff: boolean
   onBlobComplete: (path: { x: number; y: number }[], zoneId: string, chainId: string) => void
   onRouteClick: (route: Route) => void
   onVolumePerimeterComplete?: (perimeter: { x: number; y: number }[], zoneId: string, chainId: string) => void
   onVolumeDetailStroke?: (stroke: { x: number; y: number }[]) => void
-  onVolumeClick?: (volume: Volume) => void
+  onVolumeClick?: (volume: Volume, displayZoneId: string) => void
+  onRepositionOffsetChange?: (offset: { dx: number; dy: number }) => void
   onActiveZoneChange?: (zoneId: string | null) => void
   jumpToZoneId?: string | null
 }
@@ -40,8 +42,10 @@ interface Props {
 export default function ChainCanvas({
   zones, anchors, routes, volumes = [], paintMode, drawColor, previewBlob,
   volumePaintMode = null, previewVolumePerimeter = null, previewVolumeDetails = [],
+  repositionMode = null,
   isStaff, onBlobComplete, onRouteClick,
   onVolumePerimeterComplete, onVolumeDetailStroke, onVolumeClick,
+  onRepositionOffsetChange,
   onActiveZoneChange, jumpToZoneId,
 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null)
@@ -76,16 +80,13 @@ export default function ChainCanvas({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeIdx, sorted.length])
 
-  // Salto desde minimap externo
   useEffect(() => {
     if (!jumpToZoneId) return
     const idx = sorted.findIndex(z => z.id === jumpToZoneId)
     if (idx < 0) return
     setActiveIdx(idx)
-    panXRef.current = 0
-    setPanX(0)
-    zoomRef.current = 1
-    setZoom(1)
+    panXRef.current = 0; setPanX(0)
+    zoomRef.current = 1; setZoom(1)
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [jumpToZoneId])
 
@@ -95,7 +96,6 @@ export default function ChainCanvas({
   const [zoom, setZoom] = useState(1)
   const zoomRef = useRef(1)
 
-  // yOffset: centra verticalmente cuando zoom > 1
   const yOffset = (size.h - size.h * zoom) / 2
 
   const [transX, setTransX] = useState(0)
@@ -135,8 +135,7 @@ export default function ChainCanvas({
     function tick(now: number) {
       const t = Math.min(1, (now - start) / ms)
       const ease = 1 - Math.pow(1 - t, 3)
-      const val = from + (to - from) * ease
-      onTick(val)
+      onTick(from + (to - from) * ease)
       if (t < 1) { animFrameRef.current = requestAnimationFrame(tick) } else { onTick(to); onDone() }
     }
     animFrameRef.current = requestAnimationFrame(tick)
@@ -190,6 +189,17 @@ export default function ChainCanvas({
   const onVolumeDetailStrokeRef = useRef(onVolumeDetailStroke)
   onVolumeDetailStrokeRef.current = onVolumeDetailStroke
 
+  // ── Reposicionamiento ─────────────────────────────────────────
+  // Ref para evitar recrear callbacks en cada frame durante el drag
+  const repositionModeRef = useRef(repositionMode)
+  repositionModeRef.current = repositionMode
+  const repoStartX = useRef(0)
+  const repoStartY = useRef(0)
+  const repoBaseOffset = useRef<{ dx: number; dy: number }>({ dx: 0, dy: 0 })
+  const isRepoDragging = useRef(false)
+  const onRepositionOffsetChangeRef = useRef(onRepositionOffsetChange)
+  onRepositionOffsetChangeRef.current = onRepositionOffsetChange
+
   function screenToChain(sx: number, sy: number): { x: number; y: number } {
     const zone = sorted[activeIdx]
     const zl = layout.zones.find(z => z.id === zone?.id)
@@ -230,7 +240,7 @@ export default function ChainCanvas({
 
   function finishVolumePerimeter() {
     const pts = drawPointsRef.current; drawPointsRef.current = []; setDrawPoints([])
-    if (pts.length < 6) return  // need at least 3 points
+    if (pts.length < 6) return
     const zone = sorted[activeIdx]
     if (!zone || !zone.chain_id) return
     const path: { x: number; y: number }[] = []
@@ -262,6 +272,7 @@ export default function ChainCanvas({
       isPinching.current = true
       isTouching.current = false
       isDrawing.current = false
+      isRepoDragging.current = false
       const rect = stageRef.current!.container().getBoundingClientRect()
       const t1 = touches[0], t2 = touches[1]
       startPinchDist.current = Math.hypot(t2.clientX - t1.clientX, t2.clientY - t1.clientY)
@@ -275,6 +286,15 @@ export default function ChainCanvas({
     isPinching.current = false
     touchMoved.current = false
     const t = touches[0]
+
+    // Reposicionamiento: single touch mueve el volumen
+    if (repositionModeRef.current) {
+      repoStartX.current = t.clientX
+      repoStartY.current = t.clientY
+      repoBaseOffset.current = { ...repositionModeRef.current.offset }
+      isRepoDragging.current = true
+      return
+    }
 
     if (paintMode || volumePaintMode) {
       isDrawing.current = true
@@ -314,6 +334,16 @@ export default function ChainCanvas({
     const t = touches[0]
     touchMoved.current = true
 
+    // Reposicionamiento
+    if (repositionModeRef.current && isRepoDragging.current) {
+      const dw = displayWForIdx(activeIdx)
+      const z = zoomRef.current
+      const dx = (t.clientX - repoStartX.current) / (dw * z) + repoBaseOffset.current.dx
+      const dy = (t.clientY - repoStartY.current) / (size.h * z) + repoBaseOffset.current.dy
+      onRepositionOffsetChangeRef.current?.({ dx, dy })
+      return
+    }
+
     if ((paintMode || volumePaintMode) && isDrawing.current) {
       const rect = stageRef.current!.container().getBoundingClientRect()
       addDrawPoint(t.clientX - rect.left, t.clientY - rect.top)
@@ -351,6 +381,12 @@ export default function ChainCanvas({
   const handleTouchEnd = useCallback((_e: KonvaEventObject<TouchEvent>) => {
     if (isPinching.current) {
       isPinching.current = false
+      return
+    }
+
+    // Reposicionamiento: el fin del drag no hace nada (WallPage guarda en su botón)
+    if (repositionModeRef.current && isRepoDragging.current) {
+      isRepoDragging.current = false
       return
     }
 
@@ -394,6 +430,14 @@ export default function ChainCanvas({
 
   // Mouse (desktop)
   const handleMouseDown = useCallback((_e: KonvaEventObject<MouseEvent>) => {
+    if (repositionModeRef.current) {
+      const p = stageRef.current!.getPointerPosition()!
+      repoStartX.current = p.x
+      repoStartY.current = p.y
+      repoBaseOffset.current = { ...repositionModeRef.current.offset }
+      isRepoDragging.current = true
+      return
+    }
     if (!paintMode && !volumePaintMode) return
     isDrawing.current = true
     const p = stageRef.current!.getPointerPosition()!
@@ -402,13 +446,27 @@ export default function ChainCanvas({
   }, [paintMode, volumePaintMode, activeIdx, sorted.length, size, layout])
 
   const handleMouseMove = useCallback((_e: KonvaEventObject<MouseEvent>) => {
+    if (repositionModeRef.current && isRepoDragging.current) {
+      const p = stageRef.current!.getPointerPosition()!
+      const dw = displayWForIdx(activeIdx)
+      const z = zoomRef.current
+      onRepositionOffsetChangeRef.current?.({
+        dx: (p.x - repoStartX.current) / (dw * z) + repoBaseOffset.current.dx,
+        dy: (p.y - repoStartY.current) / (size.h * z) + repoBaseOffset.current.dy,
+      })
+      return
+    }
     if ((!paintMode && !volumePaintMode) || !isDrawing.current) return
     const p = stageRef.current!.getPointerPosition()!
     addDrawPoint(p.x, p.y)
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [paintMode, volumePaintMode, activeIdx, layout])
+  }, [paintMode, volumePaintMode, activeIdx, layout, size])
 
   const handleMouseUp = useCallback((_e: KonvaEventObject<MouseEvent>) => {
+    if (repositionModeRef.current && isRepoDragging.current) {
+      isRepoDragging.current = false
+      return
+    }
     if ((!paintMode && !volumePaintMode) || !isDrawing.current) return
     isDrawing.current = false
     if (paintMode) finishDrawing()
@@ -464,14 +522,13 @@ export default function ChainCanvas({
     if (!zone) return null
     const img = zoneImages[zone.id]
     const dw = displayWForIdx(idx) * zoom
-    const x = screenOffsetX
     if (img) {
-      return <KonvaImage key={zone.id} x={x} y={yOffset} width={dw} height={size.h * zoom} image={img} />
+      return <KonvaImage key={zone.id} x={screenOffsetX} y={yOffset} width={dw} height={size.h * zoom} image={img} />
     }
     return (
       <Group key={zone.id}>
-        <Rect x={x} y={0} width={size.w} height={size.h} fill={FALLBACK_COLOR} />
-        <Text x={x + 24} y={24} text={zone.name} fontSize={22} fill="rgba(255,255,255,0.2)" fontFamily="sans-serif" />
+        <Rect x={screenOffsetX} y={0} width={size.w} height={size.h} fill={FALLBACK_COLOR} />
+        <Text x={screenOffsetX + 24} y={24} text={zone.name} fontSize={22} fill="rgba(255,255,255,0.2)" fontFamily="sans-serif" />
       </Group>
     )
   }
@@ -506,29 +563,54 @@ export default function ChainCanvas({
     function renderVolume(
       vol: Volume,
       converter: (p: { x: number; y: number }) => { x: number; y: number },
+      displayZoneId: string,
+      isOwnZone: boolean,
       keySuffix = ''
     ) {
       if (!vol.perimeter || vol.perimeter.length < 3) return null
-      const perimeterPts = vol.perimeter.flatMap(p => { const s = converter(p); return [s.x, s.y] })
+
+      const repo = repositionModeRef.current
+      const isRepositioning = repo?.volumeId === vol.id && repo?.zoneId === displayZoneId
+
+      // Aplica offset almacenado o el live offset de reposicionamiento (solo en cross-zone)
+      let effectiveConverter = converter
+      if (!isOwnZone) {
+        const storedOffset = vol.zone_offsets?.[displayZoneId]
+        const activeOffset = isRepositioning ? repo!.offset : storedOffset
+        if (activeOffset && (activeOffset.dx !== 0 || activeOffset.dy !== 0)) {
+          const off = activeOffset
+          effectiveConverter = (p) => {
+            const raw = converter(p)
+            return {
+              x: raw.x + off.dx * dw * zoom,
+              y: raw.y + off.dy * size.h * zoom,
+            }
+          }
+        }
+      }
+
+      const perimeterPts = vol.perimeter.flatMap(p => { const s = effectiveConverter(p); return [s.x, s.y] })
+      const clickable = !!onVolumeClick && !repo
+
       return (
         <Group
           key={vol.id + keySuffix}
-          onClick={onVolumeClick ? () => onVolumeClick!(vol) : undefined}
-          onTap={onVolumeClick ? () => onVolumeClick!(vol) : undefined}
-          listening={!!onVolumeClick}
+          onClick={clickable ? () => onVolumeClick!(vol, displayZoneId) : undefined}
+          onTap={clickable ? () => onVolumeClick!(vol, displayZoneId) : undefined}
+          listening={clickable}
         >
           <Line
             points={perimeterPts}
             closed={true}
-            fill="rgba(110,110,110,0.38)"
-            stroke="rgba(148,148,148,0.55)"
-            strokeWidth={2}
+            fill={isRepositioning ? 'rgba(110,110,110,0.60)' : 'rgba(110,110,110,0.38)'}
+            stroke={isRepositioning ? 'rgba(250,204,21,0.85)' : 'rgba(148,148,148,0.55)'}
+            strokeWidth={isRepositioning ? 3 : 2}
             tension={0.3}
             lineCap="round"
-            hitStrokeWidth={onVolumeClick ? 20 : 0}
+            hitStrokeWidth={clickable ? 20 : 0}
           />
           {(vol.details ?? []).map((stroke, i) => {
-            const pts = stroke.flatMap(p => { const s = converter(p); return [s.x, s.y] })
+            const pts = stroke.flatMap(p => { const s = effectiveConverter(p); return [s.x, s.y] })
             return <Line key={i} points={pts} stroke="rgba(55,55,55,0.92)" strokeWidth={5} tension={0.5} lineCap="round" lineJoin="round" listening={false} />
           })}
         </Group>
@@ -543,7 +625,7 @@ export default function ChainCanvas({
       keySuffix: string
     ) {
       if (!xVols.length) return null
-      const nodes = xVols.map(v => renderVolume(v, converter, keySuffix))
+      const nodes = xVols.map(v => renderVolume(v, converter, zone.id, false, keySuffix))
       return clipFn
         ? <Group clipFunc={clipFn}>{nodes}</Group>
         : <>{nodes}</>
@@ -552,7 +634,6 @@ export default function ChainCanvas({
     const ownVolumes = volumes.filter(v => v.chain_id && v.perimeter?.length && v.zone_id === zone.id)
     const ownConverter = (p: { x: number; y: number }) => chainToScreen(p, idx, localPanX)
 
-    // A→B cross-zone volumes (from prev zone)
     const prevZone = sorted[idx - 1]
     const prevAnchor = prevZone ? anchors.find(a => a.zone_a_id === prevZone.id && a.zone_b_id === zone.id) : null
     const prevPairs = prevAnchor?.point_pairs ?? []
@@ -573,7 +654,6 @@ export default function ChainCanvas({
       prevClipFunc = photoClipFunc
     }
 
-    // B→A cross-zone volumes (from next zone)
     const nextZone = sorted[idx + 1]
     const nextAnchor = nextZone ? anchors.find(a => a.zone_a_id === zone.id && a.zone_b_id === nextZone.id) : null
     const nextPairs = nextAnchor?.point_pairs ?? []
@@ -596,7 +676,7 @@ export default function ChainCanvas({
 
     return (
       <>
-        {ownVolumes.map(v => renderVolume(v, ownConverter))}
+        {ownVolumes.map(v => renderVolume(v, ownConverter, zone.id, true))}
         {prevCrossConverter && renderCrossVolumeGroup(prevCrossVolumes, prevCrossConverter, prevClipFunc, '_prev')}
         {nextCrossConverter && renderCrossVolumeGroup(nextCrossVolumes, nextCrossConverter, nextClipFunc, '_next')}
       </>
@@ -673,12 +753,9 @@ export default function ChainCanvas({
     }
 
     const prevZone = sorted[idx - 1]
-    const prevAnchor = prevZone
-      ? anchors.find(a => a.zone_a_id === prevZone.id && a.zone_b_id === zone.id)
-      : null
+    const prevAnchor = prevZone ? anchors.find(a => a.zone_a_id === prevZone.id && a.zone_b_id === zone.id) : null
     const prevPairs = prevAnchor?.point_pairs ?? []
     const zl_prev = prevZone ? layout.zones.find(z => z.id === prevZone.id) : null
-
     let prevCrossRoutes: Route[] = []
     let prevCrossConverter: ((p: { x: number; y: number }) => { x: number; y: number }) | null = null
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -686,9 +763,7 @@ export default function ChainCanvas({
 
     if (prevPairs.length >= 3 && zl_prev) {
       const t = computeAnchorTransform(prevPairs)
-      prevCrossRoutes = routes.filter(r =>
-        r.chain_id && r.blob_path?.length && r.zone_id === prevZone!.id
-      )
+      prevCrossRoutes = routes.filter(r => r.chain_id && r.blob_path?.length && r.zone_id === prevZone!.id)
       prevCrossConverter = (p: { x: number; y: number }) => {
         const relX_A = (p.x * layout.totalW - zl_prev.virtualX) / zl_prev.virtualW
         const { x: relX_B, y: relY_B } = t.aToB({ x: relX_A, y: p.y })
@@ -698,12 +773,9 @@ export default function ChainCanvas({
     }
 
     const nextZone = sorted[idx + 1]
-    const nextAnchor = nextZone
-      ? anchors.find(a => a.zone_a_id === zone.id && a.zone_b_id === nextZone.id)
-      : null
+    const nextAnchor = nextZone ? anchors.find(a => a.zone_a_id === zone.id && a.zone_b_id === nextZone.id) : null
     const nextPairs = nextAnchor?.point_pairs ?? []
     const zl_next = nextZone ? layout.zones.find(z => z.id === nextZone.id) : null
-
     let nextCrossRoutes: Route[] = []
     let nextCrossConverter: ((p: { x: number; y: number }) => { x: number; y: number }) | null = null
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -711,9 +783,7 @@ export default function ChainCanvas({
 
     if (nextPairs.length >= 3 && zl_next) {
       const t = computeAnchorTransform(nextPairs)
-      nextCrossRoutes = routes.filter(r =>
-        r.chain_id && r.blob_path?.length && r.zone_id === nextZone!.id
-      )
+      nextCrossRoutes = routes.filter(r => r.chain_id && r.blob_path?.length && r.zone_id === nextZone!.id)
       nextCrossConverter = (p: { x: number; y: number }) => {
         const relX_B = (p.x * layout.totalW - zl_next.virtualX) / zl_next.virtualW
         const { x: relX_A, y: relY_A } = t.bToA({ x: relX_B, y: p.y })
@@ -732,12 +802,9 @@ export default function ChainCanvas({
   }
 
   const effectivePanX = panX + transX
-
   const showPrevPeek = transX < 0 && activeIdx > 0
   const showNextPeek = transX > 0 && activeIdx < sorted.length - 1
-
   const prevExitPanX = showPrevPeek ? maxPanXForIdx(activeIdx - 1) : 0
-
   const nextEntryPanX = 0
 
   const drawScreenPts = drawPoints.length >= 4
@@ -755,7 +822,6 @@ export default function ChainCanvas({
     ? previewBlob.path.flatMap(p => { const s = chainToScreen(p, activeIdx, panX); return [s.x, s.y] })
     : []
 
-  // Volume preview screen coords
   const previewVolPerimScreenPts = previewVolumePerimeter && previewVolumePerimeter.length >= 3
     ? previewVolumePerimeter.flatMap(p => { const s = chainToScreen(p, activeIdx, panX); return [s.x, s.y] })
     : []
@@ -785,7 +851,7 @@ export default function ChainCanvas({
           {renderPhoto(activeIdx, -effectivePanX)}
         </Layer>
 
-        {/* Volumes + Routes (volumes first so routes render on top) */}
+        {/* Volumes + Routes (volumes primero = debajo de rutas) */}
         <Layer>
           {showPrevPeek && renderVolumes(activeIdx - 1, prevExitPanX + size.w + transX)}
           {showNextPeek && renderVolumes(activeIdx + 1, nextEntryPanX + transX - size.w)}
@@ -797,7 +863,6 @@ export default function ChainCanvas({
 
         {/* Drawing preview layer */}
         <Layer listening={false}>
-          {/* Route preview */}
           {previewScreenPts.length >= 4 && (
             <Line points={previewScreenPts} stroke={getColorHex(drawColor)} strokeWidth={STROKE_W}
               tension={0.5} lineCap="round" lineJoin="round" opacity={0.75} dash={[20, 8]} />
@@ -807,36 +872,22 @@ export default function ChainCanvas({
               tension={0.5} lineCap="round" lineJoin="round" opacity={0.85} />
           )}
 
-          {/* Volume perimeter preview (shown during review and details phases) */}
           {previewVolPerimScreenPts.length >= 6 && (
-            <Line
-              points={previewVolPerimScreenPts}
-              closed={true}
-              fill="rgba(110,110,110,0.38)"
-              stroke="rgba(170,170,170,0.75)"
-              strokeWidth={2.5}
-              tension={0.3}
-              lineCap="round"
-            />
+            <Line points={previewVolPerimScreenPts} closed={true}
+              fill="rgba(110,110,110,0.38)" stroke="rgba(170,170,170,0.75)" strokeWidth={2.5}
+              tension={0.3} lineCap="round" />
           )}
-
-          {/* Accumulated detail strokes preview */}
           {previewVolDetailsScreenPts.map((pts, i) =>
             pts.length >= 4 && (
               <Line key={i} points={pts} stroke="rgba(55,55,55,0.95)" strokeWidth={5} tension={0.5} lineCap="round" lineJoin="round" />
             )
           )}
-
-          {/* Live volume drawing stroke */}
           {volumePaintMode === 'perimeter' && drawScreenPts.length >= 4 && (
             <>
               <Line points={drawScreenPts} stroke="rgba(180,180,180,0.88)" strokeWidth={3} tension={0.3} lineCap="round" />
-              {/* Dashed closing hint */}
               <Line
                 points={[drawScreenPts[drawScreenPts.length - 2], drawScreenPts[drawScreenPts.length - 1], drawScreenPts[0], drawScreenPts[1]]}
-                stroke="rgba(180,180,180,0.28)"
-                strokeWidth={2}
-                dash={[8, 6]}
+                stroke="rgba(180,180,180,0.28)" strokeWidth={2} dash={[8, 6]}
               />
             </>
           )}
@@ -860,7 +911,6 @@ export default function ChainCanvas({
         </div>
       )}
 
-      {/* Indicador de zoom */}
       {zoom !== 1 && (
         <div className="absolute top-3 left-1/2 -translate-x-1/2 pointer-events-none z-10">
           <div className="bg-zinc-900/80 backdrop-blur-sm text-zinc-400 text-[10px] font-bold px-2.5 py-1 rounded-full border border-zinc-700/50">
