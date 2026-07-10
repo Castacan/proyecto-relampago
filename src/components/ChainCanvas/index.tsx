@@ -766,27 +766,28 @@ export default function ChainCanvas({
     ) {
       if (!route.blob_path || route.blob_path.length < 2) return null
       const flat = route.blob_path.flatMap(p => { const s = converter(p); return [s.x, s.y] })
-      const midS = converter(route.blob_path[Math.floor(route.blob_path.length / 2)])
       const colorHex = getColorHex(route.color)
       const level = getFreshnessLevel(route.placed_at)
       const freshnessHex = getFreshnessColor(level)
       const days = getDaysOnWall(route.placed_at)
+      const bd = badgeMap.get(route.id + keySuffix)
       return (
         <Group key={route.id + keySuffix}>
           <Line points={flat} stroke={freshnessHex} strokeWidth={STROKE_W + 6} tension={0.5} lineCap="round" lineJoin="round" opacity={0.35} listening={false} />
           <Line id={`RTE:${route.id}`} points={flat} stroke={colorHex} strokeWidth={STROKE_W} tension={0.5} lineCap="round" lineJoin="round" opacity={0.92} hitStrokeWidth={32} />
-          {isStaff ? (
-            <Group x={midS.x} y={midS.y - 28} listening={false}>
-              <Line points={[0, 4, 0, 18]} stroke={freshnessHex} strokeWidth={2} />
-              <Rect x={-18} y={-12} width={36} height={16} fill={freshnessHex} cornerRadius={4} />
-              <Text x={-16} y={-9} text={`${days}d`} fontSize={10} fill="#111" fontStyle="bold" fontFamily="sans-serif" width={32} align="center" />
-            </Group>
-          ) : (
-            <Group x={midS.x} y={midS.y - 28} listening={false}>
-              <Line points={[0, 4, 0, 18]} stroke={freshnessHex} strokeWidth={2} />
-              <Rect x={-30} y={-12} width={60} height={16} fill="rgba(0,0,0,0.75)" cornerRadius={4} />
-              <Text x={-28} y={-9} text={getPublicLabel(level)} fontSize={9} fill={freshnessHex} fontStyle="bold" fontFamily="sans-serif" width={56} align="center" />
-            </Group>
+          {bd && isStaff && (
+            <>
+              <Line points={[bd.bx, bd.by + BADGE_H, bd.anchorX, bd.anchorY]} stroke={freshnessHex} strokeWidth={1.5} opacity={0.7} listening={false} />
+              <Rect x={bd.bx - BADGE_W / 2} y={bd.by} width={BADGE_W} height={BADGE_H} fill={freshnessHex} cornerRadius={4} listening={false} />
+              <Text x={bd.bx - BADGE_W / 2 + 2} y={bd.by + 3} text={`${days}d`} fontSize={10} fill="#111" fontStyle="bold" fontFamily="sans-serif" width={BADGE_W - 4} align="center" listening={false} />
+            </>
+          )}
+          {bd && !isStaff && (
+            <>
+              <Line points={[bd.bx, bd.by + BADGE_H, bd.anchorX, bd.anchorY]} stroke={freshnessHex} strokeWidth={1.5} opacity={0.7} listening={false} />
+              <Rect x={bd.bx - BADGE_W / 2} y={bd.by} width={BADGE_W} height={BADGE_H} fill="rgba(0,0,0,0.75)" cornerRadius={4} listening={false} />
+              <Text x={bd.bx - BADGE_W / 2 + 2} y={bd.by + 3} text={getPublicLabel(level)} fontSize={9} fill={freshnessHex} fontStyle="bold" fontFamily="sans-serif" width={BADGE_W - 4} align="center" listening={false} />
+            </>
           )}
         </Group>
       )
@@ -855,6 +856,59 @@ export default function ChainCanvas({
       }
       nextClipFunc = photoClipFunc
     }
+
+    // ── Badge layout: ancla en punto más alto + separación sin colisiones ────
+    const BADGE_W = isStaff ? 38 : 62
+    const BADGE_H = 16
+    const LINE_BASE = 26
+    const GAP = 5
+
+    const routeDefs: Array<{
+      route: Route
+      converter: (p: { x: number; y: number }) => { x: number; y: number }
+      key: string
+    }> = [
+      ...ownRoutes.map(r => ({ route: r, converter: ownConverter, key: r.id })),
+      ...(prevCrossConverter
+        ? prevCrossRoutes.map(r => ({ route: r, converter: prevCrossConverter!, key: r.id + '_prev' }))
+        : []),
+      ...(nextCrossConverter
+        ? nextCrossRoutes.map(r => ({ route: r, converter: nextCrossConverter!, key: r.id + '_next' }))
+        : []),
+    ]
+
+    const badges = routeDefs.map(({ route, converter, key }) => {
+      const pts = route.blob_path.map(p => converter(p))
+      const top = pts.reduce((best, p) => p.y < best.y ? p : best, pts[0])
+      return { key, anchorX: top.x, anchorY: top.y, bx: top.x, by: top.y - LINE_BASE - BADGE_H }
+    })
+
+    for (let iter = 0; iter < 60; iter++) {
+      let moved = false
+      for (let i = 0; i < badges.length; i++) {
+        for (let j = i + 1; j < badges.length; j++) {
+          const a = badges[i], b = badges[j]
+          const ox = BADGE_W + GAP - Math.abs(a.bx - b.bx)
+          const oy = BADGE_H + GAP - Math.abs(a.by - b.by)
+          if (ox > 0 && oy > 0) {
+            moved = true
+            if (ox <= oy) {
+              const push = ox / 2 + 1
+              if (a.bx <= b.bx) { a.bx -= push; b.bx += push }
+              else { a.bx += push; b.bx -= push }
+            } else {
+              const push = oy + 2
+              if (a.by >= b.by) a.by -= push
+              else b.by -= push
+            }
+          }
+        }
+      }
+      if (!moved) break
+    }
+
+    const badgeMap = new Map(badges.map(b => [b.key, b]))
+    // ──────────────────────────────────────────────────────────────────────────
 
     return (
       <>
