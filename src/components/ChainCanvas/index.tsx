@@ -125,12 +125,7 @@ export default function ChainCanvas({
   }
 
   function transitionPanXForIdx(idx: number): number {
-    if (idx >= sorted.length - 1) return maxPanXForIdx(idx)
-    const za = sorted[idx], zb = sorted[idx + 1]
-    const anchor = anchors.find(a => a.zone_a_id === za?.id && a.zone_b_id === zb?.id)
-    const transform = computeAnchorTransform(anchor?.point_pairs ?? [])
-    if (transform.aTransitionX >= 1) return maxPanXForIdx(idx)
-    return Math.max(0, transform.aTransitionX * displayWForIdx(idx) * zoomRef.current - size.w)
+    return maxPanXForIdx(idx)
   }
 
   // ── Animación ────────────────────────────────────────────────
@@ -150,16 +145,11 @@ export default function ChainCanvas({
   function startTransitionToNext() {
     if (isTransitioning.current || activeIdx >= sorted.length - 1) return
     isTransitioning.current = true
-    const za = sorted[activeIdx], zb = sorted[activeIdx + 1]
-    const anchor = anchors.find(a => a.zone_a_id === za?.id && a.zone_b_id === zb?.id)
-    const transform = computeAnchorTransform(anchor?.point_pairs ?? [])
-    const nextDW = displayWForIdx(activeIdx + 1)
-    const entryPanX = Math.max(0, Math.min(transform.bEntryX * nextDW * zoomRef.current, Math.max(0, nextDW * zoomRef.current - size.w)))
     const fromTx = transXRef.current
     animate(fromTx, size.w, TRANSITION_MS, v => { transXRef.current = v; setTransX(v) }, () => {
       isTransitioning.current = false
       transXRef.current = 0; setTransX(0)
-      panXRef.current = entryPanX; setPanX(entryPanX)
+      panXRef.current = 0; setPanX(0)
       setActiveIdx(i => i + 1)
     })
   }
@@ -167,14 +157,7 @@ export default function ChainCanvas({
   function startTransitionToPrev() {
     if (isTransitioning.current || activeIdx <= 0) return
     isTransitioning.current = true
-    const za = sorted[activeIdx - 1], zb = sorted[activeIdx]
-    const anchor = anchors.find(a => a.zone_a_id === za?.id && a.zone_b_id === zb?.id)
-    const transform = computeAnchorTransform(anchor?.point_pairs ?? [])
-    const prevDW = displayWForIdx(activeIdx - 1)
-    const exitPanX = Math.max(0, Math.min(
-      transform.aTransitionX * prevDW * zoomRef.current - size.w * 0.3,
-      maxPanXForIdx(activeIdx - 1)
-    ))
+    const exitPanX = maxPanXForIdx(activeIdx - 1)
     const fromTx = transXRef.current
     animate(fromTx, -size.w, TRANSITION_MS, v => { transXRef.current = v; setTransX(v) }, () => {
       isTransitioning.current = false
@@ -753,21 +736,9 @@ export default function ChainCanvas({
   const showPrevPeek = transX < 0 && activeIdx > 0
   const showNextPeek = transX > 0 && activeIdx < sorted.length - 1
 
-  const prevExitPanX = (() => {
-    if (!showPrevPeek) return 0
-    const za = sorted[activeIdx - 1], zb = sorted[activeIdx]
-    const anchor = anchors.find(a => a.zone_a_id === za?.id && a.zone_b_id === zb?.id)
-    const t = computeAnchorTransform(anchor?.point_pairs ?? [])
-    return Math.max(0, t.aTransitionX * displayWForIdx(activeIdx - 1) * zoom - size.w * 0.3)
-  })()
+  const prevExitPanX = showPrevPeek ? maxPanXForIdx(activeIdx - 1) : 0
 
-  const nextEntryPanX = (() => {
-    if (!showNextPeek) return 0
-    const za = sorted[activeIdx], zb = sorted[activeIdx + 1]
-    const anchor = anchors.find(a => a.zone_a_id === za?.id && a.zone_b_id === zb?.id)
-    const t = computeAnchorTransform(anchor?.point_pairs ?? [])
-    return Math.max(0, Math.min(t.bEntryX * displayWForIdx(activeIdx + 1) * zoom, maxPanXForIdx(activeIdx + 1)))
-  })()
+  const nextEntryPanX = 0
 
   const drawScreenPts = drawPoints.length >= 4
     ? (() => {
