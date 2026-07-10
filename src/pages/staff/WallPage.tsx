@@ -389,7 +389,7 @@ export default function WallPage() {
           <div className="w-full bg-zinc-900 rounded-t-3xl px-6 pt-6 pb-24 border-t border-zinc-800/80" onClick={e => e.stopPropagation()}>
             <div className="w-10 h-1 bg-zinc-700 rounded-full mx-auto mb-5" />
             <h2 className="text-white font-bold text-lg tracking-tight mb-5">¿De qué color son las presas?</h2>
-            <div className="grid grid-cols-5 gap-4 mb-6">
+            <div className="grid grid-cols-6 gap-3 mb-6">
               {ROUTE_COLORS.map(c => (
                 <button key={c.key} onClick={() => setPaintColor(c.key)} className="flex flex-col items-center gap-2 group cursor-pointer">
                   <div
