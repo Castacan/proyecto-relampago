@@ -27,10 +27,8 @@ const ZONE_POLYS: Record<string, PolyDef> = {
   // Combined polygon for the two fondo-derecho photo sections
   'fondo-derecho':          { points: '198,15 368,15 320,58 198,58',         label: 'Fondo Der',        labelX: 280, labelY: 40,  badgeX: 340, badgeY: 27  },
   'pared-derecha':          { points: '320,58 368,15 320,300 300,300',       label: 'Pared\nDer',       labelX: 330, labelY: 168, badgeX: 340, badgeY: 155 },
-  'flanco-tunel-izquierdo': { points: '108,82 155,82 155,248 108,248',       label: 'Flanco\nIzq',      labelX: 132, labelY: 168, badgeX: 132, badgeY: 155 },
-  'flanco-tunel-derecho':   { points: '245,82 292,82 292,248 245,248',       label: 'Flanco\nDer',      labelX: 269, labelY: 168, badgeX: 269, badgeY: 155 },
-  'tunel-norte':            { points: '155,82 245,82 245,165 155,165',       label: 'Túnel\nNorte',     labelX: 200, labelY: 128, badgeX: 200, badgeY: 115 },
-  'tunel-sur':              { points: '155,165 245,165 245,248 155,248',     label: 'Túnel\nSur',       labelX: 200, labelY: 210, badgeX: 200, badgeY: 197 },
+  'flanco-tunel-izquierdo': { points: '108,82 200,82 200,248 108,248',       label: 'Flanco\nIzq',      labelX: 133, labelY: 168, badgeX: 133, badgeY: 155 },
+  'flanco-tunel-derecho':   { points: '200,82 292,82 292,248 200,248',       label: 'Flanco\nDer',      labelX: 269, labelY: 168, badgeX: 269, badgeY: 155 },
   'desplome':               { points: '108,248 292,248 292,295 108,295',     label: 'Desplome',         labelX: 200, labelY: 274, badgeX: 260, badgeY: 261 },
 }
 
