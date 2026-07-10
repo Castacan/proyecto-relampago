@@ -4,6 +4,7 @@ import ZoneMap from '../../components/ZoneMap'
 import ChainCanvas from '../../components/ChainCanvas'
 import { useZones } from '../../hooks/useZones'
 import { useRoutes } from '../../hooks/useRoutes'
+import { useVolumes } from '../../hooks/useVolumes'
 import { useQrByRoute } from '../../hooks/useQrByRoute'
 import { useChain } from '../../hooks/useChain'
 import type { Route } from '../../types'
@@ -12,6 +13,7 @@ export default function PublicWallPage() {
   const navigate = useNavigate()
   const { zones: allZones } = useZones()
   const { routes } = useRoutes()
+  const { volumes } = useVolumes()
   const { qrByRoute } = useQrByRoute()
 
   const defaultChainId = allZones.find(z => z.chain_id)?.chain_id ?? null
@@ -50,6 +52,7 @@ export default function PublicWallPage() {
               zones={chainZones}
               anchors={anchors}
               routes={routes}
+              volumes={volumes}
               paintMode={false}
               drawColor="amarillo"
               previewBlob={null}

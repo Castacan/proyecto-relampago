@@ -1,36 +1,54 @@
 import { useState, useEffect } from 'react'
 import { useSearchParams } from 'react-router-dom'
+import { supabase } from '../../lib/supabase'
 import ZoneMap from '../../components/ZoneMap'
 import ChainCanvas from '../../components/ChainCanvas'
 import RouteForm from '../../components/RouteForm'
 import RouteDetail from '../../components/RouteDetail'
+import VolumeDetail from '../../components/VolumeDetail'
 import { useZones } from '../../hooks/useZones'
 import { useRoutes } from '../../hooks/useRoutes'
+import { useVolumes } from '../../hooks/useVolumes'
 import { useChain } from '../../hooks/useChain'
 import { ROUTE_COLORS, getColorHex } from '../../lib/colors'
-import type { Route, Zone } from '../../types'
+import type { Route, Volume, Zone } from '../../types'
 
-type UIState = 'idle' | 'color-pick' | 'drawing' | 'review' | 'form'
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const db = supabase as unknown as any
+
+type UIState =
+  | 'idle'
+  | 'color-pick' | 'drawing' | 'review' | 'form'
+  | 'vol-perimeter' | 'vol-perimeter-review' | 'vol-details'
 
 export default function WallPage() {
   const [searchParams] = useSearchParams()
   const assignQrId = searchParams.get('qr') ?? undefined
 
   const { zones: allZones } = useZones()
-  const { routes, refetch } = useRoutes()
+  const { routes, refetch: refetchRoutes } = useRoutes()
+  const { volumes, refetch: refetchVolumes } = useVolumes()
 
-  // Encuentra la primera cadena disponible
   const defaultChainId = allZones.find(z => z.chain_id)?.chain_id ?? null
   const { zones: chainZones, anchors, loading: chainLoading } = useChain(defaultChainId)
 
   const [activeZoneId, setActiveZoneId] = useState<string | null>(null)
   const [jumpZoneId, setJumpZoneId] = useState<string | null>(null)
   const [selectedRoute, setSelectedRoute] = useState<Route | null>(null)
+  const [selectedVolume, setSelectedVolume] = useState<Volume | null>(null)
   const [ui, setUi] = useState<UIState>('idle')
+
+  // Route drawing state
   const [paintColor, setPaintColor] = useState('amarillo')
   const [newBlobPath, setNewBlobPath] = useState<{ x: number; y: number }[] | null>(null)
   const [newBlobZoneId, setNewBlobZoneId] = useState<string | null>(null)
   const [newBlobChainId, setNewBlobChainId] = useState<string | null>(null)
+
+  // Volume drawing state
+  const [volPerimeter, setVolPerimeter] = useState<{ x: number; y: number }[] | null>(null)
+  const [volDetails, setVolDetails] = useState<{ x: number; y: number }[][]>([])
+  const [volZoneId, setVolZoneId] = useState<string | null>(null)
+  const [volChainId, setVolChainId] = useState<string | null>(null)
 
   useEffect(() => {
     if (chainZones.length > 0 && !activeZoneId) {
@@ -40,6 +58,18 @@ export default function WallPage() {
 
   const activeZone: Zone | null = chainZones.find(z => z.id === activeZoneId) ?? null
 
+  function cancelAll() {
+    setUi('idle')
+    setNewBlobPath(null)
+    setNewBlobZoneId(null)
+    setNewBlobChainId(null)
+    setPaintColor('amarillo')
+    setVolPerimeter(null)
+    setVolDetails([])
+    setVolZoneId(null)
+    setVolChainId(null)
+  }
+
   function handleBlobComplete(path: { x: number; y: number }[], zoneId: string, chainId: string) {
     setNewBlobPath(path)
     setNewBlobZoneId(zoneId)
@@ -47,12 +77,27 @@ export default function WallPage() {
     setUi('review')
   }
 
-  function cancelAll() {
-    setUi('idle')
-    setNewBlobPath(null)
-    setNewBlobZoneId(null)
-    setNewBlobChainId(null)
-    setPaintColor('amarillo')
+  function handleVolumePerimeterComplete(perimeter: { x: number; y: number }[], zoneId: string, chainId: string) {
+    setVolPerimeter(perimeter)
+    setVolZoneId(zoneId)
+    setVolChainId(chainId)
+    setUi('vol-perimeter-review')
+  }
+
+  function handleVolumeDetailStroke(stroke: { x: number; y: number }[]) {
+    setVolDetails(prev => [...prev, stroke])
+  }
+
+  async function saveVolume(withDetails = true) {
+    if (!volPerimeter || !volZoneId || !volChainId) return
+    await db.from('volumes').insert({
+      zone_id: volZoneId,
+      chain_id: volChainId,
+      perimeter: volPerimeter,
+      details: withDetails ? volDetails : [],
+    })
+    cancelAll()
+    refetchVolumes()
   }
 
   if (chainLoading || allZones.length === 0) return (
@@ -70,6 +115,10 @@ export default function WallPage() {
     </div>
   )
 
+  const volPaintMode: 'perimeter' | 'details' | null =
+    ui === 'vol-perimeter' ? 'perimeter' :
+    ui === 'vol-details' ? 'details' : null
+
   return (
     <div className="relative w-full h-full">
       {/* Canvas principal */}
@@ -77,12 +126,21 @@ export default function WallPage() {
         zones={chainZones}
         anchors={anchors}
         routes={routes}
+        volumes={volumes}
         paintMode={ui === 'drawing'}
         drawColor={paintColor}
         previewBlob={(ui === 'review' || ui === 'form') && newBlobPath ? { path: newBlobPath } : null}
+        volumePaintMode={volPaintMode}
+        previewVolumePerimeter={
+          (ui === 'vol-perimeter-review' || ui === 'vol-details') ? volPerimeter : null
+        }
+        previewVolumeDetails={ui === 'vol-details' ? volDetails : []}
         isStaff={true}
         onBlobComplete={handleBlobComplete}
         onRouteClick={route => { if (ui === 'idle') setSelectedRoute(route) }}
+        onVolumePerimeterComplete={handleVolumePerimeterComplete}
+        onVolumeDetailStroke={handleVolumeDetailStroke}
+        onVolumeClick={vol => { if (ui === 'idle') setSelectedVolume(vol) }}
         onActiveZoneChange={setActiveZoneId}
         jumpToZoneId={jumpZoneId}
       />
@@ -92,7 +150,6 @@ export default function WallPage() {
         zones={allZones}
         routes={routes}
         onZoneSelect={zone => {
-          // Solo zonas de la cadena activa tienen efecto
           const inChain = chainZones.find(z => z.id === zone.id)
           if (inChain) setJumpZoneId(zone.id)
         }}
@@ -117,17 +174,7 @@ export default function WallPage() {
         </div>
       )}
 
-      {/* Review hint */}
-      {ui === 'review' && (
-        <div className="absolute top-14 left-0 right-0 flex justify-center pointer-events-none z-20">
-          <div className="flex items-center gap-2.5 bg-zinc-950/95 backdrop-blur-sm px-5 py-2.5 rounded-full border border-zinc-800/60 shadow-xl">
-            <div className="w-3 h-3 rounded-full border border-white/30 shrink-0" style={{ backgroundColor: getColorHex(paintColor) }} />
-            <span className="text-white text-xs font-semibold">¿Se ve bien?</span>
-          </div>
-        </div>
-      )}
-
-      {/* Draw hint */}
+      {/* Draw hint — route */}
       {ui === 'drawing' && (
         <div className="absolute top-14 left-0 right-0 flex justify-center pointer-events-none z-20">
           <div className="flex items-center gap-2.5 bg-zinc-950/95 backdrop-blur-sm px-5 py-2.5 rounded-full border border-zinc-800/60 shadow-xl">
@@ -137,17 +184,69 @@ export default function WallPage() {
         </div>
       )}
 
+      {/* Review hint — route */}
+      {ui === 'review' && (
+        <div className="absolute top-14 left-0 right-0 flex justify-center pointer-events-none z-20">
+          <div className="flex items-center gap-2.5 bg-zinc-950/95 backdrop-blur-sm px-5 py-2.5 rounded-full border border-zinc-800/60 shadow-xl">
+            <div className="w-3 h-3 rounded-full border border-white/30 shrink-0" style={{ backgroundColor: getColorHex(paintColor) }} />
+            <span className="text-white text-xs font-semibold">¿Se ve bien?</span>
+          </div>
+        </div>
+      )}
+
+      {/* Draw hint — volume perimeter */}
+      {ui === 'vol-perimeter' && (
+        <div className="absolute top-14 left-0 right-0 flex justify-center pointer-events-none z-20">
+          <div className="flex items-center gap-2.5 bg-zinc-950/95 backdrop-blur-sm px-5 py-2.5 rounded-full border border-zinc-800/60 shadow-xl">
+            <div className="w-3 h-3 rounded-full bg-zinc-400 shrink-0" />
+            <span className="text-zinc-200 text-xs font-semibold">Dibuja el perímetro del volumen</span>
+          </div>
+        </div>
+      )}
+
+      {/* Review hint — volume perimeter */}
+      {ui === 'vol-perimeter-review' && (
+        <div className="absolute top-14 left-0 right-0 flex justify-center pointer-events-none z-20">
+          <div className="flex items-center gap-2.5 bg-zinc-950/95 backdrop-blur-sm px-5 py-2.5 rounded-full border border-zinc-800/60 shadow-xl">
+            <div className="w-3 h-3 rounded-full bg-zinc-400 shrink-0" />
+            <span className="text-white text-xs font-semibold">¿Se ve bien el perímetro?</span>
+          </div>
+        </div>
+      )}
+
+      {/* Draw hint — volume details */}
+      {ui === 'vol-details' && (
+        <div className="absolute top-14 left-0 right-0 flex justify-center pointer-events-none z-20">
+          <div className="flex items-center gap-2.5 bg-zinc-950/95 backdrop-blur-sm px-5 py-2.5 rounded-full border border-zinc-800/60 shadow-xl">
+            <div className="w-3 h-3 rounded-full bg-zinc-600 shrink-0" />
+            <span className="text-zinc-200 text-xs font-semibold">Dibuja detalles · {volDetails.length} trazo{volDetails.length !== 1 ? 's' : ''}</span>
+          </div>
+        </div>
+      )}
+
       {/* Bottom action bar */}
-      {(ui === 'idle' || ui === 'color-pick' || ui === 'drawing' || ui === 'review') && (
+      {(ui === 'idle' || ui === 'color-pick' || ui === 'drawing' || ui === 'review'
+        || ui === 'vol-perimeter' || ui === 'vol-perimeter-review' || ui === 'vol-details') && (
         <div className="absolute bottom-5 left-4 right-4 flex justify-end pointer-events-none z-20">
+
           {ui === 'idle' ? (
-            <button
-              onClick={() => setUi('color-pick')}
-              className="pointer-events-auto flex items-center gap-2.5 px-6 py-3.5 rounded-2xl font-black text-base shadow-2xl shadow-yellow-400/30 bg-yellow-400 text-zinc-950 hover:bg-yellow-300 active:scale-95 transition-all border-2 border-yellow-300/40"
-            >
-              <span className="text-xl leading-none font-black">+</span>
-              Nueva ruta
-            </button>
+            <div className="flex gap-2.5 pointer-events-auto">
+              <button
+                onClick={() => setUi('vol-perimeter')}
+                className="flex items-center gap-2 px-4 py-3.5 rounded-2xl font-bold text-sm shadow-xl bg-zinc-800 text-zinc-300 border-2 border-zinc-700 hover:bg-zinc-700 hover:text-white active:scale-95 transition-all"
+              >
+                <div className="w-4 h-4 rounded bg-zinc-500/60 border border-zinc-400/50" />
+                Volumen
+              </button>
+              <button
+                onClick={() => setUi('color-pick')}
+                className="flex items-center gap-2.5 px-6 py-3.5 rounded-2xl font-black text-base shadow-2xl shadow-yellow-400/30 bg-yellow-400 text-zinc-950 hover:bg-yellow-300 active:scale-95 transition-all border-2 border-yellow-300/40"
+              >
+                <span className="text-xl leading-none font-black">+</span>
+                Nueva ruta
+              </button>
+            </div>
+
           ) : ui === 'review' ? (
             <div className="flex gap-3 pointer-events-auto">
               <button
@@ -163,6 +262,45 @@ export default function WallPage() {
                 Continuar →
               </button>
             </div>
+
+          ) : ui === 'vol-perimeter-review' ? (
+            <div className="flex gap-2 pointer-events-auto">
+              <button
+                onClick={() => { setVolPerimeter(null); setUi('vol-perimeter') }}
+                className="px-4 py-3.5 rounded-2xl font-bold text-sm shadow-xl bg-zinc-800 text-zinc-300 border-2 border-zinc-700 hover:bg-zinc-700 hover:text-white active:scale-95 transition-all"
+              >
+                Rehacer
+              </button>
+              <button
+                onClick={() => { setVolDetails([]); setUi('vol-details') }}
+                className="px-4 py-3.5 rounded-2xl font-bold text-sm shadow-xl bg-zinc-700 text-zinc-200 border-2 border-zinc-600 hover:bg-zinc-600 hover:text-white active:scale-95 transition-all"
+              >
+                + Detalles
+              </button>
+              <button
+                onClick={() => saveVolume(false)}
+                className="px-5 py-3.5 rounded-2xl font-bold text-sm shadow-2xl bg-zinc-300 text-zinc-900 hover:bg-white active:scale-95 transition-all"
+              >
+                Guardar
+              </button>
+            </div>
+
+          ) : ui === 'vol-details' ? (
+            <div className="flex gap-3 pointer-events-auto">
+              <button
+                onClick={cancelAll}
+                className="px-4 py-3.5 rounded-2xl font-bold text-sm shadow-xl bg-zinc-800 text-zinc-300 border-2 border-zinc-700 hover:bg-zinc-700 hover:text-white active:scale-95 transition-all"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={() => saveVolume(true)}
+                className="px-6 py-3.5 rounded-2xl font-bold text-sm shadow-2xl bg-zinc-300 text-zinc-900 hover:bg-white active:scale-95 transition-all"
+              >
+                Listo
+              </button>
+            </div>
+
           ) : (
             <button
               onClick={cancelAll}
@@ -213,7 +351,7 @@ export default function WallPage() {
           initialZoneId={newBlobZoneId}
           initialChainId={newBlobChainId ?? undefined}
           assignQrId={assignQrId}
-          onSave={() => { cancelAll(); refetch() }}
+          onSave={() => { cancelAll(); refetchRoutes() }}
           onCancel={cancelAll}
         />
       )}
@@ -224,8 +362,18 @@ export default function WallPage() {
           route={selectedRoute}
           zones={allZones}
           onClose={() => setSelectedRoute(null)}
-          onUpdate={() => { setSelectedRoute(null); refetch() }}
-          onRetire={() => { setSelectedRoute(null); refetch() }}
+          onUpdate={() => { setSelectedRoute(null); refetchRoutes() }}
+          onRetire={() => { setSelectedRoute(null); refetchRoutes() }}
+        />
+      )}
+
+      {/* Volume detail */}
+      {selectedVolume && (
+        <VolumeDetail
+          volume={selectedVolume}
+          zones={allZones}
+          onClose={() => setSelectedVolume(null)}
+          onRetire={() => { setSelectedVolume(null); refetchVolumes() }}
         />
       )}
     </div>

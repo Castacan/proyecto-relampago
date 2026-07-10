@@ -58,3 +58,14 @@ export interface ZoneAnchor {
   b_overlap_end: number
   point_pairs: PointPair[]
 }
+
+export interface Volume {
+  id: string
+  zone_id: string
+  chain_id: string | null
+  status: 'active' | 'retired'
+  placed_at: string
+  retired_at: string | null
+  perimeter: { x: number; y: number }[]
+  details: { x: number; y: number }[][]
+}
