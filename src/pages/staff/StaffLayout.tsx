@@ -72,7 +72,7 @@ export default function StaffLayout() {
           )}
         </NavLink>
 
-        <NavLink to="/staff/stats" className="flex-1 flex justify-center">
+        {isAdmin && <NavLink to="/staff/stats" className="flex-1 flex justify-center">
           {({ isActive }) => (
             <div className={`flex items-center gap-2 px-6 py-2.5 rounded-2xl transition-all text-sm font-bold ${
               isActive
@@ -87,7 +87,7 @@ export default function StaffLayout() {
               <span>Stats</span>
             </div>
           )}
-        </NavLink>
+        </NavLink>}
 
         {isAdmin && (
           <NavLink to="/staff/admin" className="flex-1 flex justify-center">
