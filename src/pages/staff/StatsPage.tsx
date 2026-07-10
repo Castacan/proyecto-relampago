@@ -220,7 +220,25 @@ export default function StatsPage() {
               </div>
             )}
 
-            {/* Frescura — solo en vista actual */}
+            {/* Por zona */}
+            <div className="bg-zinc-900 rounded-2xl p-4 border border-zinc-800/80">
+              <h2 className="text-white font-bold text-base mb-4">Por zona</h2>
+              <BarChart items={zoneItems} />
+            </div>
+
+            {/* Por color */}
+            <div className="bg-zinc-900 rounded-2xl p-4 border border-zinc-800/80">
+              <h2 className="text-white font-bold text-base mb-4">Por color</h2>
+              <ColumnChart items={colorItems} />
+            </div>
+
+            {/* Por grado */}
+            <div className="bg-zinc-900 rounded-2xl p-4 border border-zinc-800/80">
+              <h2 className="text-white font-bold text-base mb-4">Por grado</h2>
+              <ColumnChart items={gradeItems} />
+            </div>
+
+            {/* Frescura — solo en vista actual, al fondo */}
             {view === 'current' && (
               <div className="bg-zinc-900 rounded-2xl p-4 border border-zinc-800/80">
                 <h2 className="text-white font-bold text-base mb-4">Frescura</h2>
@@ -248,24 +266,6 @@ export default function StatsPage() {
                 </div>
               </div>
             )}
-
-            {/* Por zona */}
-            <div className="bg-zinc-900 rounded-2xl p-4 border border-zinc-800/80">
-              <h2 className="text-white font-bold text-base mb-4">Por zona</h2>
-              <BarChart items={zoneItems} />
-            </div>
-
-            {/* Por color */}
-            <div className="bg-zinc-900 rounded-2xl p-4 border border-zinc-800/80">
-              <h2 className="text-white font-bold text-base mb-4">Por color</h2>
-              <ColumnChart items={colorItems} />
-            </div>
-
-            {/* Por grado */}
-            <div className="bg-zinc-900 rounded-2xl p-4 border border-zinc-800/80">
-              <h2 className="text-white font-bold text-base mb-4">Por grado</h2>
-              <ColumnChart items={gradeItems} />
-            </div>
 
           </div>
         )}
