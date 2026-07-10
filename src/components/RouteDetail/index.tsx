@@ -26,6 +26,7 @@ export default function RouteDetail({ route, zones, onClose, onUpdate, onRetire 
   const [editGrade, setEditGrade] = useState(route.grade)
   const [editZoneId, setEditZoneId] = useState(route.zone_id)
   const [editNotes, setEditNotes] = useState(route.notes ?? '')
+  const [editDate, setEditDate] = useState(route.placed_at.slice(0, 10))
   const [saving, setSaving] = useState(false)
 
   const [retiring, setRetiring] = useState(false)
@@ -67,6 +68,7 @@ export default function RouteDetail({ route, zones, onClose, onUpdate, onRetire 
     await supabase.from('routes').update({
       color: editColor, grade: editGrade, zone_id: editZoneId,
       notes: editNotes.trim() || null,
+      placed_at: new Date(editDate + 'T12:00:00.000Z').toISOString(),
     }).eq('id', route.id)
     setSaving(false)
     onUpdate()
@@ -278,7 +280,7 @@ export default function RouteDetail({ route, zones, onClose, onUpdate, onRetire 
         ) : (
           <>
             <p className="text-zinc-500 text-[11px] font-semibold uppercase tracking-widest mb-3">Color</p>
-            <div className="grid grid-cols-5 gap-4 mb-6">
+            <div className="grid grid-cols-6 gap-3 mb-6">
               {ROUTE_COLORS.map(c => (
                 <button key={c.key} onClick={() => setEditColor(c.key)} className="flex flex-col items-center gap-2 group cursor-pointer">
                   <div
@@ -319,6 +321,15 @@ export default function RouteDetail({ route, zones, onClose, onUpdate, onRetire 
             >
               {zones.map(z => <option key={z.id} value={z.id}>{z.name}</option>)}
             </select>
+
+            <p className="text-zinc-500 text-[11px] font-semibold uppercase tracking-widest mb-3">Fecha en pared</p>
+            <input
+              type="date"
+              value={editDate}
+              onChange={e => setEditDate(e.target.value)}
+              max={new Date().toISOString().slice(0, 10)}
+              className="w-full bg-zinc-800 text-white rounded-xl px-4 py-3 text-sm mb-6 outline-none border border-zinc-700/50 hover:border-zinc-600 focus:border-yellow-400/60 transition-all [color-scheme:dark]"
+            />
 
             <p className="text-zinc-500 text-[11px] font-semibold uppercase tracking-widest mb-3">Notas</p>
             <textarea
