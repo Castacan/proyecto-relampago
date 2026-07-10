@@ -766,10 +766,7 @@ export default function ChainCanvas({
     ) {
       if (!route.blob_path || route.blob_path.length < 2) return null
       const flat = route.blob_path.flatMap(p => { const s = converter(p); return [s.x, s.y] })
-      const centS = converter({
-        x: route.blob_path.reduce((s, p) => s + p.x, 0) / route.blob_path.length,
-        y: route.blob_path.reduce((s, p) => s + p.y, 0) / route.blob_path.length,
-      })
+      const midS = converter(route.blob_path[Math.floor(route.blob_path.length / 2)])
       const colorHex = getColorHex(route.color)
       const level = getFreshnessLevel(route.placed_at)
       const freshnessHex = getFreshnessColor(level)
@@ -779,13 +776,13 @@ export default function ChainCanvas({
           <Line points={flat} stroke={freshnessHex} strokeWidth={STROKE_W + 6} tension={0.5} lineCap="round" lineJoin="round" opacity={0.35} listening={false} />
           <Line id={`RTE:${route.id}`} points={flat} stroke={colorHex} strokeWidth={STROKE_W} tension={0.5} lineCap="round" lineJoin="round" opacity={0.92} hitStrokeWidth={32} />
           {isStaff ? (
-            <Group x={centS.x} y={centS.y - 28} listening={false}>
+            <Group x={midS.x} y={midS.y - 28} listening={false}>
               <Line points={[0, 4, 0, 18]} stroke={freshnessHex} strokeWidth={2} />
               <Rect x={-18} y={-12} width={36} height={16} fill={freshnessHex} cornerRadius={4} />
               <Text x={-16} y={-9} text={`${days}d`} fontSize={10} fill="#111" fontStyle="bold" fontFamily="sans-serif" width={32} align="center" />
             </Group>
           ) : (
-            <Group x={centS.x} y={centS.y - 28} listening={false}>
+            <Group x={midS.x} y={midS.y - 28} listening={false}>
               <Line points={[0, 4, 0, 18]} stroke={freshnessHex} strokeWidth={2} />
               <Rect x={-30} y={-12} width={60} height={16} fill="rgba(0,0,0,0.75)" cornerRadius={4} />
               <Text x={-28} y={-9} text={getPublicLabel(level)} fontSize={9} fill={freshnessHex} fontStyle="bold" fontFamily="sans-serif" width={56} align="center" />
