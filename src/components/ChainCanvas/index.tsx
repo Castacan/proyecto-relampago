@@ -824,7 +824,7 @@ export default function ChainCanvas({
       const repo = repositionModeRef.current
       const isRepositioning = repo?.volumeId === vol.id && repo?.zoneId === displayZoneId
       const adj = adjustModeRef.current
-      const isAdjusting = adj?.volumeId === vol.id && keySuffix === ''
+      const isAdjusting = adj?.volumeId === vol.id && adj?.zoneId === displayZoneId
 
       // Offset: adjust (live) > reposition (live) > stored
       let effectiveConverter = converter
