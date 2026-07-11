@@ -226,13 +226,14 @@ export default function ChainCanvas({
   const onVolumePlacedRef = useRef(onVolumePlaced)
   onVolumePlacedRef.current = onVolumePlaced
 
-  function screenToChain(sx: number, sy: number): { x: number; y: number } {
+  function screenToChain(sx: number, sy: number, panXOverride?: number): { x: number; y: number } {
     const zone = sorted[activeIdx]
     const zl = layout.zones.find(z => z.id === zone?.id)
     const dw = displayWForIdx(activeIdx)
     if (!zl || !dw) return { x: 0, y: 0 }
     const z = zoomRef.current
-    const photoRelX = (sx + panXRef.current) / (dw * z)
+    const effectivePanX = panXOverride !== undefined ? panXOverride : panXRef.current
+    const photoRelX = (sx + effectivePanX) / (dw * z)
     const photoRelY = (sy - (size.h - size.h * z) / 2) / (size.h * z)
     const virtualX = zl.virtualX + photoRelX * zl.virtualW
     return {
@@ -512,6 +513,8 @@ export default function ChainCanvas({
       const rect = stageRef.current.container().getBoundingClientRect()
       const tapX = touchStartX.current - rect.left
       const tapY = touchStartY.current - rect.top
+      // Use pan captured at touchStart (consistent with tapX/tapY, not drifted)
+      const tapPanX = touchStartPanX.current
       const catalogItem = volPlaceModeRef.current
       const CATALOG_PX = 100
       // Center on shape centroid so the tap lands on the visual center
@@ -522,10 +525,10 @@ export default function ChainCanvas({
         x: tapX + (p.x - cxCat) * CATALOG_PX * 2,
         y: tapY + (p.y - cyCat) * CATALOG_PX * 2,
       })
-      const perimeter = catalogItem.shape.map(p => { const s = catToScreen(p); return screenToChain(s.x, s.y) })
+      const perimeter = catalogItem.shape.map(p => { const s = catToScreen(p); return screenToChain(s.x, s.y, tapPanX) })
       // Convert details to chain-space using the same transform
       const details = (catalogItem.details ?? []).map(stroke =>
-        stroke.map(p => { const s = catToScreen(p); return screenToChain(s.x, s.y) })
+        stroke.map(p => { const s = catToScreen(p); return screenToChain(s.x, s.y, tapPanX) })
       )
       const zone = sorted[activeIdx]
       if (zone?.chain_id) {
