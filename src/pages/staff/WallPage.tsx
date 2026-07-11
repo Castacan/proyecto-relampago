@@ -20,7 +20,6 @@ const db = supabase as unknown as any
 type UIState =
   | 'idle'
   | 'color-pick' | 'drawing' | 'review' | 'form'
-  | 'vol-perimeter' | 'vol-perimeter-review' | 'vol-details'
   | 'vol-action' | 'vol-reposition'
   | 'vol-catalog' | 'vol-place' | 'vol-adjust'
 
@@ -47,12 +46,6 @@ export default function WallPage() {
   const [newBlobPath, setNewBlobPath] = useState<{ x: number; y: number }[] | null>(null)
   const [newBlobZoneId, setNewBlobZoneId] = useState<string | null>(null)
   const [newBlobChainId, setNewBlobChainId] = useState<string | null>(null)
-
-  // Volume drawing state
-  const [volPerimeter, setVolPerimeter] = useState<{ x: number; y: number }[] | null>(null)
-  const [volDetails, setVolDetails] = useState<{ x: number; y: number }[][]>([])
-  const [volZoneId, setVolZoneId] = useState<string | null>(null)
-  const [volChainId, setVolChainId] = useState<string | null>(null)
 
   // Volume action sheet (cross-zone tap)
   const [actionVol, setActionVol] = useState<Volume | null>(null)
@@ -94,10 +87,6 @@ export default function WallPage() {
     setNewBlobZoneId(null)
     setNewBlobChainId(null)
     setPaintColor('amarillo')
-    setVolPerimeter(null)
-    setVolDetails([])
-    setVolZoneId(null)
-    setVolChainId(null)
     setActionVol(null)
     setActionDisplayZoneId(null)
     setRepoVolume(null)
@@ -116,29 +105,6 @@ export default function WallPage() {
     setNewBlobZoneId(zoneId)
     setNewBlobChainId(chainId)
     setUi('review')
-  }
-
-  function handleVolumePerimeterComplete(perimeter: { x: number; y: number }[], zoneId: string, chainId: string) {
-    setVolPerimeter(perimeter)
-    setVolZoneId(zoneId)
-    setVolChainId(chainId)
-    setUi('vol-perimeter-review')
-  }
-
-  function handleVolumeDetailStroke(stroke: { x: number; y: number }[]) {
-    setVolDetails(prev => [...prev, stroke])
-  }
-
-  async function saveVolume(withDetails = true) {
-    if (!volPerimeter || !volZoneId || !volChainId) return
-    await db.from('volumes').insert({
-      zone_id: volZoneId,
-      chain_id: volChainId,
-      perimeter: volPerimeter,
-      details: withDetails ? volDetails : [],
-    })
-    cancelAll()
-    refetchVolumes()
   }
 
   function handleVolumeClick(vol: Volume, displayZoneId: string) {
@@ -240,10 +206,6 @@ export default function WallPage() {
     </div>
   )
 
-  const volPaintMode: 'perimeter' | 'details' | null =
-    ui === 'vol-perimeter' ? 'perimeter' :
-    ui === 'vol-details' ? 'details' : null
-
   return (
     <div className="relative w-full h-full">
       {/* Canvas principal */}
@@ -255,16 +217,9 @@ export default function WallPage() {
         paintMode={ui === 'drawing'}
         drawColor={paintColor}
         previewBlob={(ui === 'review' || ui === 'form') && newBlobPath ? { path: newBlobPath } : null}
-        volumePaintMode={volPaintMode}
-        previewVolumePerimeter={
-          (ui === 'vol-perimeter-review' || ui === 'vol-details') ? volPerimeter : null
-        }
-        previewVolumeDetails={ui === 'vol-details' ? volDetails : []}
         isStaff={true}
         onBlobComplete={handleBlobComplete}
         onRouteClick={route => { if (ui === 'idle') setSelectedRoute(route) }}
-        onVolumePerimeterComplete={handleVolumePerimeterComplete}
-        onVolumeDetailStroke={handleVolumeDetailStroke}
         onVolumeClick={handleVolumeClick}
         repositionMode={ui === 'vol-reposition' && repoVolume && repoZoneId
           ? { volumeId: repoVolume.id, zoneId: repoZoneId, offset: repoOffset }
@@ -337,36 +292,6 @@ export default function WallPage() {
         </div>
       )}
 
-      {/* Draw hint — volume perimeter */}
-      {ui === 'vol-perimeter' && (
-        <div className="absolute top-14 left-0 right-0 flex justify-center pointer-events-none z-20">
-          <div className="flex items-center gap-2.5 bg-zinc-950/95 backdrop-blur-sm px-5 py-2.5 rounded-full border border-zinc-800/60 shadow-xl">
-            <div className="w-3 h-3 rounded-full bg-zinc-400 shrink-0" />
-            <span className="text-zinc-200 text-xs font-semibold">Dibuja el perímetro del volumen</span>
-          </div>
-        </div>
-      )}
-
-      {/* Review hint — volume perimeter */}
-      {ui === 'vol-perimeter-review' && (
-        <div className="absolute top-14 left-0 right-0 flex justify-center pointer-events-none z-20">
-          <div className="flex items-center gap-2.5 bg-zinc-950/95 backdrop-blur-sm px-5 py-2.5 rounded-full border border-zinc-800/60 shadow-xl">
-            <div className="w-3 h-3 rounded-full bg-zinc-400 shrink-0" />
-            <span className="text-white text-xs font-semibold">¿Se ve bien el perímetro?</span>
-          </div>
-        </div>
-      )}
-
-      {/* Draw hint — volume details */}
-      {ui === 'vol-details' && (
-        <div className="absolute top-14 left-0 right-0 flex justify-center pointer-events-none z-20">
-          <div className="flex items-center gap-2.5 bg-zinc-950/95 backdrop-blur-sm px-5 py-2.5 rounded-full border border-zinc-800/60 shadow-xl">
-            <div className="w-3 h-3 rounded-full bg-zinc-600 shrink-0" />
-            <span className="text-zinc-200 text-xs font-semibold">Dibuja detalles · {volDetails.length} trazo{volDetails.length !== 1 ? 's' : ''}</span>
-          </div>
-        </div>
-      )}
-
       {/* Reposition hint */}
       {ui === 'vol-reposition' && (
         <div className="absolute top-14 left-0 right-0 flex justify-center pointer-events-none z-20">
@@ -399,7 +324,6 @@ export default function WallPage() {
 
       {/* Bottom action bar */}
       {(ui === 'idle' || ui === 'color-pick' || ui === 'drawing' || ui === 'review'
-        || ui === 'vol-perimeter' || ui === 'vol-perimeter-review' || ui === 'vol-details'
         || ui === 'vol-reposition' || ui === 'vol-place' || ui === 'vol-adjust') && (
         <div className="absolute bottom-5 left-4 right-4 flex justify-end pointer-events-none z-20">
 
@@ -434,44 +358,6 @@ export default function WallPage() {
                 className="px-6 py-3.5 rounded-2xl font-bold text-sm shadow-2xl shadow-yellow-400/30 bg-yellow-400 text-zinc-950 hover:bg-yellow-300 active:scale-95 transition-all border-2 border-yellow-300/40"
               >
                 Continuar →
-              </button>
-            </div>
-
-          ) : ui === 'vol-perimeter-review' ? (
-            <div className="flex gap-2 pointer-events-auto">
-              <button
-                onClick={() => { setVolPerimeter(null); setUi('vol-perimeter') }}
-                className="px-4 py-3.5 rounded-2xl font-bold text-sm shadow-xl bg-zinc-800 text-zinc-300 border-2 border-zinc-700 hover:bg-zinc-700 hover:text-white active:scale-95 transition-all"
-              >
-                Rehacer
-              </button>
-              <button
-                onClick={() => { setVolDetails([]); setUi('vol-details') }}
-                className="px-4 py-3.5 rounded-2xl font-bold text-sm shadow-xl bg-zinc-700 text-zinc-200 border-2 border-zinc-600 hover:bg-zinc-600 hover:text-white active:scale-95 transition-all"
-              >
-                + Detalles
-              </button>
-              <button
-                onClick={() => saveVolume(false)}
-                className="px-5 py-3.5 rounded-2xl font-bold text-sm shadow-2xl bg-zinc-300 text-zinc-900 hover:bg-white active:scale-95 transition-all"
-              >
-                Guardar
-              </button>
-            </div>
-
-          ) : ui === 'vol-details' ? (
-            <div className="flex gap-3 pointer-events-auto">
-              <button
-                onClick={cancelAll}
-                className="px-4 py-3.5 rounded-2xl font-bold text-sm shadow-xl bg-zinc-800 text-zinc-300 border-2 border-zinc-700 hover:bg-zinc-700 hover:text-white active:scale-95 transition-all"
-              >
-                Cancelar
-              </button>
-              <button
-                onClick={() => saveVolume(true)}
-                className="px-6 py-3.5 rounded-2xl font-bold text-sm shadow-2xl bg-zinc-300 text-zinc-900 hover:bg-white active:scale-95 transition-all"
-              >
-                Listo
               </button>
             </div>
 
@@ -564,16 +450,8 @@ export default function WallPage() {
           <div className="w-full bg-zinc-900 rounded-t-3xl px-6 pt-6 pb-24 border-t border-zinc-800/80" onClick={e => e.stopPropagation()}>
             <div className="w-10 h-1 bg-zinc-700 rounded-full mx-auto mb-5" />
             <h2 className="text-white font-bold text-lg tracking-tight mb-4">Agregar volumen</h2>
-            <button
-              onClick={() => { setUi('vol-perimeter') }}
-              className="w-full py-4 rounded-2xl bg-zinc-700 hover:bg-zinc-600 text-white font-bold text-sm flex items-center justify-center gap-2.5 transition-all mb-3"
-            >
-              <span>✏️</span>
-              Dibujar perímetro
-            </button>
             {catalog.length > 0 && (
               <>
-                <p className="text-zinc-500 text-xs font-bold uppercase tracking-widest mb-3">Desde catálogo</p>
                 <div className="space-y-2 max-h-64 overflow-y-auto">
                   {catalog.map(item => {
                     const pts = item.shape.map(p => `${p.x * 44},${p.y * 44}`).join(' ')
@@ -688,6 +566,7 @@ export default function WallPage() {
           zones={allZones}
           onClose={() => setSelectedVolume(null)}
           onRetire={() => { setSelectedVolume(null); refetchVolumes() }}
+          onUpdate={refetchVolumes}
         />
       )}
     </div>

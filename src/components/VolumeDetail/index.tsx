@@ -11,12 +11,15 @@ interface Props {
   zones: Zone[]
   onClose: () => void
   onRetire: () => void
+  onUpdate?: () => void
 }
 
-export default function VolumeDetail({ volume, zones, onClose, onRetire }: Props) {
+export default function VolumeDetail({ volume, zones, onClose, onRetire, onUpdate }: Props) {
   const [retiring, setRetiring] = useState(false)
   const [confirmRetire, setConfirmRetire] = useState(false)
   const [catalogItem, setCatalogItem] = useState<VolumeCatalogItem | null>(null)
+  const [editDate, setEditDate] = useState(volume.placed_at.slice(0, 10))
+  const [savingDate, setSavingDate] = useState(false)
 
   const days = getDaysOnWall(volume.placed_at)
   const zone = zones.find(z => z.id === volume.zone_id)
@@ -26,6 +29,13 @@ export default function VolumeDetail({ volume, zones, onClose, onRetire }: Props
     db.from('volume_catalog').select('*').eq('id', volume.catalog_id).single()
       .then(({ data }: { data: VolumeCatalogItem | null }) => { if (data) setCatalogItem(data) })
   }, [volume.catalog_id])
+
+  async function handleSaveDate() {
+    setSavingDate(true)
+    await db.from('volumes').update({ placed_at: new Date(editDate + 'T12:00:00.000Z').toISOString() }).eq('id', volume.id)
+    setSavingDate(false)
+    onUpdate?.()
+  }
 
   async function handleRetire() {
     if (!confirmRetire) { setConfirmRetire(true); return }
@@ -81,9 +91,23 @@ export default function VolumeDetail({ volume, zones, onClose, onRetire }: Props
           <span className="text-zinc-400 text-sm font-medium">días en la pared</span>
         </div>
 
-        <p className="text-zinc-600 text-xs mb-5">
-          Colocado el {new Date(volume.placed_at).toLocaleDateString('es-MX', { day: 'numeric', month: 'long', year: 'numeric' })}
-        </p>
+        <p className="text-zinc-500 text-[11px] font-semibold uppercase tracking-widest mb-2">Fecha en pared</p>
+        <div className="flex gap-2 mb-5">
+          <input
+            type="date"
+            value={editDate}
+            onChange={e => setEditDate(e.target.value)}
+            max={new Date().toISOString().slice(0, 10)}
+            className="flex-1 bg-zinc-800 text-white rounded-xl px-4 py-3 text-sm outline-none border border-zinc-700/50 hover:border-zinc-600 focus:border-yellow-400/60 transition-all [color-scheme:dark]"
+          />
+          <button
+            onClick={handleSaveDate}
+            disabled={savingDate || editDate === volume.placed_at.slice(0, 10)}
+            className="px-4 py-3 rounded-xl bg-zinc-700 hover:bg-zinc-600 text-white text-sm font-bold transition-all disabled:opacity-40"
+          >
+            {savingDate ? '…' : 'Guardar'}
+          </button>
+        </div>
 
         <button
           onClick={handleRetire}
