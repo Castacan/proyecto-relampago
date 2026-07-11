@@ -161,11 +161,12 @@ export default function WallPage() {
 
   // Catalog volume handlers
   async function handleVolumePlaced(perimeter: { x: number; y: number }[], zoneId: string, chainId: string, catalogId: string) {
+    const item = catalog.find(c => c.id === catalogId)
     await db.from('volumes').insert({
       zone_id: zoneId,
       chain_id: chainId,
       perimeter,
-      details: [],
+      details: item?.details ?? [],
       catalog_id: catalogId,
       rotation: 0,
       vol_scale: 1,
@@ -560,6 +561,9 @@ export default function WallPage() {
                       >
                         <svg width="44" height="44" viewBox="0 0 44 44" className="shrink-0 rounded-lg bg-zinc-900">
                           <polygon points={pts} fill="rgba(110,110,110,0.55)" stroke="rgba(180,180,180,0.6)" strokeWidth={1.5} />
+                          {(item.details ?? []).map((stroke, si) => (
+                            <polyline key={si} points={stroke.map(p => `${p.x*44},${p.y*44}`).join(' ')} fill="none" stroke="rgba(35,35,35,0.9)" strokeWidth={2} strokeLinecap="round" />
+                          ))}
                         </svg>
                         <span className="font-bold text-sm">{item.name}</span>
                       </button>

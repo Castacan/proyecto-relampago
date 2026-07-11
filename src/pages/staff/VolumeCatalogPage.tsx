@@ -1,4 +1,4 @@
-import { useRef, useState, useEffect } from 'react'
+import { useRef, useState, useEffect, useCallback } from 'react'
 import { Navigate, useNavigate } from 'react-router-dom'
 import { useProfile } from '../../hooks/useProfile'
 import { useVolumeCatalog } from '../../hooks/useVolumeCatalog'
@@ -8,14 +8,29 @@ import type { VolumeCatalogItem } from '../../types'
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const db = supabase as unknown as any
 
-const CANVAS_SIZE = 220
+// Internal pixel resolution of the canvas
+const CANVAS_RES = 360
 
-function ShapePreview({ shape, size = 56 }: { shape: { x: number; y: number }[]; size?: number }) {
+type DrawMode = 'perimeter' | 'details'
+
+function ShapePreview({ item, size = 56 }: { item: Pick<VolumeCatalogItem, 'shape' | 'details'>; size?: number }) {
+  const { shape, details = [] } = item
   if (!shape.length) return <div className="bg-zinc-800 rounded-xl" style={{ width: size, height: size }} />
   const pts = shape.map(p => `${p.x * size},${p.y * size}`).join(' ')
   return (
     <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className="rounded-xl overflow-hidden bg-zinc-800">
       <polygon points={pts} fill="rgba(110,110,110,0.55)" stroke="rgba(180,180,180,0.6)" strokeWidth={1.5} />
+      {details.map((stroke, i) => (
+        <polyline
+          key={i}
+          points={stroke.map(p => `${p.x * size},${p.y * size}`).join(' ')}
+          fill="none"
+          stroke="rgba(35,35,35,0.9)"
+          strokeWidth={Math.max(1, size / 22)}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+      ))}
     </svg>
   )
 }
@@ -27,66 +42,115 @@ export default function VolumeCatalogPage() {
 
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const isDrawing = useRef(false)
-  const drawPts = useRef<{ x: number; y: number }[]>([])
+  const drawPts = useRef<{ x: number; y: number }[]>([])   // display-space coords
 
+  const [drawMode, setDrawMode] = useState<DrawMode>('perimeter')
   const [savedShape, setSavedShape] = useState<{ x: number; y: number }[]>([])
+  const [savedDetails, setSavedDetails] = useState<{ x: number; y: number }[][]>([])
   const [name, setName] = useState('')
   const [saving, setSaving] = useState(false)
   const [deletingId, setDeletingId] = useState<string | null>(null)
 
-  useEffect(() => {
+  const hasPerimeter = savedShape.length >= 3
+
+  // ── Canvas helpers ───────────────────────────────────────────────
+  function getScale(): number {
+    const c = canvasRef.current
+    if (!c) return 1
+    const rect = c.getBoundingClientRect()
+    return rect.width > 0 ? CANVAS_RES / rect.width : 1
+  }
+
+  const redrawCanvas = useCallback((shape: {x:number,y:number}[], details: {x:number,y:number}[][]) => {
     const canvas = canvasRef.current
     if (!canvas) return
     const ctx = canvas.getContext('2d')!
-    ctx.clearRect(0, 0, CANVAS_SIZE, CANVAS_SIZE)
+    const S = CANVAS_RES
+    ctx.clearRect(0, 0, S, S)
+    if (shape.length < 3) return
+
+    // Perimeter fill + outline
+    ctx.fillStyle = 'rgba(110,110,110,0.45)'
     ctx.strokeStyle = 'rgba(180,180,180,0.85)'
-    ctx.lineWidth = 2.5
+    ctx.lineWidth = 3
     ctx.lineCap = 'round'
     ctx.lineJoin = 'round'
-    if (savedShape.length >= 3) {
-      ctx.fillStyle = 'rgba(110,110,110,0.45)'
+    ctx.beginPath()
+    shape.forEach((p, i) => {
+      const sx = p.x * S, sy = p.y * S
+      i === 0 ? ctx.moveTo(sx, sy) : ctx.lineTo(sx, sy)
+    })
+    ctx.closePath()
+    ctx.fill()
+    ctx.stroke()
+
+    // Saved detail strokes (darker gray)
+    ctx.strokeStyle = 'rgba(38,38,38,0.92)'
+    ctx.lineWidth = 7
+    details.forEach(stroke => {
+      if (stroke.length < 2) return
       ctx.beginPath()
-      savedShape.forEach((p, i) => {
-        const sx = p.x * CANVAS_SIZE, sy = p.y * CANVAS_SIZE
+      stroke.forEach((p, i) => {
+        const sx = p.x * S, sy = p.y * S
         i === 0 ? ctx.moveTo(sx, sy) : ctx.lineTo(sx, sy)
       })
-      ctx.closePath()
-      ctx.fill()
       ctx.stroke()
-    }
-  }, [savedShape])
+    })
+  }, [])
+
+  // Redraw whenever saved data changes
+  useEffect(() => {
+    redrawCanvas(savedShape, savedDetails)
+  }, [savedShape, savedDetails, redrawCanvas])
 
   function getPos(e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) {
     const canvas = canvasRef.current!
     const rect = canvas.getBoundingClientRect()
     if ('touches' in e) {
-      const t = e.touches[0]
+      const t = (e as React.TouchEvent).touches[0]
       return { x: t.clientX - rect.left, y: t.clientY - rect.top }
     }
     return { x: (e as React.MouseEvent).clientX - rect.left, y: (e as React.MouseEvent).clientY - rect.top }
   }
 
-  function drawLine(pts: { x: number; y: number }[]) {
-    const canvas = canvasRef.current
-    if (!canvas || pts.length < 2) return
-    const ctx = canvas.getContext('2d')!
-    ctx.clearRect(0, 0, CANVAS_SIZE, CANVAS_SIZE)
-    ctx.strokeStyle = 'rgba(180,180,180,0.85)'
-    ctx.lineWidth = 2.5
-    ctx.lineCap = 'round'
-    ctx.lineJoin = 'round'
-    ctx.beginPath()
-    pts.forEach((p, i) => i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y))
-    ctx.stroke()
-    // close hint
-    if (pts.length >= 3) {
+  function drawLiveStroke(pts: {x:number, y:number}[], scale: number, mode: DrawMode) {
+    if (pts.length < 2) return
+    const ctx = canvasRef.current!.getContext('2d')!
+    // Redraw saved content first
+    redrawCanvas(savedShape, savedDetails)
+    // Then draw the live stroke on top
+    if (mode === 'perimeter') {
+      ctx.strokeStyle = 'rgba(200,200,200,0.9)'
+      ctx.lineWidth = 3
+      ctx.lineCap = 'round'
+      ctx.lineJoin = 'round'
       ctx.beginPath()
-      ctx.setLineDash([6, 5])
-      ctx.strokeStyle = 'rgba(180,180,180,0.3)'
-      ctx.moveTo(pts[pts.length - 1].x, pts[pts.length - 1].y)
-      ctx.lineTo(pts[0].x, pts[0].y)
+      pts.forEach((p, i) => {
+        const sx = p.x * scale, sy = p.y * scale
+        i === 0 ? ctx.moveTo(sx, sy) : ctx.lineTo(sx, sy)
+      })
       ctx.stroke()
-      ctx.setLineDash([])
+      // Close hint
+      if (pts.length >= 3) {
+        ctx.beginPath()
+        ctx.setLineDash([8, 6])
+        ctx.strokeStyle = 'rgba(180,180,180,0.3)'
+        ctx.moveTo(pts[pts.length - 1].x * scale, pts[pts.length - 1].y * scale)
+        ctx.lineTo(pts[0].x * scale, pts[0].y * scale)
+        ctx.stroke()
+        ctx.setLineDash([])
+      }
+    } else {
+      ctx.strokeStyle = 'rgba(38,38,38,0.92)'
+      ctx.lineWidth = 7
+      ctx.lineCap = 'round'
+      ctx.lineJoin = 'round'
+      ctx.beginPath()
+      pts.forEach((p, i) => {
+        const sx = p.x * scale, sy = p.y * scale
+        i === 0 ? ctx.moveTo(sx, sy) : ctx.lineTo(sx, sy)
+      })
+      ctx.stroke()
     }
   }
 
@@ -94,11 +158,13 @@ export default function VolumeCatalogPage() {
     e.preventDefault()
     isDrawing.current = true
     drawPts.current = []
-    setSavedShape([])
     const p = getPos(e)
     drawPts.current.push(p)
-    const ctx = canvasRef.current!.getContext('2d')!
-    ctx.clearRect(0, 0, CANVAS_SIZE, CANVAS_SIZE)
+    // If starting a new perimeter, clear everything
+    if (drawMode === 'perimeter') {
+      setSavedShape([])
+      setSavedDetails([])
+    }
   }
 
   function onMove(e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) {
@@ -106,9 +172,9 @@ export default function VolumeCatalogPage() {
     if (!isDrawing.current) return
     const p = getPos(e)
     const last = drawPts.current[drawPts.current.length - 1]
-    if (last && Math.hypot(p.x - last.x, p.y - last.y) < 4) return
+    if (last && Math.hypot(p.x - last.x, p.y - last.y) < 3) return
     drawPts.current.push(p)
-    drawLine(drawPts.current)
+    drawLiveStroke(drawPts.current, getScale(), drawMode)
   }
 
   function onEnd(e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) {
@@ -116,20 +182,38 @@ export default function VolumeCatalogPage() {
     if (!isDrawing.current) return
     isDrawing.current = false
     const pts = drawPts.current
-    if (pts.length < 6) return
-    const normalized = pts.map(p => ({ x: p.x / CANVAS_SIZE, y: p.y / CANVAS_SIZE }))
-    setSavedShape(normalized)
+    const canvas = canvasRef.current!
+    const rect = canvas.getBoundingClientRect()
+    const w = rect.width || CANVAS_RES
+    const h = rect.height || CANVAS_RES
+
+    if (drawMode === 'perimeter') {
+      if (pts.length < 6) { redrawCanvas(savedShape, savedDetails); return }
+      const normalized = pts.map(p => ({ x: p.x / w, y: p.y / h }))
+      setSavedShape(normalized)
+    } else {
+      if (pts.length < 3) { redrawCanvas(savedShape, savedDetails); return }
+      const normalized = pts.map(p => ({ x: p.x / w, y: p.y / h }))
+      setSavedDetails(prev => [...prev, normalized])
+    }
+    drawPts.current = []
+  }
+
+  function resetAll() {
+    setSavedShape([])
+    setSavedDetails([])
+    setDrawMode('perimeter')
+    setName('')
+    const canvas = canvasRef.current
+    if (canvas) canvas.getContext('2d')!.clearRect(0, 0, CANVAS_RES, CANVAS_RES)
   }
 
   async function saveShape() {
-    if (!savedShape.length || !name.trim()) return
+    if (!hasPerimeter || !name.trim()) return
     setSaving(true)
-    await db.from('volume_catalog').insert({ name: name.trim(), shape: savedShape })
+    await db.from('volume_catalog').insert({ name: name.trim(), shape: savedShape, details: savedDetails })
     setSaving(false)
-    setName('')
-    setSavedShape([])
-    const ctx = canvasRef.current!.getContext('2d')!
-    ctx.clearRect(0, 0, CANVAS_SIZE, CANVAS_SIZE)
+    resetAll()
     refetch()
   }
 
@@ -160,33 +244,75 @@ export default function VolumeCatalogPage() {
 
         {/* Draw area */}
         <div className="bg-zinc-900 rounded-2xl p-4 border border-zinc-800/80 mb-4">
-          <h2 className="text-white font-bold text-base mb-1">Dibujar nueva forma</h2>
-          <p className="text-zinc-500 text-xs mb-4">Dibuja el contorno del volumen con el dedo o el ratón</p>
-
-          <div className="flex justify-center mb-4">
-            <canvas
-              ref={canvasRef}
-              width={CANVAS_SIZE}
-              height={CANVAS_SIZE}
-              className="rounded-2xl border-2 border-zinc-700 bg-zinc-800 touch-none cursor-crosshair"
-              style={{ width: CANVAS_SIZE, height: CANVAS_SIZE }}
-              onMouseDown={onStart}
-              onMouseMove={onMove}
-              onMouseUp={onEnd}
-              onTouchStart={onStart}
-              onTouchMove={onMove}
-              onTouchEnd={onEnd}
-            />
+          <div className="flex items-center justify-between mb-1">
+            <h2 className="text-white font-bold text-base">Dibujar nueva forma</h2>
+            {(hasPerimeter || savedDetails.length > 0) && (
+              <button onClick={resetAll} className="text-zinc-500 hover:text-zinc-300 text-xs font-bold transition-colors">
+                Limpiar
+              </button>
+            )}
           </div>
+          <p className="text-zinc-500 text-xs mb-4">
+            {drawMode === 'perimeter'
+              ? 'Dibuja el contorno del volumen con el dedo o el ratón'
+              : `Dibuja líneas de detalle · ${savedDetails.length} trazo${savedDetails.length !== 1 ? 's' : ''}`
+            }
+          </p>
 
-          {savedShape.length >= 3 && (
-            <>
+          {/* Mode toggle (visible once perimeter exists) */}
+          {hasPerimeter && (
+            <div className="flex gap-1 mb-3 bg-zinc-800 p-1 rounded-xl">
+              <button
+                onClick={() => setDrawMode('perimeter')}
+                className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all ${
+                  drawMode === 'perimeter' ? 'bg-zinc-600 text-white' : 'text-zinc-500 hover:text-zinc-300'
+                }`}
+              >
+                Contorno
+              </button>
+              <button
+                onClick={() => setDrawMode('details')}
+                className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all ${
+                  drawMode === 'details' ? 'bg-zinc-600 text-white' : 'text-zinc-500 hover:text-zinc-300'
+                }`}
+              >
+                + Detalles
+              </button>
+            </div>
+          )}
+
+          {/* Canvas — full width, square */}
+          <canvas
+            ref={canvasRef}
+            width={CANVAS_RES}
+            height={CANVAS_RES}
+            className="rounded-2xl border-2 border-zinc-700 bg-zinc-800 touch-none cursor-crosshair"
+            style={{ width: '100%', aspectRatio: '1 / 1', display: 'block' }}
+            onMouseDown={onStart}
+            onMouseMove={onMove}
+            onMouseUp={onEnd}
+            onTouchStart={onStart}
+            onTouchMove={onMove}
+            onTouchEnd={onEnd}
+          />
+
+          {/* Action area */}
+          {hasPerimeter ? (
+            <div className="mt-4 space-y-3">
+              {savedDetails.length > 0 && (
+                <button
+                  onClick={() => setSavedDetails(prev => prev.slice(0, -1))}
+                  className="w-full py-2.5 rounded-xl font-bold text-xs bg-zinc-800 text-zinc-400 hover:bg-zinc-700 hover:text-zinc-200 border border-zinc-700 transition-all"
+                >
+                  Deshacer último trazo
+                </button>
+              )}
               <input
                 type="text"
                 placeholder="Nombre del volumen (ej. Triángulo grande)"
                 value={name}
                 onChange={e => setName(e.target.value)}
-                className="w-full bg-zinc-800 text-white rounded-xl px-4 py-3 text-sm mb-3 outline-none border border-zinc-700/50 focus:border-yellow-400/60 transition-all"
+                className="w-full bg-zinc-800 text-white rounded-xl px-4 py-3 text-sm outline-none border border-zinc-700/50 focus:border-yellow-400/60 transition-all"
               />
               <button
                 onClick={saveShape}
@@ -195,11 +321,9 @@ export default function VolumeCatalogPage() {
               >
                 {saving ? 'Guardando...' : 'Guardar en catálogo'}
               </button>
-            </>
-          )}
-
-          {!savedShape.length && (
-            <p className="text-zinc-600 text-xs text-center">Dibuja una forma para continuar</p>
+            </div>
+          ) : (
+            <p className="text-zinc-600 text-xs text-center mt-4">Dibuja el contorno para continuar</p>
           )}
         </div>
 
@@ -216,10 +340,13 @@ export default function VolumeCatalogPage() {
             <div className="space-y-3">
               {catalog.map(item => (
                 <div key={item.id} className="flex items-center gap-3 bg-zinc-800 rounded-2xl p-3">
-                  <ShapePreview shape={item.shape} size={52} />
+                  <ShapePreview item={item} size={56} />
                   <div className="flex-1 min-w-0">
                     <p className="text-white text-sm font-bold truncate">{item.name}</p>
-                    <p className="text-zinc-500 text-xs">{new Date(item.created_at).toLocaleDateString('es-MX')}</p>
+                    <p className="text-zinc-500 text-xs">
+                      {new Date(item.created_at).toLocaleDateString('es-MX')}
+                      {(item.details?.length ?? 0) > 0 && ` · ${item.details.length} detalles`}
+                    </p>
                   </div>
                   <button
                     onClick={() => deleteItem(item)}
