@@ -49,6 +49,7 @@ export default function VolumeCatalogPage() {
   const [savedDetails, setSavedDetails] = useState<{ x: number; y: number }[][]>([])
   const [name, setName] = useState('')
   const [saving, setSaving] = useState(false)
+  const [saveError, setSaveError] = useState<string | null>(null)
   const [deletingId, setDeletingId] = useState<string | null>(null)
 
   const hasPerimeter = savedShape.length >= 3
@@ -211,8 +212,20 @@ export default function VolumeCatalogPage() {
   async function saveShape() {
     if (!hasPerimeter || !name.trim()) return
     setSaving(true)
-    await db.from('volume_catalog').insert({ name: name.trim(), shape: savedShape, details: savedDetails })
+    setSaveError(null)
+    // Try inserting with details; if that column doesn't exist yet, retry without it
+    let res = await db.from('volume_catalog').insert({ name: name.trim(), shape: savedShape, details: savedDetails })
+    if (res?.error) {
+      const msg: string = res.error.message ?? ''
+      if (msg.includes('details') || msg.includes('column')) {
+        res = await db.from('volume_catalog').insert({ name: name.trim(), shape: savedShape })
+      }
+    }
     setSaving(false)
+    if (res?.error) {
+      setSaveError(res.error.message)
+      return
+    }
     resetAll()
     refetch()
   }
@@ -314,6 +327,9 @@ export default function VolumeCatalogPage() {
                 onChange={e => setName(e.target.value)}
                 className="w-full bg-zinc-800 text-white rounded-xl px-4 py-3 text-sm outline-none border border-zinc-700/50 focus:border-yellow-400/60 transition-all"
               />
+              {saveError && (
+                <p className="text-red-400 text-xs text-center px-2">{saveError}</p>
+              )}
               <button
                 onClick={saveShape}
                 disabled={saving || !name.trim()}
