@@ -1,8 +1,8 @@
 import { useRef, useState, useCallback, useEffect, useMemo } from 'react'
-import { Stage, Layer, Line, Rect, Text, Group, Image as KonvaImage } from 'react-konva'
+import { Stage, Layer, Line, Rect, Text, Group, Circle, Image as KonvaImage } from 'react-konva'
 import type Konva from 'konva'
 import type { KonvaEventObject } from 'konva/lib/Node'
-import type { Zone, Route, ZoneAnchor, Volume } from '../../types'
+import type { Zone, Route, ZoneAnchor, Volume, VolumeCatalogItem } from '../../types'
 import { getColorHex } from '../../lib/colors'
 import { getFreshnessLevel, getFreshnessColor, getDaysOnWall, getPublicLabel } from '../../lib/freshness'
 import { CHAIN_H, computeChainLayout, computeAnchorTransform } from '../../lib/chain'
@@ -35,6 +35,12 @@ interface Props {
   onVolumeDetailStroke?: (stroke: { x: number; y: number }[]) => void
   onVolumeClick?: (volume: Volume, displayZoneId: string) => void
   onRepositionOffsetChange?: (offset: { dx: number; dy: number }) => void
+  // Catalog volume placement
+  volPlaceMode?: VolumeCatalogItem | null
+  onVolumePlaced?: (perimeter: { x: number; y: number }[], zoneId: string, chainId: string, catalogId: string) => void
+  // Adjust mode (move + rotate + scale for catalog volumes)
+  adjustMode?: { volumeId: string; zoneId: string; offset: { dx: number; dy: number }; rotation: number; volScale: number } | null
+  onAdjustChange?: (changes: { offset?: { dx: number; dy: number }; rotation?: number; volScale?: number }) => void
   onActiveZoneChange?: (zoneId: string | null) => void
   jumpToZoneId?: string | null
 }
@@ -43,6 +49,8 @@ export default function ChainCanvas({
   zones, anchors, routes, volumes = [], paintMode, drawColor, previewBlob,
   volumePaintMode = null, previewVolumePerimeter = null, previewVolumeDetails = [],
   repositionMode = null,
+  volPlaceMode = null, onVolumePlaced,
+  adjustMode = null, onAdjustChange,
   isStaff, onBlobComplete, onRouteClick,
   onVolumePerimeterComplete, onVolumeDetailStroke, onVolumeClick,
   onRepositionOffsetChange,
@@ -200,6 +208,24 @@ export default function ChainCanvas({
   const onRepositionOffsetChangeRef = useRef(onRepositionOffsetChange)
   onRepositionOffsetChangeRef.current = onRepositionOffsetChange
 
+  // ── Adjust mode (catalog volumes: move + rotate + scale) ──────
+  const adjustModeRef = useRef(adjustMode)
+  adjustModeRef.current = adjustMode
+  const onAdjustChangeRef = useRef(onAdjustChange)
+  onAdjustChangeRef.current = onAdjustChange
+  const isAdjustDragging = useRef<'rotation' | 'scale' | 'body' | null>(null)
+  const adjustStartAngle = useRef(0)
+  const adjustStartRotation = useRef(0)
+  const adjustStartScale = useRef(1)
+  const adjustStartDist = useRef(50)
+  const adjustHandlePosRef = useRef<{ cx: number; cy: number; rotX: number; rotY: number; sclX: number; sclY: number } | null>(null)
+
+  // ── Vol-place mode (catalog) ───────────────────────────────────
+  const volPlaceModeRef = useRef(volPlaceMode)
+  volPlaceModeRef.current = volPlaceMode
+  const onVolumePlacedRef = useRef(onVolumePlaced)
+  onVolumePlacedRef.current = onVolumePlaced
+
   function screenToChain(sx: number, sy: number): { x: number; y: number } {
     const zone = sorted[activeIdx]
     const zl = layout.zones.find(z => z.id === zone?.id)
@@ -300,6 +326,33 @@ export default function ChainCanvas({
     touchMoved.current = false
     const t = touches[0]
 
+    // Adjust mode (catalog volumes)
+    if (adjustModeRef.current) {
+      const rect = stageRef.current!.container().getBoundingClientRect()
+      const stageX = t.clientX - rect.left
+      const stageY = t.clientY - rect.top
+      const hp = adjustHandlePosRef.current
+      if (hp) {
+        if (Math.hypot(stageX - hp.rotX, stageY - hp.rotY) <= 28) {
+          isAdjustDragging.current = 'rotation'
+          adjustStartAngle.current = Math.atan2(stageX - hp.cx, -(stageY - hp.cy))
+          adjustStartRotation.current = adjustModeRef.current.rotation
+          return
+        }
+        if (Math.hypot(stageX - hp.sclX, stageY - hp.sclY) <= 28) {
+          isAdjustDragging.current = 'scale'
+          adjustStartDist.current = Math.max(20, Math.hypot(stageX - hp.cx, stageY - hp.cy))
+          adjustStartScale.current = adjustModeRef.current.volScale
+          return
+        }
+      }
+      isAdjustDragging.current = 'body'
+      repoStartX.current = t.clientX
+      repoStartY.current = t.clientY
+      repoBaseOffset.current = { ...adjustModeRef.current.offset }
+      return
+    }
+
     // Reposicionamiento: single touch mueve el volumen
     if (repositionModeRef.current) {
       repoStartX.current = t.clientX
@@ -352,6 +405,30 @@ export default function ChainCanvas({
     touchLastY.current = t.clientY
     touchMoved.current = true
 
+    // Adjust mode
+    if (adjustModeRef.current && isAdjustDragging.current) {
+      const rect = stageRef.current!.container().getBoundingClientRect()
+      const stageX = t.clientX - rect.left
+      const stageY = t.clientY - rect.top
+      const hp = adjustHandlePosRef.current
+      if (isAdjustDragging.current === 'rotation' && hp) {
+        const angle = Math.atan2(stageX - hp.cx, -(stageY - hp.cy))
+        const delta = angle - adjustStartAngle.current
+        onAdjustChangeRef.current?.({ rotation: adjustStartRotation.current + delta * 180 / Math.PI })
+      } else if (isAdjustDragging.current === 'scale' && hp) {
+        const dist = Math.hypot(stageX - hp.cx, stageY - hp.cy)
+        onAdjustChangeRef.current?.({ volScale: Math.max(0.2, Math.min(4, adjustStartScale.current * dist / adjustStartDist.current)) })
+      } else if (isAdjustDragging.current === 'body') {
+        const dw = displayWForIdx(activeIdx)
+        const z = zoomRef.current
+        onAdjustChangeRef.current?.({ offset: {
+          dx: (t.clientX - repoStartX.current) / (dw * z) + repoBaseOffset.current.dx,
+          dy: (t.clientY - repoStartY.current) / (size.h * z) + repoBaseOffset.current.dy,
+        }})
+      }
+      return
+    }
+
     // Reposicionamiento
     if (repositionModeRef.current && isRepoDragging.current) {
       const dw = displayWForIdx(activeIdx)
@@ -402,6 +479,12 @@ export default function ChainCanvas({
       return
     }
 
+    // Adjust mode
+    if (adjustModeRef.current && isAdjustDragging.current) {
+      isAdjustDragging.current = null
+      return
+    }
+
     // Reposicionamiento: el fin del drag no hace nada (WallPage guarda en su botón)
     if (repositionModeRef.current && isRepoDragging.current) {
       isRepoDragging.current = false
@@ -424,7 +507,24 @@ export default function ChainCanvas({
     const tapDy = Math.abs(touchLastY.current - touchStartY.current)
     const isTap = tapDx < 12 && tapDy < 12
 
-    if (isTap && !paintMode && !volumePaintMode && !repositionModeRef.current && stageRef.current) {
+    // Vol-place mode: single tap places catalog volume at tapped position
+    if (isTap && volPlaceModeRef.current && stageRef.current) {
+      const rect = stageRef.current.container().getBoundingClientRect()
+      const tapX = touchStartX.current - rect.left
+      const tapY = touchStartY.current - rect.top
+      const catalogItem = volPlaceModeRef.current
+      const CATALOG_PX = 100
+      const perimeter = catalogItem.shape.map(pt =>
+        screenToChain(tapX + (pt.x - 0.5) * CATALOG_PX * 2, tapY + (pt.y - 0.5) * CATALOG_PX * 2)
+      )
+      const zone = sorted[activeIdx]
+      if (zone?.chain_id) {
+        onVolumePlacedRef.current?.(perimeter, zone.id, zone.chain_id, catalogItem.id)
+      }
+      return
+    }
+
+    if (isTap && !paintMode && !volumePaintMode && !repositionModeRef.current && !adjustModeRef.current && stageRef.current) {
       const rect = stageRef.current.container().getBoundingClientRect()
       const tapPos = { x: touchStartX.current - rect.left, y: touchStartY.current - rect.top }
       const shapes = stageRef.current.getAllIntersections(tapPos)
@@ -479,6 +579,29 @@ export default function ChainCanvas({
 
   // Mouse (desktop)
   const handleMouseDown = useCallback((_e: KonvaEventObject<MouseEvent>) => {
+    if (adjustModeRef.current) {
+      const p = stageRef.current!.getPointerPosition()!
+      const hp = adjustHandlePosRef.current
+      if (hp) {
+        if (Math.hypot(p.x - hp.rotX, p.y - hp.rotY) <= 28) {
+          isAdjustDragging.current = 'rotation'
+          adjustStartAngle.current = Math.atan2(p.x - hp.cx, -(p.y - hp.cy))
+          adjustStartRotation.current = adjustModeRef.current.rotation
+          return
+        }
+        if (Math.hypot(p.x - hp.sclX, p.y - hp.sclY) <= 28) {
+          isAdjustDragging.current = 'scale'
+          adjustStartDist.current = Math.max(20, Math.hypot(p.x - hp.cx, p.y - hp.cy))
+          adjustStartScale.current = adjustModeRef.current.volScale
+          return
+        }
+      }
+      isAdjustDragging.current = 'body'
+      repoStartX.current = p.x
+      repoStartY.current = p.y
+      repoBaseOffset.current = { ...adjustModeRef.current.offset }
+      return
+    }
     if (repositionModeRef.current) {
       const p = stageRef.current!.getPointerPosition()!
       repoStartX.current = p.x
@@ -495,6 +618,25 @@ export default function ChainCanvas({
   }, [paintMode, volumePaintMode, activeIdx, sorted.length, size, layout])
 
   const handleMouseMove = useCallback((_e: KonvaEventObject<MouseEvent>) => {
+    if (adjustModeRef.current && isAdjustDragging.current) {
+      const p = stageRef.current!.getPointerPosition()!
+      const hp = adjustHandlePosRef.current
+      if (isAdjustDragging.current === 'rotation' && hp) {
+        const angle = Math.atan2(p.x - hp.cx, -(p.y - hp.cy))
+        onAdjustChangeRef.current?.({ rotation: adjustStartRotation.current + (angle - adjustStartAngle.current) * 180 / Math.PI })
+      } else if (isAdjustDragging.current === 'scale' && hp) {
+        const dist = Math.hypot(p.x - hp.cx, p.y - hp.cy)
+        onAdjustChangeRef.current?.({ volScale: Math.max(0.2, Math.min(4, adjustStartScale.current * dist / adjustStartDist.current)) })
+      } else if (isAdjustDragging.current === 'body') {
+        const dw = displayWForIdx(activeIdx)
+        const z = zoomRef.current
+        onAdjustChangeRef.current?.({ offset: {
+          dx: (p.x - repoStartX.current) / (dw * z) + repoBaseOffset.current.dx,
+          dy: (p.y - repoStartY.current) / (size.h * z) + repoBaseOffset.current.dy,
+        }})
+      }
+      return
+    }
     if (repositionModeRef.current && isRepoDragging.current) {
       const p = stageRef.current!.getPointerPosition()!
       const dw = displayWForIdx(activeIdx)
@@ -512,6 +654,10 @@ export default function ChainCanvas({
   }, [paintMode, volumePaintMode, activeIdx, layout, size])
 
   const handleMouseUp = useCallback((_e: KonvaEventObject<MouseEvent>) => {
+    if (adjustModeRef.current && isAdjustDragging.current) {
+      isAdjustDragging.current = null
+      return
+    }
     if (repositionModeRef.current && isRepoDragging.current) {
       isRepoDragging.current = false
       return
@@ -523,8 +669,24 @@ export default function ChainCanvas({
       else finishVolumeDetail()
       return
     }
+    // Vol-place mode (desktop)
+    if (!paintMode && !volumePaintMode && volPlaceModeRef.current && stageRef.current) {
+      const pos = stageRef.current.getPointerPosition()
+      if (pos) {
+        const catalogItem = volPlaceModeRef.current
+        const CATALOG_PX = 100
+        const perimeter = catalogItem.shape.map(pt =>
+          screenToChain(pos.x + (pt.x - 0.5) * CATALOG_PX * 2, pos.y + (pt.y - 0.5) * CATALOG_PX * 2)
+        )
+        const zone = sorted[activeIdx]
+        if (zone?.chain_id) {
+          onVolumePlacedRef.current?.(perimeter, zone.id, zone.chain_id, catalogItem.id)
+        }
+      }
+      return
+    }
     // Click idle en desktop → detectar ruta/volumen
-    if (!paintMode && !volumePaintMode && !repositionModeRef.current && stageRef.current) {
+    if (!paintMode && !volumePaintMode && !repositionModeRef.current && !adjustModeRef.current && stageRef.current) {
       const pos = stageRef.current.getPointerPosition()
       if (pos) {
         const shapes = stageRef.current.getAllIntersections(pos)
@@ -660,7 +822,59 @@ export default function ChainCanvas({
       }
 
       const perimeterPts = vol.perimeter.flatMap(p => { const s = effectiveConverter(p); return [s.x, s.y] })
-      const hasClickHandler = !!onVolumeClickRef.current && !repo
+      const hasClickHandler = !!onVolumeClickRef.current && !repo && !adjustModeRef.current
+
+      // Catalog volumes: apply rotation + scale around centroid
+      const rotation = vol.rotation ?? 0
+      const volScale = vol.vol_scale ?? 1
+      const hasCatalogTransform = !!vol.catalog_id && (rotation !== 0 || volScale !== 1)
+
+      let cx = 0, cy = 0
+      if (hasCatalogTransform || adjustModeRef.current?.volumeId === vol.id) {
+        const n = perimeterPts.length / 2
+        for (let i = 0; i < perimeterPts.length; i += 2) { cx += perimeterPts[i]; cy += perimeterPts[i + 1] }
+        cx /= n; cy /= n
+      }
+
+      // Update handle positions when this is the adjust-mode volume
+      const isAdjusting = adjustModeRef.current?.volumeId === vol.id && keySuffix === ''
+      if (isAdjusting) {
+        const HANDLE_DIST = 75
+        const rot = adjustModeRef.current!.rotation
+        const rotRad = rot * Math.PI / 180
+        adjustHandlePosRef.current = {
+          cx, cy,
+          rotX: cx + HANDLE_DIST * Math.sin(rotRad),
+          rotY: cy - HANDLE_DIST * Math.cos(rotRad),
+          sclX: cx + HANDLE_DIST * Math.sin(rotRad + Math.PI / 2),
+          sclY: cy - HANDLE_DIST * Math.cos(rotRad + Math.PI / 2),
+        }
+      }
+
+      if (hasCatalogTransform) {
+        const relPts = perimeterPts.map((v, i) => i % 2 === 0 ? v - cx : v - cy)
+        const relDetails = (vol.details ?? []).map(stroke =>
+          stroke.flatMap(p => { const s = effectiveConverter(p); return [s.x - cx, s.y - cy] })
+        )
+        return (
+          <Group key={vol.id + keySuffix} x={cx} y={cy} rotation={rotation} scaleX={volScale} scaleY={volScale}>
+            <Line
+              id={hasClickHandler ? `VOL:${vol.id}:${displayZoneId}` : ''}
+              points={relPts}
+              closed={true}
+              fill={isRepositioning ? 'rgba(110,110,110,0.60)' : 'rgba(110,110,110,0.38)'}
+              stroke={isRepositioning ? 'rgba(250,204,21,0.85)' : isAdjusting ? 'rgba(250,204,21,0.85)' : 'rgba(148,148,148,0.55)'}
+              strokeWidth={isRepositioning || isAdjusting ? 3 : 2}
+              tension={0.3} lineCap="round"
+              hitStrokeWidth={hasClickHandler ? 20 : 0}
+              listening={hasClickHandler}
+            />
+            {relDetails.map((pts, i) => (
+              <Line key={i} points={pts} stroke="rgba(55,55,55,0.92)" strokeWidth={5} tension={0.5} lineCap="round" lineJoin="round" listening={false} />
+            ))}
+          </Group>
+        )
+      }
 
       return (
         <Group key={vol.id + keySuffix}>
@@ -978,6 +1192,26 @@ export default function ChainCanvas({
           {showNextPeek && renderRoutes(activeIdx + 1, nextEntryPanX + transX - size.w)}
           {renderRoutes(activeIdx, effectivePanX)}
         </Layer>
+
+        {/* Adjust mode handles layer */}
+        {adjustMode && adjustHandlePosRef.current && (
+          <Layer listening={false}>
+            {(() => {
+              const hp = adjustHandlePosRef.current!
+              return (
+                <>
+                  <Line points={[hp.cx, hp.cy, hp.rotX, hp.rotY]} stroke="rgba(251,146,60,0.5)" strokeWidth={1.5} dash={[4, 3]} />
+                  <Line points={[hp.cx, hp.cy, hp.sclX, hp.sclY]} stroke="rgba(96,165,250,0.5)" strokeWidth={1.5} dash={[4, 3]} />
+                  <Circle x={hp.rotX} y={hp.rotY} radius={14} fill="#f97316" stroke="#fff" strokeWidth={2} />
+                  <Text x={hp.rotX - 6} y={hp.rotY - 6} text="↻" fontSize={13} fill="#fff" fontFamily="sans-serif" listening={false} />
+                  <Circle x={hp.sclX} y={hp.sclY} radius={14} fill="#3b82f6" stroke="#fff" strokeWidth={2} />
+                  <Text x={hp.sclX - 6} y={hp.sclY - 6} text="⤡" fontSize={12} fill="#fff" fontFamily="sans-serif" listening={false} />
+                  <Circle x={hp.cx} y={hp.cy} radius={8} fill="rgba(255,255,255,0.25)" stroke="rgba(255,255,255,0.6)" strokeWidth={1.5} />
+                </>
+              )
+            })()}
+          </Layer>
+        )}
 
         {/* Drawing preview layer */}
         <Layer listening={false}>

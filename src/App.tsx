@@ -6,6 +6,7 @@ import QrInventoryPage from './pages/staff/QrInventoryPage'
 import AdminPage from './pages/staff/AdminPage'
 import StatsPage from './pages/staff/StatsPage'
 import CalibrationPage from './pages/staff/CalibrationPage'
+import VolumeCatalogPage from './pages/staff/VolumeCatalogPage'
 import { ErrorBoundary } from './components/ErrorBoundary'
 import PublicWallPage from './pages/public/PublicWallPage'
 import PublicRoutePage from './pages/public/PublicRoutePage'
@@ -38,6 +39,7 @@ export default function App() {
           <Route path="stats" element={<StatsPage />} />
           <Route path="calibration" element={<ErrorBoundary><CalibrationPage /></ErrorBoundary>} />
           <Route path="admin" element={<ErrorBoundary><AdminPage /></ErrorBoundary>} />
+          <Route path="volume-catalog" element={<ErrorBoundary><VolumeCatalogPage /></ErrorBoundary>} />
         </Route>
         <Route path="/" element={<Navigate to="/muro" replace />} />
       </Routes>

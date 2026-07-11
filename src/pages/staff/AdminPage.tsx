@@ -212,6 +212,18 @@ export default function AdminPage() {
           </button>
         </div>
 
+        {/* Catálogo de volúmenes */}
+        <div className="bg-zinc-900 rounded-2xl p-4 border border-zinc-800/80 mb-4">
+          <h2 className="text-white font-bold text-base mb-1">Catálogo de Volúmenes</h2>
+          <p className="text-zinc-500 text-xs font-medium mb-4">Dibuja formas de volúmenes para colocarlos desde inventario</p>
+          <button
+            onClick={() => navigate('/staff/volume-catalog')}
+            className="w-full bg-zinc-800 text-zinc-200 font-bold text-sm py-2.5 rounded-xl hover:bg-zinc-700 border border-zinc-700 transition-all"
+          >
+            Abrir Catálogo
+          </button>
+        </div>
+
         {/* QR Generation */}
         <div className="bg-zinc-900 rounded-2xl p-4 border border-zinc-800/80 mb-4">
           <h2 className="text-white font-bold text-base mb-3">Generar QR Codes</h2>

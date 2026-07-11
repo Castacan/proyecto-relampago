@@ -9,9 +9,10 @@ import VolumeDetail from '../../components/VolumeDetail'
 import { useZones } from '../../hooks/useZones'
 import { useRoutes } from '../../hooks/useRoutes'
 import { useVolumes } from '../../hooks/useVolumes'
+import { useVolumeCatalog } from '../../hooks/useVolumeCatalog'
 import { useChain } from '../../hooks/useChain'
 import { ROUTE_COLORS, getColorHex } from '../../lib/colors'
-import type { Route, Volume, Zone } from '../../types'
+import type { Route, Volume, VolumeCatalogItem, Zone } from '../../types'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const db = supabase as unknown as any
@@ -21,6 +22,7 @@ type UIState =
   | 'color-pick' | 'drawing' | 'review' | 'form'
   | 'vol-perimeter' | 'vol-perimeter-review' | 'vol-details'
   | 'vol-action' | 'vol-reposition'
+  | 'vol-catalog' | 'vol-place' | 'vol-adjust'
 
 export default function WallPage() {
   const [searchParams] = useSearchParams()
@@ -29,6 +31,7 @@ export default function WallPage() {
   const { zones: allZones } = useZones()
   const { routes, refetch: refetchRoutes } = useRoutes()
   const { volumes, refetch: refetchVolumes } = useVolumes()
+  const { catalog } = useVolumeCatalog()
 
   const defaultChainId = allZones.find(z => z.chain_id)?.chain_id ?? null
   const { zones: chainZones, anchors, loading: chainLoading } = useChain(defaultChainId)
@@ -60,6 +63,16 @@ export default function WallPage() {
   const [repoZoneId, setRepoZoneId] = useState<string | null>(null)
   const [repoOffset, setRepoOffset] = useState<{ dx: number; dy: number }>({ dx: 0, dy: 0 })
 
+  // Catalog placement state
+  const [selectedCatalogItem, setSelectedCatalogItem] = useState<VolumeCatalogItem | null>(null)
+
+  // Adjust mode state (catalog volumes: move + rotate + scale)
+  const [adjustVolume, setAdjustVolume] = useState<Volume | null>(null)
+  const [adjustZoneId, setAdjustZoneId] = useState<string | null>(null)
+  const [adjustOffset, setAdjustOffset] = useState<{ dx: number; dy: number }>({ dx: 0, dy: 0 })
+  const [adjustRotation, setAdjustRotation] = useState(0)
+  const [adjustScale, setAdjustScale] = useState(1)
+
   useEffect(() => {
     if (chainZones.length > 0 && !activeZoneId) {
       setActiveZoneId(chainZones[0].id)
@@ -83,6 +96,12 @@ export default function WallPage() {
     setRepoVolume(null)
     setRepoZoneId(null)
     setRepoOffset({ dx: 0, dy: 0 })
+    setSelectedCatalogItem(null)
+    setAdjustVolume(null)
+    setAdjustZoneId(null)
+    setAdjustOffset({ dx: 0, dy: 0 })
+    setAdjustRotation(0)
+    setAdjustScale(1)
   }
 
   function handleBlobComplete(path: { x: number; y: number }[], zoneId: string, chainId: string) {
@@ -140,6 +159,51 @@ export default function WallPage() {
     refetchVolumes()
   }
 
+  // Catalog volume handlers
+  async function handleVolumePlaced(perimeter: { x: number; y: number }[], zoneId: string, chainId: string, catalogId: string) {
+    await db.from('volumes').insert({
+      zone_id: zoneId,
+      chain_id: chainId,
+      perimeter,
+      details: [],
+      catalog_id: catalogId,
+      rotation: 0,
+      vol_scale: 1,
+    })
+    cancelAll()
+    refetchVolumes()
+  }
+
+  function startAdjust() {
+    if (!actionVol || !actionDisplayZoneId) return
+    setAdjustVolume(actionVol)
+    setAdjustZoneId(actionDisplayZoneId)
+    setAdjustOffset(actionVol.zone_offsets?.[actionDisplayZoneId] ?? { dx: 0, dy: 0 })
+    setAdjustRotation(actionVol.rotation ?? 0)
+    setAdjustScale(actionVol.vol_scale ?? 1)
+    setActionVol(null)
+    setActionDisplayZoneId(null)
+    setUi('vol-adjust')
+  }
+
+  async function saveAdjust() {
+    if (!adjustVolume || !adjustZoneId) return
+    const newOffsets = { ...(adjustVolume.zone_offsets ?? {}), [adjustZoneId]: adjustOffset }
+    await db.from('volumes').update({
+      zone_offsets: newOffsets,
+      rotation: adjustRotation,
+      vol_scale: adjustScale,
+    }).eq('id', adjustVolume.id)
+    cancelAll()
+    refetchVolumes()
+  }
+
+  function handleAdjustChange(changes: { offset?: { dx: number; dy: number }; rotation?: number; volScale?: number }) {
+    if (changes.offset) setAdjustOffset(changes.offset)
+    if (changes.rotation !== undefined) setAdjustRotation(changes.rotation)
+    if (changes.volScale !== undefined) setAdjustScale(changes.volScale)
+  }
+
   if (chainLoading || allZones.length === 0) return (
     <div className="w-full h-full flex items-center justify-center bg-zinc-950">
       <div className="w-6 h-6 rounded-full border-2 border-yellow-400 border-t-transparent animate-spin" />
@@ -185,6 +249,16 @@ export default function WallPage() {
           ? { volumeId: repoVolume.id, zoneId: repoZoneId, offset: repoOffset }
           : null}
         onRepositionOffsetChange={setRepoOffset}
+        volPlaceMode={ui === 'vol-place' ? selectedCatalogItem : null}
+        onVolumePlaced={handleVolumePlaced}
+        adjustMode={ui === 'vol-adjust' && adjustVolume && adjustZoneId ? {
+          volumeId: adjustVolume.id,
+          zoneId: adjustZoneId,
+          offset: adjustOffset,
+          rotation: adjustRotation,
+          volScale: adjustScale,
+        } : null}
+        onAdjustChange={handleAdjustChange}
         onActiveZoneChange={setActiveZoneId}
         jumpToZoneId={jumpZoneId}
       />
@@ -278,16 +352,36 @@ export default function WallPage() {
         </div>
       )}
 
+      {/* Vol-place hint */}
+      {ui === 'vol-place' && selectedCatalogItem && (
+        <div className="absolute top-14 left-0 right-0 flex justify-center pointer-events-none z-20">
+          <div className="flex items-center gap-2.5 bg-zinc-950/95 backdrop-blur-sm px-5 py-2.5 rounded-full border border-zinc-800/60 shadow-xl">
+            <div className="w-3 h-3 rounded-full bg-zinc-400 shrink-0" />
+            <span className="text-white text-xs font-semibold">Toca donde quieres colocar «{selectedCatalogItem.name}»</span>
+          </div>
+        </div>
+      )}
+
+      {/* Vol-adjust hint */}
+      {ui === 'vol-adjust' && (
+        <div className="absolute top-14 left-0 right-0 flex justify-center pointer-events-none z-20">
+          <div className="flex items-center gap-2.5 bg-zinc-950/95 backdrop-blur-sm px-5 py-2.5 rounded-full border border-yellow-400/40 shadow-xl">
+            <div className="w-3 h-3 rounded-full bg-yellow-400 shrink-0" />
+            <span className="text-yellow-400 text-xs font-semibold">↻ rotar · ⤡ escalar · cuerpo para mover</span>
+          </div>
+        </div>
+      )}
+
       {/* Bottom action bar */}
       {(ui === 'idle' || ui === 'color-pick' || ui === 'drawing' || ui === 'review'
         || ui === 'vol-perimeter' || ui === 'vol-perimeter-review' || ui === 'vol-details'
-        || ui === 'vol-reposition') && (
+        || ui === 'vol-reposition' || ui === 'vol-place' || ui === 'vol-adjust') && (
         <div className="absolute bottom-5 left-4 right-4 flex justify-end pointer-events-none z-20">
 
           {ui === 'idle' ? (
             <div className="flex gap-2.5 pointer-events-auto">
               <button
-                onClick={() => setUi('vol-perimeter')}
+                onClick={() => setUi('vol-catalog')}
                 className="flex items-center gap-2 px-4 py-3.5 rounded-2xl font-bold text-sm shadow-xl bg-zinc-800 text-zinc-300 border-2 border-zinc-700 hover:bg-zinc-700 hover:text-white active:scale-95 transition-all"
               >
                 <div className="w-4 h-4 rounded bg-zinc-500/60 border border-zinc-400/50" />
@@ -372,6 +466,32 @@ export default function WallPage() {
               </button>
             </div>
 
+          ) : ui === 'vol-place' ? (
+            <div className="flex gap-3 pointer-events-auto">
+              <button
+                onClick={cancelAll}
+                className="px-4 py-3.5 rounded-2xl font-bold text-sm shadow-xl bg-zinc-800 text-zinc-300 border-2 border-zinc-700 hover:bg-zinc-700 hover:text-white active:scale-95 transition-all"
+              >
+                Cancelar
+              </button>
+            </div>
+
+          ) : ui === 'vol-adjust' ? (
+            <div className="flex gap-3 pointer-events-auto">
+              <button
+                onClick={cancelAll}
+                className="px-4 py-3.5 rounded-2xl font-bold text-sm shadow-xl bg-zinc-800 text-zinc-300 border-2 border-zinc-700 hover:bg-zinc-700 hover:text-white active:scale-95 transition-all"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={saveAdjust}
+                className="px-6 py-3.5 rounded-2xl font-bold text-sm shadow-2xl bg-yellow-400 text-zinc-950 hover:bg-yellow-300 active:scale-95 transition-all border-2 border-yellow-300/40"
+              >
+                Guardar
+              </button>
+            </div>
+
           ) : (
             <button
               onClick={cancelAll}
@@ -413,19 +533,74 @@ export default function WallPage() {
         </div>
       )}
 
+      {/* Vol-catalog sheet: pick draw mode or catalog item */}
+      {ui === 'vol-catalog' && (
+        <div className="fixed inset-0 bg-black/75 backdrop-blur-sm flex items-end z-50" onClick={cancelAll}>
+          <div className="w-full bg-zinc-900 rounded-t-3xl px-6 pt-6 pb-24 border-t border-zinc-800/80" onClick={e => e.stopPropagation()}>
+            <div className="w-10 h-1 bg-zinc-700 rounded-full mx-auto mb-5" />
+            <h2 className="text-white font-bold text-lg tracking-tight mb-4">Agregar volumen</h2>
+            <button
+              onClick={() => { setUi('vol-perimeter') }}
+              className="w-full py-4 rounded-2xl bg-zinc-700 hover:bg-zinc-600 text-white font-bold text-sm flex items-center justify-center gap-2.5 transition-all mb-3"
+            >
+              <span>✏️</span>
+              Dibujar perímetro
+            </button>
+            {catalog.length > 0 && (
+              <>
+                <p className="text-zinc-500 text-xs font-bold uppercase tracking-widest mb-3">Desde catálogo</p>
+                <div className="space-y-2 max-h-64 overflow-y-auto">
+                  {catalog.map(item => {
+                    const pts = item.shape.map(p => `${p.x * 44},${p.y * 44}`).join(' ')
+                    return (
+                      <button
+                        key={item.id}
+                        onClick={() => { setSelectedCatalogItem(item); setUi('vol-place') }}
+                        className="w-full flex items-center gap-3 py-3 px-4 rounded-2xl bg-zinc-800 hover:bg-zinc-700 text-white transition-all text-left"
+                      >
+                        <svg width="44" height="44" viewBox="0 0 44 44" className="shrink-0 rounded-lg bg-zinc-900">
+                          <polygon points={pts} fill="rgba(110,110,110,0.55)" stroke="rgba(180,180,180,0.6)" strokeWidth={1.5} />
+                        </svg>
+                        <span className="font-bold text-sm">{item.name}</span>
+                      </button>
+                    )
+                  })}
+                </div>
+              </>
+            )}
+            {catalog.length === 0 && (
+              <p className="text-zinc-600 text-xs text-center py-2">Sin formas en el catálogo. Ve a Admin → Catálogo de Volúmenes para agregar.</p>
+            )}
+            <button onClick={cancelAll} className="w-full py-3 text-zinc-500 hover:text-zinc-300 text-sm font-medium transition-colors mt-3">
+              Cancelar
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Volume action sheet */}
       {ui === 'vol-action' && actionVol && (
         <div className="fixed inset-0 bg-black/75 backdrop-blur-sm flex items-end z-50" onClick={cancelAll}>
           <div className="w-full bg-zinc-900 rounded-t-3xl px-6 pt-6 pb-24 border-t border-zinc-800/80" onClick={e => e.stopPropagation()}>
             <div className="w-10 h-1 bg-zinc-700 rounded-full mx-auto mb-5" />
             <h2 className="text-white font-bold text-lg tracking-tight mb-6">Volumen</h2>
-            <button
-              onClick={startReposition}
-              className="w-full py-4 rounded-2xl bg-zinc-700 hover:bg-zinc-600 text-white font-bold text-sm flex items-center justify-center gap-2.5 transition-all mb-3"
-            >
-              <span className="text-base">↔</span>
-              Mover en esta zona
-            </button>
+            {actionVol.catalog_id ? (
+              <button
+                onClick={startAdjust}
+                className="w-full py-4 rounded-2xl bg-zinc-700 hover:bg-zinc-600 text-white font-bold text-sm flex items-center justify-center gap-2.5 transition-all mb-3"
+              >
+                <span className="text-base">↻</span>
+                Ajustar (mover, rotar, escalar)
+              </button>
+            ) : (
+              <button
+                onClick={startReposition}
+                className="w-full py-4 rounded-2xl bg-zinc-700 hover:bg-zinc-600 text-white font-bold text-sm flex items-center justify-center gap-2.5 transition-all mb-3"
+              >
+                <span className="text-base">↔</span>
+                Mover en esta zona
+              </button>
+            )}
             <button
               onClick={() => { setSelectedVolume(actionVol); cancelAll() }}
               className="w-full py-4 rounded-2xl bg-zinc-800 hover:bg-zinc-700 text-zinc-300 font-bold text-sm flex items-center justify-center gap-2.5 transition-all mb-3"

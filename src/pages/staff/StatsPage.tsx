@@ -3,10 +3,11 @@ import { Navigate } from 'react-router-dom'
 import { useProfile } from '../../hooks/useProfile'
 import { useRoutes } from '../../hooks/useRoutes'
 import { useZones } from '../../hooks/useZones'
+import { useVolumes } from '../../hooks/useVolumes'
 import { supabase } from '../../lib/supabase'
 import { ROUTE_COLORS, GRADES } from '../../lib/colors'
 import { getFreshnessLevel, getFreshnessColor, getDaysOnWall, getPublicLabel } from '../../lib/freshness'
-import type { Route, Zone } from '../../types'
+import type { Route, Zone, Volume } from '../../types'
 
 // ── Zone grouping ─────────────────────────────────────────────────────────────
 const ZONE_GROUPS = [
@@ -98,15 +99,22 @@ function ColumnChart({ items }: { items: ColItem[] }) {
 }
 
 // ── Página ───────────────────────────────────────────────────────────────────
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const db = supabase as unknown as any
+
 export default function StatsPage() {
   const { profile } = useProfile()
   const { routes, loading } = useRoutes()   // solo activas
   const { zones } = useZones()
+  const { volumes } = useVolumes()          // volúmenes activos
 
   const [view, setView] = useState<'current' | 'historical'>('current')
   const [allRoutes, setAllRoutes] = useState<Route[]>([])
   const [loadingAll, setLoadingAll] = useState(false)
   const [fetchedAll, setFetchedAll] = useState(false)
+
+  const [allVolumes, setAllVolumes] = useState<Volume[]>([])
+  const [fetchedAllVols, setFetchedAllVols] = useState(false)
 
   // Fetch lazy: solo cuando se cambia a históricas por primera vez
   useEffect(() => {
@@ -119,7 +127,14 @@ export default function StatsPage() {
           setFetchedAll(true)
         })
     }
-  }, [view, fetchedAll, loadingAll])
+    if (view === 'historical' && !fetchedAllVols) {
+      db.from('volumes').select('*').order('placed_at', { ascending: false })
+        .then(({ data }: { data: Volume[] | null }) => {
+          setAllVolumes((data ?? []) as Volume[])
+          setFetchedAllVols(true)
+        })
+    }
+  }, [view, fetchedAll, loadingAll, fetchedAllVols])
 
   if (profile === null) return (
     <div className="flex justify-center items-center h-full bg-zinc-950">
@@ -175,6 +190,16 @@ export default function StatsPage() {
   // ── Cálculos vista histórica ───────────────────────────────────────────────
   const activeNow   = historicalRoutes.filter(r => r.status === 'active').length
   const retiredSince = historicalRoutes.filter(r => r.status === 'retired').length
+
+  // ── Volúmenes ──────────────────────────────────────────────────────────────
+  const volDays = volumes.map(v => getDaysOnWall(v.placed_at))
+  const volAvgDays = volDays.length ? Math.round(volDays.reduce((a, b) => a + b, 0) / volDays.length) : 0
+  const historicalVolumes = allVolumes.filter(v =>
+    v.status === 'active' ||
+    (v.status === 'retired' && v.retired_at != null && v.retired_at >= HISTORICAL_CUTOFF)
+  )
+  const volActiveNow = historicalVolumes.filter(v => v.status === 'active').length
+  const volRetiredSince = historicalVolumes.filter(v => v.status === 'retired').length
 
   return (
     <div className="h-full overflow-y-auto bg-zinc-950">
@@ -236,6 +261,23 @@ export default function StatsPage() {
             <div className="bg-zinc-900 rounded-2xl p-4 border border-zinc-800/80">
               <h2 className="text-white font-bold text-base mb-4">Por grado</h2>
               <ColumnChart items={gradeItems} />
+            </div>
+
+            {/* Volúmenes */}
+            <div className="bg-zinc-900 rounded-2xl p-4 border border-zinc-800/80">
+              <h2 className="text-white font-bold text-base mb-3">Volúmenes</h2>
+              {view === 'current' ? (
+                <div className="flex gap-3">
+                  <StatCard value={volumes.length} label="Activos" sub="en el muro ahora" />
+                  <StatCard value={volDays.length ? `${volAvgDays}d` : '—'} label="Promedio" sub="días en pared" />
+                </div>
+              ) : (
+                <div className="flex gap-3">
+                  <StatCard value={historicalVolumes.length} label="Total" sub="desde jul 2026" />
+                  <StatCard value={volActiveNow} label="Activos" sub="ahora" />
+                  <StatCard value={volRetiredSince} label="Retirados" sub="desde jul 2026" />
+                </div>
+              )}
             </div>
 
             {/* Frescura — solo en vista actual, al fondo */}

@@ -1,7 +1,7 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { supabase } from '../../lib/supabase'
 import { getDaysOnWall } from '../../lib/freshness'
-import type { Volume, Zone } from '../../types'
+import type { Volume, VolumeCatalogItem, Zone } from '../../types'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const db = supabase as unknown as any
@@ -16,9 +16,16 @@ interface Props {
 export default function VolumeDetail({ volume, zones, onClose, onRetire }: Props) {
   const [retiring, setRetiring] = useState(false)
   const [confirmRetire, setConfirmRetire] = useState(false)
+  const [catalogItem, setCatalogItem] = useState<VolumeCatalogItem | null>(null)
 
   const days = getDaysOnWall(volume.placed_at)
   const zone = zones.find(z => z.id === volume.zone_id)
+
+  useEffect(() => {
+    if (!volume.catalog_id) return
+    db.from('volume_catalog').select('*').eq('id', volume.catalog_id).single()
+      .then(({ data }: { data: VolumeCatalogItem | null }) => { if (data) setCatalogItem(data) })
+  }, [volume.catalog_id])
 
   async function handleRetire() {
     if (!confirmRetire) { setConfirmRetire(true); return }
@@ -50,6 +57,23 @@ export default function VolumeDetail({ volume, zones, onClose, onRetire }: Props
             ×
           </button>
         </div>
+
+        {catalogItem && (
+          <div className="flex items-center gap-3 mb-4 p-3 rounded-2xl bg-zinc-800/60 border border-zinc-700/40">
+            <svg width="36" height="36" viewBox="0 0 36 36" className="shrink-0 rounded-lg bg-zinc-900">
+              <polygon
+                points={catalogItem.shape.map(p => `${p.x * 36},${p.y * 36}`).join(' ')}
+                fill="rgba(110,110,110,0.55)" stroke="rgba(180,180,180,0.6)" strokeWidth={1.5}
+              />
+            </svg>
+            <div>
+              <p className="text-white text-sm font-bold">{catalogItem.name}</p>
+              <p className="text-zinc-500 text-xs">
+                {Math.round(volume.rotation ?? 0)}° · ×{((volume.vol_scale ?? 1)).toFixed(2)}
+              </p>
+            </div>
+          </div>
+        )}
 
         <div className="flex items-center gap-3 mb-5 p-4 rounded-2xl bg-zinc-800/60 border border-zinc-700/40">
           <div className="w-2 h-2 rounded-full shrink-0 bg-zinc-400" />

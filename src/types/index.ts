@@ -69,4 +69,14 @@ export interface Volume {
   perimeter: { x: number; y: number }[]
   details: { x: number; y: number }[][]
   zone_offsets?: Record<string, { dx: number; dy: number }>
+  catalog_id?: string | null
+  rotation?: number
+  vol_scale?: number
+}
+
+export interface VolumeCatalogItem {
+  id: string
+  name: string
+  shape: { x: number; y: number }[]
+  created_at: string
 }
