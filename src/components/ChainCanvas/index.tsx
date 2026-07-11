@@ -37,7 +37,7 @@ interface Props {
   onRepositionOffsetChange?: (offset: { dx: number; dy: number }) => void
   // Catalog volume placement
   volPlaceMode?: VolumeCatalogItem | null
-  onVolumePlaced?: (perimeter: { x: number; y: number }[], zoneId: string, chainId: string, catalogId: string) => void
+  onVolumePlaced?: (perimeter: { x: number; y: number }[], zoneId: string, chainId: string, catalogId: string, details: { x: number; y: number }[][]) => void
   // Adjust mode (move + rotate + scale for catalog volumes)
   adjustMode?: { volumeId: string; zoneId: string; offset: { dx: number; dy: number }; rotation: number; volScale: number } | null
   onAdjustChange?: (changes: { offset?: { dx: number; dy: number }; rotation?: number; volScale?: number }) => void
@@ -514,12 +514,22 @@ export default function ChainCanvas({
       const tapY = touchStartY.current - rect.top
       const catalogItem = volPlaceModeRef.current
       const CATALOG_PX = 100
-      const perimeter = catalogItem.shape.map(pt =>
-        screenToChain(tapX + (pt.x - 0.5) * CATALOG_PX * 2, tapY + (pt.y - 0.5) * CATALOG_PX * 2)
+      // Center on shape centroid so the tap lands on the visual center
+      const n = catalogItem.shape.length
+      const cxCat = catalogItem.shape.reduce((s, p) => s + p.x, 0) / n
+      const cyCat = catalogItem.shape.reduce((s, p) => s + p.y, 0) / n
+      const catToScreen = (p: { x: number; y: number }) => ({
+        x: tapX + (p.x - cxCat) * CATALOG_PX * 2,
+        y: tapY + (p.y - cyCat) * CATALOG_PX * 2,
+      })
+      const perimeter = catalogItem.shape.map(p => { const s = catToScreen(p); return screenToChain(s.x, s.y) })
+      // Convert details to chain-space using the same transform
+      const details = (catalogItem.details ?? []).map(stroke =>
+        stroke.map(p => { const s = catToScreen(p); return screenToChain(s.x, s.y) })
       )
       const zone = sorted[activeIdx]
       if (zone?.chain_id) {
-        onVolumePlacedRef.current?.(perimeter, zone.id, zone.chain_id, catalogItem.id)
+        onVolumePlacedRef.current?.(perimeter, zone.id, zone.chain_id, catalogItem.id, details)
       }
       return
     }
@@ -675,12 +685,20 @@ export default function ChainCanvas({
       if (pos) {
         const catalogItem = volPlaceModeRef.current
         const CATALOG_PX = 100
-        const perimeter = catalogItem.shape.map(pt =>
-          screenToChain(pos.x + (pt.x - 0.5) * CATALOG_PX * 2, pos.y + (pt.y - 0.5) * CATALOG_PX * 2)
+        const n = catalogItem.shape.length
+        const cxCat = catalogItem.shape.reduce((s, p) => s + p.x, 0) / n
+        const cyCat = catalogItem.shape.reduce((s, p) => s + p.y, 0) / n
+        const catToScreen = (p: { x: number; y: number }) => ({
+          x: pos.x + (p.x - cxCat) * CATALOG_PX * 2,
+          y: pos.y + (p.y - cyCat) * CATALOG_PX * 2,
+        })
+        const perimeter = catalogItem.shape.map(p => { const s = catToScreen(p); return screenToChain(s.x, s.y) })
+        const details = (catalogItem.details ?? []).map(stroke =>
+          stroke.map(p => { const s = catToScreen(p); return screenToChain(s.x, s.y) })
         )
         const zone = sorted[activeIdx]
         if (zone?.chain_id) {
-          onVolumePlacedRef.current?.(perimeter, zone.id, zone.chain_id, catalogItem.id)
+          onVolumePlacedRef.current?.(perimeter, zone.id, zone.chain_id, catalogItem.id, details)
         }
       }
       return

@@ -167,25 +167,25 @@ export default function WallPage() {
   }
 
   // Catalog volume handlers
-  async function handleVolumePlaced(perimeter: { x: number; y: number }[], zoneId: string, chainId: string, catalogId: string) {
-    const item = catalog.find(c => c.id === catalogId)
+  async function handleVolumePlaced(
+    perimeter: { x: number; y: number }[],
+    zoneId: string,
+    chainId: string,
+    catalogId: string,
+    details: { x: number; y: number }[][]
+  ) {
+    // details already converted to chain-space by ChainCanvas
     let res = await db.from('volumes').insert({
       zone_id: zoneId,
       chain_id: chainId,
       perimeter,
-      details: item?.details ?? [],
+      details,
       catalog_id: catalogId,
       rotation: 0,
       vol_scale: 1,
     })
     if (res?.error) {
-      // Fallback: insert without catalog columns (if ALTER TABLE not run yet)
-      res = await db.from('volumes').insert({
-        zone_id: zoneId,
-        chain_id: chainId,
-        perimeter,
-        details: item?.details ?? [],
-      })
+      res = await db.from('volumes').insert({ zone_id: zoneId, chain_id: chainId, perimeter, details })
     }
     if (res?.error) {
       alert('Error al colocar volumen: ' + res.error.message)
