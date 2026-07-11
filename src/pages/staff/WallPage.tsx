@@ -301,7 +301,11 @@ export default function WallPage() {
         <span className="text-white text-sm font-semibold truncate max-w-36">
           {activeZone?.name ?? '—'}
         </span>
-        <span className="text-zinc-500 text-xs font-medium">{routes.length} rutas</span>
+        <span className="text-zinc-500 text-xs font-medium">
+          {routes.filter(r => r.zone_id === activeZoneId).length} rutas
+          {' · '}
+          {volumes.filter(v => v.chain_id && v.perimeter?.length && v.zone_id === activeZoneId).length} vols
+        </span>
       </div>
 
       {/* QR assignment banner */}

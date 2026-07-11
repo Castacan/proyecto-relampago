@@ -882,9 +882,9 @@ export default function ChainCanvas({
               id={hasClickHandler ? `VOL:${vol.id}:${displayZoneId}` : ''}
               points={relPts}
               closed={true}
-              fill={isRepositioning ? 'rgba(110,110,110,0.60)' : 'rgba(110,110,110,0.38)'}
-              stroke={isRepositioning ? 'rgba(250,204,21,0.85)' : isAdjusting ? 'rgba(250,204,21,0.85)' : 'rgba(148,148,148,0.55)'}
-              strokeWidth={isRepositioning || isAdjusting ? 3 : 2}
+              fill={isRepositioning ? 'rgba(110,110,110,0.60)' : 'rgba(110,110,110,0.42)'}
+              stroke={isRepositioning ? 'rgba(250,204,21,0.9)' : isAdjusting ? 'rgba(250,204,21,0.9)' : 'rgba(255,255,255,0.75)'}
+              strokeWidth={isRepositioning || isAdjusting ? 3 : 2.5}
               tension={0.3} lineCap="round"
               hitStrokeWidth={hasClickHandler ? 20 : 0}
               listening={hasClickHandler}
@@ -902,9 +902,9 @@ export default function ChainCanvas({
             id={hasClickHandler ? `VOL:${vol.id}:${displayZoneId}` : ''}
             points={perimeterPts}
             closed={true}
-            fill={isRepositioning ? 'rgba(110,110,110,0.60)' : 'rgba(110,110,110,0.38)'}
-            stroke={isRepositioning ? 'rgba(250,204,21,0.85)' : 'rgba(148,148,148,0.55)'}
-            strokeWidth={isRepositioning ? 3 : 2}
+            fill={isRepositioning ? 'rgba(110,110,110,0.60)' : 'rgba(110,110,110,0.42)'}
+            stroke={isRepositioning ? 'rgba(250,204,21,0.9)' : 'rgba(255,255,255,0.75)'}
+            strokeWidth={isRepositioning ? 3 : 2.5}
             tension={0.3}
             lineCap="round"
             hitStrokeWidth={hasClickHandler ? 20 : 0}
