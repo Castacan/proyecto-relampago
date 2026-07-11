@@ -287,7 +287,7 @@ export default function VolumeCatalogPage() {
             width={CANVAS_RES}
             height={CANVAS_RES}
             className="rounded-2xl border-2 border-zinc-700 bg-zinc-800 touch-none cursor-crosshair"
-            style={{ width: '100%', aspectRatio: '1 / 1', display: 'block' }}
+            style={{ width: '100%', maxWidth: 300, aspectRatio: '1 / 1', display: 'block', margin: '0 auto' }}
             onMouseDown={onStart}
             onMouseMove={onMove}
             onMouseUp={onEnd}
