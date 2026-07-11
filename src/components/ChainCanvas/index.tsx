@@ -805,11 +805,14 @@ export default function ChainCanvas({
 
       const repo = repositionModeRef.current
       const isRepositioning = repo?.volumeId === vol.id && repo?.zoneId === displayZoneId
+      const adj = adjustModeRef.current
+      const isAdjusting = adj?.volumeId === vol.id && keySuffix === ''
 
-      // Aplica offset almacenado o el live offset de reposicionamiento (todas las zonas)
+      // Offset: adjust (live) > reposition (live) > stored
       let effectiveConverter = converter
       const storedOffset = vol.zone_offsets?.[displayZoneId]
-      const activeOffset = isRepositioning ? repo!.offset : storedOffset
+      const activeOffset = isAdjusting ? adj!.offset
+        : isRepositioning ? repo!.offset : storedOffset
       if (activeOffset && (activeOffset.dx !== 0 || activeOffset.dy !== 0)) {
         const off = activeOffset
         effectiveConverter = (p) => {
@@ -822,22 +825,21 @@ export default function ChainCanvas({
       }
 
       const perimeterPts = vol.perimeter.flatMap(p => { const s = effectiveConverter(p); return [s.x, s.y] })
-      const hasClickHandler = !!onVolumeClickRef.current && !repo && !adjustModeRef.current
+      const hasClickHandler = !!onVolumeClickRef.current && !repo && !adj
 
-      // Catalog volumes: apply rotation + scale around centroid
-      const rotation = vol.rotation ?? 0
-      const volScale = vol.vol_scale ?? 1
-      const hasCatalogTransform = !!vol.catalog_id && (rotation !== 0 || volScale !== 1)
+      // Use live values from adjustMode when adjusting, stored values otherwise
+      const rotation = isAdjusting ? adj!.rotation : (vol.rotation ?? 0)
+      const volScale = isAdjusting ? adj!.volScale : (vol.vol_scale ?? 1)
+      const hasCatalogTransform = (!!vol.catalog_id || isAdjusting) && (rotation !== 0 || volScale !== 1 || isAdjusting)
 
       let cx = 0, cy = 0
-      if (hasCatalogTransform || adjustModeRef.current?.volumeId === vol.id) {
+      if (hasCatalogTransform || isAdjusting) {
         const n = perimeterPts.length / 2
         for (let i = 0; i < perimeterPts.length; i += 2) { cx += perimeterPts[i]; cy += perimeterPts[i + 1] }
         cx /= n; cy /= n
       }
 
-      // Update handle positions when this is the adjust-mode volume
-      const isAdjusting = adjustModeRef.current?.volumeId === vol.id && keySuffix === ''
+      // Update handle positions for the adjust-mode volume
       if (isAdjusting) {
         const HANDLE_DIST = 75
         const rot = adjustModeRef.current!.rotation

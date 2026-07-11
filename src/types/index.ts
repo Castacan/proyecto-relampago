@@ -79,5 +79,6 @@ export interface VolumeCatalogItem {
   name: string
   shape: { x: number; y: number }[]
   details: { x: number; y: number }[][]
+  quantity: number | null
   created_at: string
 }

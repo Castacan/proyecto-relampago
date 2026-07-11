@@ -8,7 +8,6 @@ import type { VolumeCatalogItem } from '../../types'
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const db = supabase as unknown as any
 
-// Internal pixel resolution of the canvas
 const CANVAS_RES = 360
 
 type DrawMode = 'perimeter' | 'details'
@@ -42,19 +41,22 @@ export default function VolumeCatalogPage() {
 
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const isDrawing = useRef(false)
-  const drawPts = useRef<{ x: number; y: number }[]>([])   // display-space coords
+  const drawPts = useRef<{ x: number; y: number }[]>([])
 
   const [drawMode, setDrawMode] = useState<DrawMode>('perimeter')
   const [savedShape, setSavedShape] = useState<{ x: number; y: number }[]>([])
   const [savedDetails, setSavedDetails] = useState<{ x: number; y: number }[][]>([])
   const [name, setName] = useState('')
+  const [quantity, setQuantity] = useState('')
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
   const [deletingId, setDeletingId] = useState<string | null>(null)
+  const [editingItemId, setEditingItemId] = useState<string | null>(null)
 
   const hasPerimeter = savedShape.length >= 3
+  const isEditing = editingItemId !== null
 
-  // ── Canvas helpers ───────────────────────────────────────────────
+  // ── Canvas helpers ────────────────────────────────────────────────
   function getScale(): number {
     const c = canvasRef.current
     if (!c) return 1
@@ -70,7 +72,6 @@ export default function VolumeCatalogPage() {
     ctx.clearRect(0, 0, S, S)
     if (shape.length < 3) return
 
-    // Perimeter fill + outline
     ctx.fillStyle = 'rgba(110,110,110,0.45)'
     ctx.strokeStyle = 'rgba(180,180,180,0.85)'
     ctx.lineWidth = 3
@@ -85,7 +86,6 @@ export default function VolumeCatalogPage() {
     ctx.fill()
     ctx.stroke()
 
-    // Saved detail strokes (darker gray)
     ctx.strokeStyle = 'rgba(38,38,38,0.92)'
     ctx.lineWidth = 7
     details.forEach(stroke => {
@@ -99,7 +99,6 @@ export default function VolumeCatalogPage() {
     })
   }, [])
 
-  // Redraw whenever saved data changes
   useEffect(() => {
     redrawCanvas(savedShape, savedDetails)
   }, [savedShape, savedDetails, redrawCanvas])
@@ -117,9 +116,7 @@ export default function VolumeCatalogPage() {
   function drawLiveStroke(pts: {x:number, y:number}[], scale: number, mode: DrawMode) {
     if (pts.length < 2) return
     const ctx = canvasRef.current!.getContext('2d')!
-    // Redraw saved content first
     redrawCanvas(savedShape, savedDetails)
-    // Then draw the live stroke on top
     if (mode === 'perimeter') {
       ctx.strokeStyle = 'rgba(200,200,200,0.9)'
       ctx.lineWidth = 3
@@ -131,7 +128,6 @@ export default function VolumeCatalogPage() {
         i === 0 ? ctx.moveTo(sx, sy) : ctx.lineTo(sx, sy)
       })
       ctx.stroke()
-      // Close hint
       if (pts.length >= 3) {
         ctx.beginPath()
         ctx.setLineDash([8, 6])
@@ -161,8 +157,7 @@ export default function VolumeCatalogPage() {
     drawPts.current = []
     const p = getPos(e)
     drawPts.current.push(p)
-    // If starting a new perimeter, clear everything
-    if (drawMode === 'perimeter') {
+    if (drawMode === 'perimeter' && !isEditing) {
       setSavedShape([])
       setSavedDetails([])
     }
@@ -188,7 +183,7 @@ export default function VolumeCatalogPage() {
     const w = rect.width || CANVAS_RES
     const h = rect.height || CANVAS_RES
 
-    if (drawMode === 'perimeter') {
+    if (drawMode === 'perimeter' && !isEditing) {
       if (pts.length < 6) { redrawCanvas(savedShape, savedDetails); return }
       const normalized = pts.map(p => ({ x: p.x / w, y: p.y / h }))
       setSavedShape(normalized)
@@ -205,27 +200,57 @@ export default function VolumeCatalogPage() {
     setSavedDetails([])
     setDrawMode('perimeter')
     setName('')
+    setQuantity('')
+    setSaveError(null)
+    setEditingItemId(null)
     const canvas = canvasRef.current
     if (canvas) canvas.getContext('2d')!.clearRect(0, 0, CANVAS_RES, CANVAS_RES)
+  }
+
+  function startEdit(item: VolumeCatalogItem) {
+    setSavedShape(item.shape)
+    setSavedDetails(item.details ?? [])
+    setDrawMode('details')
+    setName(item.name)
+    setQuantity(item.quantity != null ? String(item.quantity) : '')
+    setSaveError(null)
+    setEditingItemId(item.id)
+    window.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
   async function saveShape() {
     if (!hasPerimeter || !name.trim()) return
     setSaving(true)
     setSaveError(null)
-    // Try inserting with details; if that column doesn't exist yet, retry without it
-    let res = await db.from('volume_catalog').insert({ name: name.trim(), shape: savedShape, details: savedDetails })
+    const payload: Record<string, unknown> = { name: name.trim(), shape: savedShape, details: savedDetails }
+    if (quantity) payload.quantity = parseInt(quantity)
+    let res = await db.from('volume_catalog').insert(payload)
     if (res?.error) {
       const msg: string = res.error.message ?? ''
       if (msg.includes('details') || msg.includes('column')) {
-        res = await db.from('volume_catalog').insert({ name: name.trim(), shape: savedShape })
+        const p2: Record<string, unknown> = { name: name.trim(), shape: savedShape }
+        if (quantity) p2.quantity = parseInt(quantity)
+        res = await db.from('volume_catalog').insert(p2)
       }
     }
     setSaving(false)
-    if (res?.error) {
-      setSaveError(res.error.message)
-      return
+    if (res?.error) { setSaveError(res.error.message); return }
+    resetAll()
+    refetch()
+  }
+
+  async function saveEdit() {
+    if (!editingItemId || !name.trim()) return
+    setSaving(true)
+    setSaveError(null)
+    const payload: Record<string, unknown> = {
+      name: name.trim(),
+      details: savedDetails,
+      quantity: quantity ? parseInt(quantity) : null,
     }
+    const res = await db.from('volume_catalog').update(payload).eq('id', editingItemId)
+    setSaving(false)
+    if (res?.error) { setSaveError(res.error.message); return }
     resetAll()
     refetch()
   }
@@ -255,25 +280,29 @@ export default function VolumeCatalogPage() {
           <h1 className="text-white font-black text-xl tracking-tight">Catálogo de Volúmenes</h1>
         </div>
 
-        {/* Draw area */}
+        {/* Draw / Edit area */}
         <div className="bg-zinc-900 rounded-2xl p-4 border border-zinc-800/80 mb-4">
           <div className="flex items-center justify-between mb-1">
-            <h2 className="text-white font-bold text-base">Dibujar nueva forma</h2>
-            {(hasPerimeter || savedDetails.length > 0) && (
+            <h2 className="text-white font-bold text-base">
+              {isEditing ? `Editando: ${name || '…'}` : 'Dibujar nueva forma'}
+            </h2>
+            {(hasPerimeter || savedDetails.length > 0 || isEditing) && (
               <button onClick={resetAll} className="text-zinc-500 hover:text-zinc-300 text-xs font-bold transition-colors">
-                Limpiar
+                {isEditing ? 'Cancelar' : 'Limpiar'}
               </button>
             )}
           </div>
           <p className="text-zinc-500 text-xs mb-4">
-            {drawMode === 'perimeter'
+            {isEditing
+              ? `Agrega o quita detalles · ${savedDetails.length} trazo${savedDetails.length !== 1 ? 's' : ''}`
+              : drawMode === 'perimeter'
               ? 'Dibuja el contorno del volumen con el dedo o el ratón'
               : `Dibuja líneas de detalle · ${savedDetails.length} trazo${savedDetails.length !== 1 ? 's' : ''}`
             }
           </p>
 
-          {/* Mode toggle (visible once perimeter exists) */}
-          {hasPerimeter && (
+          {/* Mode toggle — solo al crear, no al editar */}
+          {hasPerimeter && !isEditing && (
             <div className="flex gap-1 mb-3 bg-zinc-800 p-1 rounded-xl">
               <button
                 onClick={() => setDrawMode('perimeter')}
@@ -294,7 +323,6 @@ export default function VolumeCatalogPage() {
             </div>
           )}
 
-          {/* Canvas — full width, square */}
           <canvas
             ref={canvasRef}
             width={CANVAS_RES}
@@ -309,8 +337,7 @@ export default function VolumeCatalogPage() {
             onTouchEnd={onEnd}
           />
 
-          {/* Action area */}
-          {hasPerimeter ? (
+          {(hasPerimeter || isEditing) ? (
             <div className="mt-4 space-y-3">
               {savedDetails.length > 0 && (
                 <button
@@ -327,15 +354,27 @@ export default function VolumeCatalogPage() {
                 onChange={e => setName(e.target.value)}
                 className="w-full bg-zinc-800 text-white rounded-xl px-4 py-3 text-sm outline-none border border-zinc-700/50 focus:border-yellow-400/60 transition-all"
               />
+              <div className="flex items-center gap-3">
+                <label className="text-zinc-500 text-xs font-medium shrink-0">Inventario</label>
+                <input
+                  type="number"
+                  min="1"
+                  placeholder="Ilimitado"
+                  value={quantity}
+                  onChange={e => setQuantity(e.target.value)}
+                  className="w-28 bg-zinc-800 text-white rounded-xl px-3 py-2 text-sm outline-none border border-zinc-700/50 focus:border-yellow-400/60 transition-all"
+                />
+                <span className="text-zinc-600 text-xs">piezas (opcional)</span>
+              </div>
               {saveError && (
                 <p className="text-red-400 text-xs text-center px-2">{saveError}</p>
               )}
               <button
-                onClick={saveShape}
+                onClick={isEditing ? saveEdit : saveShape}
                 disabled={saving || !name.trim()}
                 className="w-full py-3 rounded-2xl font-bold text-sm bg-yellow-400 text-zinc-950 hover:bg-yellow-300 disabled:opacity-40 transition-all"
               >
-                {saving ? 'Guardando...' : 'Guardar en catálogo'}
+                {saving ? 'Guardando...' : isEditing ? 'Guardar cambios' : 'Guardar en catálogo'}
               </button>
             </div>
           ) : (
@@ -355,22 +394,30 @@ export default function VolumeCatalogPage() {
           ) : (
             <div className="space-y-3">
               {catalog.map(item => (
-                <div key={item.id} className="flex items-center gap-3 bg-zinc-800 rounded-2xl p-3">
+                <div key={item.id} className={`flex items-center gap-3 bg-zinc-800 rounded-2xl p-3 ${editingItemId === item.id ? 'ring-2 ring-yellow-400/60' : ''}`}>
                   <ShapePreview item={item} size={56} />
                   <div className="flex-1 min-w-0">
                     <p className="text-white text-sm font-bold truncate">{item.name}</p>
                     <p className="text-zinc-500 text-xs">
-                      {new Date(item.created_at).toLocaleDateString('es-MX')}
-                      {(item.details?.length ?? 0) > 0 && ` · ${item.details.length} detalles`}
+                      {item.quantity != null ? `Inv: ${item.quantity}` : 'Sin límite'}
+                      {(item.details?.length ?? 0) > 0 ? ` · ${item.details.length} det.` : ' · sin detalles'}
                     </p>
                   </div>
-                  <button
-                    onClick={() => deleteItem(item)}
-                    disabled={deletingId === item.id}
-                    className="text-zinc-600 hover:text-red-400 text-xs font-bold transition-colors px-2 py-1 rounded disabled:opacity-40"
-                  >
-                    Eliminar
-                  </button>
+                  <div className="flex flex-col gap-1.5 shrink-0">
+                    <button
+                      onClick={() => startEdit(item)}
+                      className="text-zinc-400 hover:text-yellow-400 text-xs font-bold transition-colors px-2 py-1 rounded"
+                    >
+                      Editar
+                    </button>
+                    <button
+                      onClick={() => deleteItem(item)}
+                      disabled={deletingId === item.id}
+                      className="text-zinc-600 hover:text-red-400 text-xs font-bold transition-colors px-2 py-1 rounded disabled:opacity-40"
+                    >
+                      Eliminar
+                    </button>
+                  </div>
                 </div>
               ))}
             </div>

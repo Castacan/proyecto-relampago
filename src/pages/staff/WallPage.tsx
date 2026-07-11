@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import ZoneMap from '../../components/ZoneMap'
@@ -72,6 +72,13 @@ export default function WallPage() {
   const [adjustOffset, setAdjustOffset] = useState<{ dx: number; dy: number }>({ dx: 0, dy: 0 })
   const [adjustRotation, setAdjustRotation] = useState(0)
   const [adjustScale, setAdjustScale] = useState(1)
+
+  // Count active volumes placed per catalog item
+  const catalogCounts = useMemo(() => {
+    const counts: Record<string, number> = {}
+    volumes.forEach(v => { if (v.catalog_id) counts[v.catalog_id] = (counts[v.catalog_id] ?? 0) + 1 })
+    return counts
+  }, [volumes])
 
   useEffect(() => {
     if (chainZones.length > 0 && !activeZoneId) {
@@ -566,11 +573,14 @@ export default function WallPage() {
                 <div className="space-y-2 max-h-64 overflow-y-auto">
                   {catalog.map(item => {
                     const pts = item.shape.map(p => `${p.x * 44},${p.y * 44}`).join(' ')
+                    const placed = catalogCounts[item.id] ?? 0
+                    const atMax = item.quantity != null && placed >= item.quantity
                     return (
                       <button
                         key={item.id}
-                        onClick={() => { setSelectedCatalogItem(item); setUi('vol-place') }}
-                        className="w-full flex items-center gap-3 py-3 px-4 rounded-2xl bg-zinc-800 hover:bg-zinc-700 text-white transition-all text-left"
+                        onClick={() => { if (!atMax) { setSelectedCatalogItem(item); setUi('vol-place') } }}
+                        disabled={atMax}
+                        className={`w-full flex items-center gap-3 py-3 px-4 rounded-2xl text-white transition-all text-left ${atMax ? 'bg-zinc-800/40 opacity-50 cursor-not-allowed' : 'bg-zinc-800 hover:bg-zinc-700'}`}
                       >
                         <svg width="44" height="44" viewBox="0 0 44 44" className="shrink-0 rounded-lg bg-zinc-900">
                           <polygon points={pts} fill="rgba(110,110,110,0.55)" stroke="rgba(180,180,180,0.6)" strokeWidth={1.5} />
@@ -578,7 +588,14 @@ export default function WallPage() {
                             <polyline key={si} points={stroke.map(p => `${p.x*44},${p.y*44}`).join(' ')} fill="none" stroke="rgba(35,35,35,0.9)" strokeWidth={2} strokeLinecap="round" />
                           ))}
                         </svg>
-                        <span className="font-bold text-sm">{item.name}</span>
+                        <div className="flex-1 min-w-0">
+                          <p className="font-bold text-sm">{item.name}</p>
+                          {item.quantity != null && (
+                            <p className={`text-xs font-medium ${atMax ? 'text-red-400' : 'text-zinc-500'}`}>
+                              {placed}/{item.quantity} en pared
+                            </p>
+                          )}
+                        </div>
                       </button>
                     )
                   })}

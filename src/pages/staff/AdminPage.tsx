@@ -2,7 +2,16 @@ import { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import QRCode from 'react-qr-code'
 import { supabase } from '../../lib/supabase'
+import { getColorHex } from '../../lib/colors'
 import type { Zone, Chain } from '../../types'
+
+interface RetiredRoute {
+  id: string
+  color: string
+  grade: string
+  retired_at: string | null
+  zones: { name: string } | null
+}
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const db = supabase as unknown as any
@@ -25,6 +34,11 @@ export default function AdminPage() {
   const [generating, setGenerating] = useState(false)
   const [genError, setGenError] = useState<string | null>(null)
   const [exportingCsv, setExportingCsv] = useState(false)
+
+  const [showRetired, setShowRetired] = useState(false)
+  const [retiredRoutes, setRetiredRoutes] = useState<RetiredRoute[]>([])
+  const [loadingRetired, setLoadingRetired] = useState(false)
+  const [restoringId, setRestoringId] = useState<string | null>(null)
 
   const [chainState, setChainState] = useState<ChainState>({ chain: null, chainZones: [], freeZones: [] })
   const [chainLoading, setChainLoading] = useState(true)
@@ -95,6 +109,21 @@ export default function AdminPage() {
       setGeneratedQrs(ids.map(id => ({ id, url: `${base}/q/${id}` })))
     }
     setGenerating(false)
+  }
+
+  async function loadRetiredRoutes() {
+    setLoadingRetired(true)
+    const { data } = await db.from('routes').select('id, color, grade, retired_at, zones(name)')
+      .eq('status', 'retired').order('retired_at', { ascending: false }).limit(30)
+    setRetiredRoutes((data ?? []) as RetiredRoute[])
+    setLoadingRetired(false)
+  }
+
+  async function restoreRoute(id: string) {
+    setRestoringId(id)
+    await db.from('routes').update({ status: 'active', retired_at: null }).eq('id', id)
+    setRestoringId(null)
+    setRetiredRoutes(prev => prev.filter(r => r.id !== id))
   }
 
   async function handleExportCsv() {
@@ -272,6 +301,55 @@ export default function AdminPage() {
                 ))}
               </div>
             </>
+          )}
+        </div>
+
+        {/* Rutas retiradas — restaurar */}
+        <div className="bg-zinc-900 rounded-2xl p-4 border border-zinc-800/80 mb-4">
+          <div className="flex items-center justify-between mb-1">
+            <h2 className="text-white font-bold text-base">Rutas retiradas</h2>
+            <button
+              onClick={() => {
+                const next = !showRetired
+                setShowRetired(next)
+                if (next && retiredRoutes.length === 0) loadRetiredRoutes()
+              }}
+              className="text-zinc-400 hover:text-white text-xs font-bold transition-colors"
+            >
+              {showRetired ? 'Ocultar' : 'Ver'}
+            </button>
+          </div>
+          <p className="text-zinc-500 text-xs font-medium mb-3">Restaura una ruta retirada por error</p>
+
+          {showRetired && (
+            loadingRetired ? (
+              <div className="flex justify-center py-4">
+                <div className="w-5 h-5 rounded-full border-2 border-yellow-400 border-t-transparent animate-spin" />
+              </div>
+            ) : retiredRoutes.length === 0 ? (
+              <p className="text-zinc-600 text-xs text-center py-3">Sin rutas retiradas</p>
+            ) : (
+              <div className="space-y-2">
+                {retiredRoutes.map(r => (
+                  <div key={r.id} className="flex items-center gap-3 bg-zinc-800 rounded-xl px-3 py-2.5">
+                    <div className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: getColorHex(r.color) }} />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-white text-sm font-bold">{r.grade} — {r.color}</p>
+                      <p className="text-zinc-500 text-xs">
+                        {r.zones?.name ?? '—'} · retirada {r.retired_at ? new Date(r.retired_at).toLocaleDateString('es-MX') : '—'}
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => restoreRoute(r.id)}
+                      disabled={restoringId === r.id}
+                      className="text-yellow-400 hover:text-yellow-300 text-xs font-black transition-colors px-2 py-1 rounded disabled:opacity-40"
+                    >
+                      {restoringId === r.id ? '…' : 'Restaurar'}
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )
           )}
         </div>
 
