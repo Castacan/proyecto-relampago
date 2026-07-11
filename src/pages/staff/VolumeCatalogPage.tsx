@@ -51,6 +51,7 @@ export default function VolumeCatalogPage() {
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
   const [deletingId, setDeletingId] = useState<string | null>(null)
+  const [retiringAllId, setRetiringAllId] = useState<string | null>(null)
   const [editingItemId, setEditingItemId] = useState<string | null>(null)
 
   const hasPerimeter = savedShape.length >= 3
@@ -255,6 +256,16 @@ export default function VolumeCatalogPage() {
     refetch()
   }
 
+  async function retireAllVolumes(item: VolumeCatalogItem) {
+    if (!window.confirm(`¿Retirar de la pared todos los volúmenes de tipo "${item.name}"?`)) return
+    setRetiringAllId(item.id)
+    await db.from('volumes')
+      .update({ status: 'retired', retired_at: new Date().toISOString() })
+      .eq('catalog_id', item.id)
+      .eq('status', 'active')
+    setRetiringAllId(null)
+  }
+
   async function deleteItem(item: VolumeCatalogItem) {
     if (!window.confirm(`¿Eliminar "${item.name}" del catálogo?`)) return
     setDeletingId(item.id)
@@ -409,6 +420,13 @@ export default function VolumeCatalogPage() {
                       className="text-zinc-400 hover:text-yellow-400 text-xs font-bold transition-colors px-2 py-1 rounded"
                     >
                       Editar
+                    </button>
+                    <button
+                      onClick={() => retireAllVolumes(item)}
+                      disabled={retiringAllId === item.id}
+                      className="text-zinc-500 hover:text-orange-400 text-xs font-bold transition-colors px-2 py-1 rounded disabled:opacity-40"
+                    >
+                      {retiringAllId === item.id ? '…' : 'Retirar todos'}
                     </button>
                     <button
                       onClick={() => deleteItem(item)}
