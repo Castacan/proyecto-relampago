@@ -471,7 +471,7 @@ export default function ChainCanvas({
     }
     setPanX(panXRef.current)
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [paintMode, volumePaintMode, activeIdx, sorted.length, size, anchors, zoom])
+  }, [paintMode, volumePaintMode, activeIdx, sorted.length, size, anchors, zoom, layout])
 
   const handleTouchEnd = useCallback((_e: KonvaEventObject<TouchEvent>) => {
     if (isPinching.current) {
@@ -585,7 +585,7 @@ export default function ChainCanvas({
       })
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [paintMode, volumePaintMode, activeIdx, sorted.length, size, anchors, zoom])
+  }, [paintMode, volumePaintMode, activeIdx, sorted.length, size, anchors, zoom, layout])
 
   // Mouse (desktop)
   const handleMouseDown = useCallback((_e: KonvaEventObject<MouseEvent>) => {
@@ -725,7 +725,7 @@ export default function ChainCanvas({
       }
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [paintMode, volumePaintMode, activeIdx, sorted])
+  }, [paintMode, volumePaintMode, activeIdx, sorted, layout])
 
   // Rueda del ratón → zoom en PC
   useEffect(() => {
