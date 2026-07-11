@@ -98,6 +98,17 @@ function ColumnChart({ items }: { items: ColItem[] }) {
   )
 }
 
+// Promedio real de vida (played_at → retired_at para retirados, → hoy para activos)
+function avgLifespan(vols: Volume[]): number {
+  if (!vols.length) return 0
+  const now = Date.now()
+  const sum = vols.reduce((acc, v) => {
+    const end = v.retired_at ? new Date(v.retired_at).getTime() : now
+    return acc + Math.max(0, (end - new Date(v.placed_at).getTime()) / 86400000)
+  }, 0)
+  return Math.round(sum / vols.length)
+}
+
 // ── Página ───────────────────────────────────────────────────────────────────
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const db = supabase as unknown as any
@@ -191,15 +202,22 @@ export default function StatsPage() {
   const activeNow   = historicalRoutes.filter(r => r.status === 'active').length
   const retiredSince = historicalRoutes.filter(r => r.status === 'retired').length
 
+  // ── Color × Grado ──────────────────────────────────────────────────────────
+  const colorGradeMatrix: Record<string, Record<string, number>> = {}
+  displayRoutes.forEach(r => {
+    if (!colorGradeMatrix[r.color]) colorGradeMatrix[r.color] = {}
+    colorGradeMatrix[r.color][r.grade] = (colorGradeMatrix[r.color][r.grade] ?? 0) + 1
+  })
+  const colorsWithRoutes = ROUTE_COLORS.filter(c => (countsByColor[c.key] ?? 0) > 0)
+
   // ── Volúmenes ──────────────────────────────────────────────────────────────
-  const volDays = volumes.map(v => getDaysOnWall(v.placed_at))
-  const volAvgDays = volDays.length ? Math.round(volDays.reduce((a, b) => a + b, 0) / volDays.length) : 0
   const historicalVolumes = allVolumes.filter(v =>
     v.status === 'active' ||
     (v.status === 'retired' && v.retired_at != null && v.retired_at >= HISTORICAL_CUTOFF)
   )
   const volActiveNow = historicalVolumes.filter(v => v.status === 'active').length
   const volRetiredSince = historicalVolumes.filter(v => v.status === 'retired').length
+  const volAvgLifespan = avgLifespan(view === 'historical' ? historicalVolumes : volumes)
 
   return (
     <div className="h-full overflow-y-auto bg-zinc-950">
@@ -263,19 +281,52 @@ export default function StatsPage() {
               <ColumnChart items={gradeItems} />
             </div>
 
+            {/* Color × Grado */}
+            {colorsWithRoutes.length > 0 && (
+              <div className="bg-zinc-900 rounded-2xl p-4 border border-zinc-800/80">
+                <h2 className="text-white font-bold text-base mb-4">Color × Grado</h2>
+                <div className="space-y-3">
+                  {colorsWithRoutes.map(c => {
+                    const grades = colorGradeMatrix[c.key] ?? {}
+                    const gradesPresent = GRADES.filter(g => (grades[g] ?? 0) > 0)
+                    return (
+                      <div key={c.key} className="flex items-center gap-2.5">
+                        <div className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: c.hex }} />
+                        <span className="text-zinc-400 text-xs w-16 shrink-0 truncate">{c.label}</span>
+                        <div className="flex flex-wrap gap-1">
+                          {gradesPresent.map(g => (
+                            <span key={g} className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-200">
+                              {g}{grades[g] > 1 && <span className="text-zinc-500 font-normal">×{grades[g]}</span>}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
+
             {/* Volúmenes */}
             <div className="bg-zinc-900 rounded-2xl p-4 border border-zinc-800/80">
               <h2 className="text-white font-bold text-base mb-3">Volúmenes</h2>
               {view === 'current' ? (
                 <div className="flex gap-3">
                   <StatCard value={volumes.length} label="Activos" sub="en el muro ahora" />
-                  <StatCard value={volDays.length ? `${volAvgDays}d` : '—'} label="Promedio" sub="días en pared" />
+                  <StatCard value={volumes.length ? `${volAvgLifespan}d` : '—'} label="Vida prom." sub="días en pared" />
                 </div>
               ) : (
-                <div className="flex gap-3">
-                  <StatCard value={historicalVolumes.length} label="Total" sub="desde jul 2026" />
-                  <StatCard value={volActiveNow} label="Activos" sub="ahora" />
-                  <StatCard value={volRetiredSince} label="Retirados" sub="desde jul 2026" />
+                <div className="space-y-3">
+                  <div className="flex gap-3">
+                    <StatCard value={historicalVolumes.length} label="Total" sub="desde jul 2026" />
+                    <StatCard value={volActiveNow} label="Activos" sub="ahora" />
+                    <StatCard value={volRetiredSince} label="Retirados" sub="desde jul 2026" />
+                  </div>
+                  <StatCard
+                    value={historicalVolumes.length ? `${volAvgLifespan}d` : '—'}
+                    label="Vida promedio"
+                    sub="días por volumen en pared"
+                  />
                 </div>
               )}
             </div>
