@@ -39,7 +39,6 @@ export default function PublicRoutePage() {
   const [loading, setLoading] = useState(true)
   const [notFound, setNotFound] = useState(false)
   const [showBeta, setShowBeta] = useState(false)
-  const [scanDebug, setScanDebug] = useState<string | null>(null)
 
   useEffect(() => {
     if (!qrId) return
@@ -62,9 +61,6 @@ export default function PublicRoutePage() {
       route_id: qr.routes.id,
       device_id: getDeviceId(),
       user_id: session?.user?.id ?? null,
-    }).then(({ error }: { error: { message: string; code: string } | null }) => {
-      if (error) setScanDebug(`ERROR ${error.code}: ${error.message}`)
-      else setScanDebug(`OK device:${getDeviceId().slice(0,8)}`)
     })
   }, [qr?.routes?.id, session?.user?.id])
 
@@ -173,11 +169,6 @@ export default function PublicRoutePage() {
         </div>
 
         {/* Send button */}
-        {scanDebug && (
-          <div className="mb-3 px-3 py-2 rounded-xl bg-zinc-800 border border-zinc-700 text-xs font-mono text-zinc-300 break-all">
-            scan: {scanDebug}
-          </div>
-        )}
         <SendButton route={route} />
 
         {/* Beta */}
