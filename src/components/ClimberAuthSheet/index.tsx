@@ -64,11 +64,12 @@ export default function ClimberAuthSheet({ isOpen, onClose, onDone, startAtSetup
     if (!displayName.trim() || !session?.user) return
     setStep('saving')
     setSaveError(null)
-    const { error } = await db.from('climbers').insert({
+    const { error } = await db.from('climbers').upsert({
       id: session.user.id,
       email: session.user.email ?? '',
       display_name: displayName.trim(),
       visible_in_leaderboard: visible,
+      updated_at: new Date().toISOString(),
     })
     if (error) {
       setSaveError('Error al guardar. Intenta de nuevo.')

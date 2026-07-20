@@ -31,13 +31,7 @@ export default function SendButton({ route }: Props) {
 
   const pts = getGradePoints(route.grade)
 
-  // Auto-open setup sheet when user just authenticated but has no climber record
-  useEffect(() => {
-    if (session?.user && !climberLoading && climber === null) {
-      setStartAtSetup(true)
-      setAuthSheetOpen(true)
-    }
-  }, [session?.user?.id, climber, climberLoading])
+  // No auto-abrimos el sheet — el usuario hace clic manualmente
 
   // Check if already sent today on mount (once session + climber are known)
   useEffect(() => {
