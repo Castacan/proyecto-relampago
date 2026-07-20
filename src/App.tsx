@@ -10,6 +10,7 @@ import VolumeCatalogPage from './pages/staff/VolumeCatalogPage'
 import { ErrorBoundary } from './components/ErrorBoundary'
 import PublicWallPage from './pages/public/PublicWallPage'
 import PublicRoutePage from './pages/public/PublicRoutePage'
+import LeaderboardDisplay from './pages/public/LeaderboardDisplay'
 import { useAuth } from './lib/auth'
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -26,6 +27,7 @@ export default function App() {
         <Route path="/login" element={<LoginPage />} />
         <Route path="/q/:qrId" element={<PublicRoutePage />} />
         <Route path="/muro" element={<PublicWallPage />} />
+        <Route path="/leaderboard/display" element={<LeaderboardDisplay />} />
         <Route
           path="/staff"
           element={

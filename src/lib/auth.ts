@@ -30,3 +30,11 @@ export async function signIn(email: string, password: string) {
 export async function signOut() {
   await supabase.auth.signOut()
 }
+
+export async function signInWithMagicLink(email: string, redirectTo: string) {
+  const { error } = await supabase.auth.signInWithOtp({
+    email,
+    options: { emailRedirectTo: redirectTo },
+  })
+  return error
+}

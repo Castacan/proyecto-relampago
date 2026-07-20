@@ -82,3 +82,32 @@ export interface VolumeCatalogItem {
   quantity: number | null
   created_at: string
 }
+
+export interface Climber {
+  id: string
+  email: string
+  display_name: string
+  visible_in_leaderboard: boolean
+  created_at: string
+}
+
+export interface Send {
+  id: string
+  user_id: string
+  route_id: string
+  sent_at: string
+  points_daily: number
+  points_monthly: number
+}
+
+export interface LeaderboardEntry {
+  display_name: string
+  total_points: number
+}
+
+export interface RecentEvent {
+  display_name: string
+  grade: string
+  color: string
+  sent_at: string
+}

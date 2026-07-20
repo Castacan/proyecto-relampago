@@ -4,13 +4,23 @@ import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../lib/auth'
 import { getColorHex } from '../../lib/colors'
 import { getFreshnessLevel, getFreshnessColor, getPublicLabel } from '../../lib/freshness'
+import { getDeviceId } from '../../lib/device'
 import VoteButtons from '../../components/VoteButtons'
+import SendButton from '../../components/SendButton'
+import type { Route } from '../../types'
 
 interface RouteData {
   id: string
   color: string
   grade: string
   placed_at: string
+  zone_id: string
+  chain_id: string | null
+  status: 'active' | 'retired'
+  retired_at: string | null
+  notes: string | null
+  blob_path: { x: number; y: number }[]
+  setter_id: string | null
   zones: { name: string } | null
   betas: { file_url: string }[]
 }
@@ -34,7 +44,7 @@ export default function PublicRoutePage() {
     if (!qrId) return
     supabase
       .from('qr_codes')
-      .select(`id, status, route_id, routes (id, color, grade, placed_at, zones (name), betas (file_url))`)
+      .select(`id, status, route_id, routes (id, color, grade, placed_at, zone_id, chain_id, status, retired_at, notes, blob_path, setter_id, zones (name), betas (file_url))`)
       .eq('id', qrId)
       .single()
       .then(({ data, error }) => {
@@ -43,6 +53,16 @@ export default function PublicRoutePage() {
         setLoading(false)
       })
   }, [qrId])
+
+  // Registrar scan para anti-gaming
+  useEffect(() => {
+    if (!qr?.routes?.id) return
+    ;(supabase as unknown as any).from('scans').insert({
+      route_id: qr.routes.id,
+      device_id: getDeviceId(),
+      user_id: session?.user?.id ?? null,
+    })
+  }, [qr?.routes?.id, session?.user?.id])
 
   if (loading) return (
     <div className="min-h-screen bg-zinc-950 flex items-center justify-center">
@@ -94,12 +114,25 @@ export default function PublicRoutePage() {
     )
   }
 
-  const route = qr!.routes!
+  const routeData = qr!.routes!
+  const route: Route = {
+    id: routeData.id,
+    color: routeData.color,
+    grade: routeData.grade,
+    placed_at: routeData.placed_at,
+    zone_id: routeData.zone_id,
+    chain_id: routeData.chain_id,
+    status: routeData.status,
+    retired_at: routeData.retired_at,
+    notes: routeData.notes,
+    blob_path: routeData.blob_path ?? [],
+    setter_id: routeData.setter_id,
+  }
   const colorHex = getColorHex(route.color)
   const level = getFreshnessLevel(route.placed_at)
   const freshnessHex = getFreshnessColor(level)
   const label = getPublicLabel(level)
-  const beta = route.betas?.[0]
+  const beta = routeData.betas?.[0]
 
   return (
     <div className="min-h-screen bg-zinc-950 flex flex-col">
@@ -118,7 +151,7 @@ export default function PublicRoutePage() {
             <h1 className="text-white font-black text-5xl font-mono leading-none tracking-tight">{route.grade}</h1>
             <p className="text-zinc-400 text-sm font-medium mt-1.5">
               {route.color.charAt(0).toUpperCase() + route.color.slice(1)}
-              {route.zones ? <span className="text-zinc-600"> · {route.zones.name}</span> : ''}
+              {routeData.zones ? <span className="text-zinc-600"> · {routeData.zones.name}</span> : ''}
             </p>
           </div>
         </div>
@@ -134,6 +167,9 @@ export default function PublicRoutePage() {
           <div className="w-2 h-2 rounded-full animate-pulse shrink-0" style={{ backgroundColor: freshnessHex }} />
           <span className="font-bold text-sm" style={{ color: freshnessHex }}>{label}</span>
         </div>
+
+        {/* Send button */}
+        <SendButton route={route} />
 
         {/* Beta */}
         <div className="mb-7">
