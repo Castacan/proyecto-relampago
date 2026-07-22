@@ -1,12 +1,15 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../lib/auth'
+import { useClimber } from '../../hooks/useClimber'
 import { getColorHex } from '../../lib/colors'
 import { getFreshnessLevel, getFreshnessColor, getPublicLabel } from '../../lib/freshness'
 import { getDeviceId } from '../../lib/device'
 import VoteButtons from '../../components/VoteButtons'
 import SendButton from '../../components/SendButton'
+import LoginBanner from '../../components/LoginBanner'
+import ClimberAuthSheet from '../../components/ClimberAuthSheet'
 import type { Route } from '../../types'
 
 interface RouteData {
@@ -35,10 +38,27 @@ interface QrData {
 export default function PublicRoutePage() {
   const { qrId } = useParams<{ qrId: string }>()
   const { session } = useAuth()
+  const { climber, loading: climberLoading, refetch: refetchClimber } = useClimber()
   const [qr, setQr] = useState<QrData | null>(null)
   const [loading, setLoading] = useState(true)
   const [notFound, setNotFound] = useState(false)
   const [showBeta, setShowBeta] = useState(false)
+  const [authSheetOpen, setAuthSheetOpen] = useState(false)
+  const [startAtSetup, setStartAtSetup] = useState(false)
+
+  // Detectar llegada vía magic link para lanzar onboarding automático
+  const isFromMagicLink = useRef(
+    typeof window !== 'undefined' && window.location.hash.includes('access_token')
+  )
+  useEffect(() => {
+    if (!isFromMagicLink.current) return
+    if (!session?.user || climberLoading) return
+    isFromMagicLink.current = false
+    if (!climber) {
+      setStartAtSetup(true)
+      setAuthSheetOpen(true)
+    }
+  }, [session?.user?.id, climberLoading, climber])
 
   useEffect(() => {
     if (!qrId) return
@@ -63,6 +83,21 @@ export default function PublicRoutePage() {
       user_id: session?.user?.id ?? null,
     })
   }, [qr?.routes?.id, session?.user?.id])
+
+  function handleNeedAuth() {
+    setStartAtSetup(false)
+    setAuthSheetOpen(true)
+  }
+
+  function handleNeedOnboarding() {
+    setStartAtSetup(true)
+    setAuthSheetOpen(true)
+  }
+
+  function handleAuthDone() {
+    setAuthSheetOpen(false)
+    refetchClimber()
+  }
 
   if (loading) return (
     <div className="min-h-screen bg-zinc-950 flex items-center justify-center">
@@ -104,10 +139,7 @@ export default function PublicRoutePage() {
         <div className="w-16 h-16 bg-zinc-800 rounded-2xl flex items-center justify-center mb-5 text-3xl border border-zinc-700/50">🏁</div>
         <h1 className="text-white font-black text-xl mb-2 tracking-tight">Esta ruta ya no está</h1>
         <p className="text-zinc-500 text-sm mb-8">La ruta fue retirada. ¡Hay nuevas esperándote!</p>
-        <Link
-          to="/muro"
-          className="px-6 py-3.5 bg-yellow-400 hover:bg-yellow-300 text-zinc-950 font-bold rounded-2xl text-sm shadow-lg shadow-yellow-400/20 active:scale-95 transition-all"
-        >
+        <Link to="/muro" className="px-6 py-3.5 bg-yellow-400 hover:bg-yellow-300 text-zinc-950 font-bold rounded-2xl text-sm shadow-lg shadow-yellow-400/20 active:scale-95 transition-all">
           Ver el muro →
         </Link>
       </div>
@@ -139,7 +171,30 @@ export default function PublicRoutePage() {
       {/* Color bar top */}
       <div className="h-1.5 shrink-0" style={{ backgroundColor: colorHex }} />
 
-      <div className="flex-1 flex flex-col max-w-md mx-auto w-full px-5 py-7">
+      {/* Mini header: volver al muro + avatar usuario */}
+      <div className="shrink-0 flex items-center justify-between px-5 pt-4 pb-1">
+        <Link
+          to="/muro"
+          className="flex items-center gap-1.5 text-zinc-500 hover:text-zinc-300 text-sm font-medium transition-colors"
+        >
+          ← Muro
+        </Link>
+        {session?.user && (
+          <Link
+            to="/mi-cuenta"
+            className="w-8 h-8 rounded-full bg-zinc-800 border border-zinc-700/60 flex items-center justify-center text-zinc-300 text-xs font-black hover:border-zinc-500 transition-colors"
+          >
+            {climber?.display_name?.[0]?.toUpperCase() ?? '⚡'}
+          </Link>
+        )}
+      </div>
+
+      {/* Banner de login (solo si no hay sesión) */}
+      {!session?.user && (
+        <LoginBanner onEnter={handleNeedAuth} />
+      )}
+
+      <div className="flex-1 flex flex-col max-w-md mx-auto w-full px-5 py-5">
 
         {/* Route identity */}
         <div className="flex items-center gap-4 mb-7">
@@ -159,17 +214,20 @@ export default function PublicRoutePage() {
         {/* Freshness badge */}
         <div
           className="inline-flex items-center gap-2.5 px-4 py-2.5 rounded-2xl mb-7 self-start border"
-          style={{
-            backgroundColor: freshnessHex + '15',
-            borderColor: freshnessHex + '40',
-          }}
+          style={{ backgroundColor: freshnessHex + '15', borderColor: freshnessHex + '40' }}
         >
           <div className="w-2 h-2 rounded-full animate-pulse shrink-0" style={{ backgroundColor: freshnessHex }} />
           <span className="font-bold text-sm" style={{ color: freshnessHex }}>{label}</span>
         </div>
 
         {/* Send button */}
-        <SendButton route={route} />
+        <SendButton
+          route={route}
+          climber={climber}
+          climberLoading={climberLoading}
+          onNeedAuth={handleNeedAuth}
+          onNeedOnboarding={handleNeedOnboarding}
+        />
 
         {/* Beta */}
         <div className="mb-7">
@@ -200,15 +258,19 @@ export default function PublicRoutePage() {
       </div>
 
       {/* Footer */}
-      <div className="flex items-center justify-between px-5 py-4 border-t border-zinc-800/40">
+      <div className="flex items-center justify-center px-5 py-4 border-t border-zinc-800/40">
         <div className="flex items-center gap-1.5">
           <span className="text-yellow-400 text-xs">⚡</span>
-          <span className="text-zinc-600 text-xs font-medium">Relámpago</span>
+          <span className="text-zinc-600 text-xs font-medium">Jaibamuro · Relámpago</span>
         </div>
-        <Link to="/muro" className="text-zinc-600 text-xs font-medium hover:text-zinc-300 transition-colors">
-          Ver todo el muro →
-        </Link>
       </div>
+
+      <ClimberAuthSheet
+        isOpen={authSheetOpen}
+        onClose={() => setAuthSheetOpen(false)}
+        onDone={handleAuthDone}
+        startAtSetup={startAtSetup}
+      />
     </div>
   )
 }

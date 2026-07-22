@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../lib/auth'
 import { signInWithMagicLink } from '../../lib/auth'
@@ -10,11 +10,12 @@ interface Props {
   isOpen: boolean
   onClose: () => void
   onDone: () => void
-  /** Si ya hay sesión activa pero no hay registro en climbers, saltamos al paso de setup */
   startAtSetup?: boolean
 }
 
 type Step = 'email' | 'sent' | 'setup' | 'saving'
+
+const RESEND_DELAY = 30
 
 export default function ClimberAuthSheet({ isOpen, onClose, onDone, startAtSetup }: Props) {
   const { session } = useAuth()
@@ -25,6 +26,9 @@ export default function ClimberAuthSheet({ isOpen, onClose, onDone, startAtSetup
   const [displayName, setDisplayName] = useState('')
   const [visible, setVisible] = useState(true)
   const [saveError, setSaveError] = useState<string | null>(null)
+  const [countdown, setCountdown] = useState(RESEND_DELAY)
+  const [resending, setResending] = useState(false)
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   // Cuando la sesión se activa (magic link clickeado), avanzar a setup
   useEffect(() => {
@@ -32,6 +36,22 @@ export default function ClimberAuthSheet({ isOpen, onClose, onDone, startAtSetup
       setStep('setup')
     }
   }, [session?.user?.id, step])
+
+  // Countdown timer para reenvío
+  useEffect(() => {
+    if (step !== 'sent') return
+    setCountdown(RESEND_DELAY)
+    timerRef.current = setInterval(() => {
+      setCountdown(prev => {
+        if (prev <= 1) {
+          clearInterval(timerRef.current!)
+          return 0
+        }
+        return prev - 1
+      })
+    }, 1000)
+    return () => { if (timerRef.current) clearInterval(timerRef.current) }
+  }, [step])
 
   // Resetear estado al abrir
   useEffect(() => {
@@ -57,6 +77,22 @@ export default function ClimberAuthSheet({ isOpen, onClose, onDone, startAtSetup
       setSendError('No se pudo enviar el link. Verifica tu correo.')
     } else {
       setStep('sent')
+    }
+  }
+
+  async function handleResend() {
+    if (!email.trim()) return
+    setResending(true)
+    const error = await signInWithMagicLink(email.trim(), window.location.href)
+    setResending(false)
+    if (!error) {
+      setCountdown(RESEND_DELAY)
+      timerRef.current = setInterval(() => {
+        setCountdown(prev => {
+          if (prev <= 1) { clearInterval(timerRef.current!); return 0 }
+          return prev - 1
+        })
+      }, 1000)
     }
   }
 
@@ -125,11 +161,30 @@ export default function ClimberAuthSheet({ isOpen, onClose, onDone, startAtSetup
                 Te enviamos un link a <span className="text-white font-semibold">{email}</span>.
                 <br />Ábrelo en este mismo celular para continuar.
               </p>
-              <p className="text-zinc-600 text-xs mt-4">El link expira en 1 hora.</p>
+              <p className="text-zinc-600 text-xs mt-3">El link expira en 1 hora.</p>
             </div>
-            <button onClick={onClose} className="w-full py-3 text-zinc-500 hover:text-zinc-300 text-sm font-medium transition-colors mt-4">
-              Cerrar
-            </button>
+
+            <div className="mt-4 space-y-2">
+              {countdown > 0 ? (
+                <p className="text-center text-zinc-600 text-xs">
+                  Puedes reenviar en {countdown}s
+                </p>
+              ) : (
+                <button
+                  onClick={handleResend}
+                  disabled={resending}
+                  className="w-full py-3 rounded-2xl bg-zinc-800 border border-zinc-700/50 text-zinc-300 text-sm font-semibold hover:bg-zinc-700 transition-all disabled:opacity-40 active:scale-95"
+                >
+                  {resending ? 'Reenviando...' : 'Reenviar link'}
+                </button>
+              )}
+              <button
+                onClick={() => setStep('email')}
+                className="w-full py-2.5 text-zinc-600 hover:text-zinc-400 text-sm font-medium transition-colors"
+              >
+                Cambiar correo
+              </button>
+            </div>
           </>
         )}
 
@@ -159,7 +214,7 @@ export default function ClimberAuthSheet({ isOpen, onClose, onDone, startAtSetup
               </div>
             </button>
             <p className="text-zinc-600 text-[10px] leading-relaxed mb-5">
-              Al continuar aceptas que tus datos (nombre y actividad) se usen para el leaderboard de El Muro conforme al aviso de privacidad disponible en recepción. Puedes cambiar esta preferencia después.
+              Al continuar aceptas que tus datos (nombre y actividad) se usen para el leaderboard de Jaibamuro conforme al aviso de privacidad disponible en recepción. Puedes cambiar esta preferencia después.
             </p>
             {saveError && <p className="text-red-400 text-xs mb-3">{saveError}</p>}
             <button
