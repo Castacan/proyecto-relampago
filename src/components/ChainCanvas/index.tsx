@@ -1144,10 +1144,28 @@ export default function ChainCanvas({
       if (!moved) break
     }
 
-    // Clamp: badges no más de 110px arriba del ancla, y nunca fuera del canvas superior
+    // Pull-down: conector máximo 50px. Después, separación horizontal para resolver solapamientos nuevos.
+    const MAX_PULL = 50
     for (const b of badges) {
-      b.by = Math.max(b.anchorY - 110 - BADGE_H, b.by)
+      b.by = Math.max(b.anchorY - MAX_PULL - BADGE_H, b.by)
       b.by = Math.max(8, b.by)
+    }
+    for (let iter = 0; iter < 30; iter++) {
+      let moved = false
+      for (let i = 0; i < badges.length; i++) {
+        for (let j = i + 1; j < badges.length; j++) {
+          const a = badges[i], b = badges[j]
+          if (Math.abs(a.by - b.by) >= BADGE_H + GAP) continue
+          const ox = BADGE_W + GAP - Math.abs(a.bx - b.bx)
+          if (ox > 0) {
+            moved = true
+            const push = ox / 2 + 1
+            if (a.bx <= b.bx) { a.bx -= push; b.bx += push }
+            else { a.bx += push; b.bx -= push }
+          }
+        }
+      }
+      if (!moved) break
     }
 
     const badgeMap = new Map(badges.map(b => [b.key, b]))
