@@ -21,6 +21,7 @@ export default function PublicWallPage() {
 
   const [activeZoneId, setActiveZoneId] = useState<string | null>(null)
   const [showMap, setShowMap] = useState(false)
+  const [jumpZoneId, setJumpZoneId] = useState<string | null>(null)
 
   function handleRouteClick(route: Route) {
     const qrId = qrByRoute[route.id]
@@ -61,13 +62,17 @@ export default function PublicWallPage() {
               onBlobComplete={() => {}}
               onRouteClick={handleRouteClick}
               onActiveZoneChange={setActiveZoneId}
+              jumpToZoneId={jumpZoneId}
             />
 
             {showMap ? (
               <ZoneMap
                 zones={allZones}
                 routes={routes}
-                onZoneSelect={() => {}}
+                onZoneSelect={zone => {
+                  const inChain = chainZones.find(z => z.id === zone.id)
+                  if (inChain) setJumpZoneId(zone.id)
+                }}
                 mini={true}
                 selectedZoneIds={activeZoneId ? [activeZoneId] : []}
                 onCollapse={() => setShowMap(false)}
