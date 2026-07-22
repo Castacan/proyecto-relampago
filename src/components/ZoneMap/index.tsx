@@ -10,6 +10,7 @@ interface Props {
   assignQrHint?: boolean
   mini?: boolean
   selectedZoneIds?: string[]
+  onCollapse?: () => void
 }
 
 function getZoneFreshnessColor(zone: Zone, routes: Route[]): string {
@@ -100,12 +101,17 @@ function buildDisplayEntries(zones: Zone[], routes: Route[], selectedZoneIds: st
 }
 
 // ── Mini overlay ──────────────────────────────────────────────────────────
-function ZoneMapMini({ zones, routes, onZoneSelect, selectedZoneIds }: Props) {
+function ZoneMapMini({ zones, routes, onZoneSelect, selectedZoneIds, onCollapse }: Props) {
   const entries = buildDisplayEntries(zones, routes, selectedZoneIds ?? [])
 
   return (
     <div className="absolute top-3 right-3 z-30 bg-zinc-950/95 backdrop-blur-sm rounded-2xl border border-zinc-800/60 shadow-2xl p-2.5">
-      <p className="text-zinc-600 text-[8px] font-bold uppercase tracking-widest mb-1.5 px-0.5 select-none">Mapa</p>
+      <div className="flex items-center justify-between mb-1.5 px-0.5">
+        <p className="text-zinc-600 text-[8px] font-bold uppercase tracking-widest select-none">Mapa</p>
+        {onCollapse && (
+          <button onClick={onCollapse} className="text-zinc-600 hover:text-zinc-300 leading-none text-[10px] font-bold ml-2">✕</button>
+        )}
+      </div>
       <svg viewBox="0 0 400 320" width="148" style={{ display: 'block' }} preserveAspectRatio="xMidYMid meet">
         <polygon points="30,15 368,15 320,300 80,300" fill="#18181b" stroke="#3f3f46" strokeWidth="1.5" />
         <rect x="108" y="82" width="184" height="213" fill="#09090b" rx="2" />
@@ -131,11 +137,11 @@ function ZoneMapMini({ zones, routes, onZoneSelect, selectedZoneIds }: Props) {
 }
 
 // ── Full-screen selector ──────────────────────────────────────────────────
-export default function ZoneMap({ zones, routes, onZoneSelect, assignQrHint, mini, selectedZoneIds }: Props) {
+export default function ZoneMap({ zones, routes, onZoneSelect, assignQrHint, mini, selectedZoneIds, onCollapse }: Props) {
   const [hovered, setHovered] = useState<string | null>(null)
 
   if (mini) {
-    return <ZoneMapMini zones={zones} routes={routes} onZoneSelect={onZoneSelect} selectedZoneIds={selectedZoneIds} />
+    return <ZoneMapMini zones={zones} routes={routes} onZoneSelect={onZoneSelect} selectedZoneIds={selectedZoneIds} onCollapse={onCollapse} />
   }
 
   const entries = buildDisplayEntries(zones, routes, selectedZoneIds ?? [])

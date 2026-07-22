@@ -20,6 +20,7 @@ export default function PublicWallPage() {
   const { zones: chainZones, anchors, loading: chainLoading } = useChain(defaultChainId)
 
   const [activeZoneId, setActiveZoneId] = useState<string | null>(null)
+  const [showMap, setShowMap] = useState(false)
 
   function handleRouteClick(route: Route) {
     const qrId = qrByRoute[route.id]
@@ -62,13 +63,23 @@ export default function PublicWallPage() {
               onActiveZoneChange={setActiveZoneId}
             />
 
-            <ZoneMap
-              zones={allZones}
-              routes={routes}
-              onZoneSelect={() => {}}
-              mini={true}
-              selectedZoneIds={activeZoneId ? [activeZoneId] : []}
-            />
+            {showMap ? (
+              <ZoneMap
+                zones={allZones}
+                routes={routes}
+                onZoneSelect={() => {}}
+                mini={true}
+                selectedZoneIds={activeZoneId ? [activeZoneId] : []}
+                onCollapse={() => setShowMap(false)}
+              />
+            ) : (
+              <button
+                onClick={() => setShowMap(true)}
+                className="absolute top-3 right-3 z-30 bg-zinc-950/95 backdrop-blur-sm border border-zinc-800/60 rounded-xl px-3 py-2 text-zinc-500 hover:text-zinc-300 transition-colors"
+              >
+                <span className="text-[9px] font-bold uppercase tracking-widest">Mapa</span>
+              </button>
+            )}
 
             {activeZoneId && (
               <div className="absolute top-3 left-3 z-30 flex items-center gap-2 bg-zinc-900/95 backdrop-blur-sm border border-zinc-700/60 rounded-xl px-3.5 py-2.5 pointer-events-none">
