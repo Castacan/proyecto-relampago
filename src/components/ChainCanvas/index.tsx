@@ -1144,8 +1144,8 @@ export default function ChainCanvas({
       if (!moved) break
     }
 
-    // Pull-down: conector máximo 50px. Después, separación horizontal para resolver solapamientos nuevos.
-    const MAX_PULL = 50
+    // Pull-down: conector máximo proporcional al zoom (50px @ zoom=1). Después, separación horizontal.
+    const MAX_PULL = Math.round(50 * Math.max(0.4, zoom))
     for (const b of badges) {
       b.by = Math.max(b.anchorY - MAX_PULL - BADGE_H, b.by)
       b.by = Math.max(8, b.by)
