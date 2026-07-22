@@ -12,7 +12,7 @@ const TRANSITION_MS = 240
 const STROKE_W = 8
 const MIN_POINT_GAP = 4
 const FALLBACK_COLOR = '#1a2433'
-const MIN_ZOOM = 0.8
+const MIN_ZOOM = 0.35
 const MAX_ZOOM = 5
 
 
@@ -1142,6 +1142,12 @@ export default function ChainCanvas({
         }
       }
       if (!moved) break
+    }
+
+    // Clamp: badges no más de 110px arriba del ancla, y nunca fuera del canvas superior
+    for (const b of badges) {
+      b.by = Math.max(b.anchorY - 110 - BADGE_H, b.by)
+      b.by = Math.max(8, b.by)
     }
 
     const badgeMap = new Map(badges.map(b => [b.key, b]))
