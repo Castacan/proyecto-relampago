@@ -35,7 +35,7 @@ export default function PublicWallPage() {
           <div className="w-7 h-7 bg-yellow-400 rounded-lg flex items-center justify-center">
             <span className="text-sm leading-none">⚡</span>
           </div>
-          <span className="text-white font-bold text-sm tracking-tight">Relámpago</span>
+          <span className="text-white font-bold text-sm tracking-tight">Jaibamuro</span>
         </div>
         <div className="flex items-center gap-2 bg-zinc-900 rounded-full px-3.5 py-1.5 border border-zinc-800/60">
           <div className="w-1.5 h-1.5 rounded-full bg-green-400" />

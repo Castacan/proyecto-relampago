@@ -29,7 +29,7 @@ export default function LoginPage() {
         <div className="w-18 h-18 bg-yellow-400 rounded-3xl flex items-center justify-center mx-auto mb-5 shadow-2xl shadow-yellow-400/30">
           <span className="text-4xl">⚡</span>
         </div>
-        <h1 className="text-white text-3xl font-black tracking-tight">Relámpago</h1>
+        <h1 className="text-white text-3xl font-black tracking-tight">Jaibamuro</h1>
         <p className="text-zinc-500 text-sm font-medium mt-1.5">Acceso para setters del gym</p>
       </div>
 

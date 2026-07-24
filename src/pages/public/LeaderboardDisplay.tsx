@@ -125,7 +125,7 @@ export default function LeaderboardDisplay() {
       {/* Footer */}
       <div className="shrink-0 h-10 bg-zinc-900 border-t border-zinc-800 flex items-center justify-center gap-2">
         <span className="text-yellow-400 text-sm">⚡</span>
-        <span className="text-zinc-600 text-sm font-medium">El Muro · Relámpago</span>
+        <span className="text-zinc-600 text-sm font-medium">El Muro · Jaibamuro</span>
       </div>
     </div>
   )

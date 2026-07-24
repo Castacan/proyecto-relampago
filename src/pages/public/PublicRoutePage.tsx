@@ -262,7 +262,7 @@ export default function PublicRoutePage() {
       <div className="flex items-center justify-center px-5 py-4 border-t border-zinc-800/40">
         <div className="flex items-center gap-1.5">
           <span className="text-yellow-400 text-xs">⚡</span>
-          <span className="text-zinc-600 text-xs font-medium">Jaibamuro · Relámpago</span>
+          <span className="text-zinc-600 text-xs font-medium">Jaibamuro</span>
         </div>
       </div>
 

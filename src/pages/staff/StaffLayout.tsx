@@ -14,7 +14,7 @@ export default function StaffLayout() {
           <div className="w-7 h-7 bg-yellow-400 rounded-lg flex items-center justify-center shrink-0">
             <span className="text-sm leading-none">⚡</span>
           </div>
-          <span className="text-white font-bold text-sm tracking-tight">Relámpago</span>
+          <span className="text-white font-bold text-sm tracking-tight">Jaibamuro</span>
           <span className="text-zinc-600 text-[11px] font-medium bg-zinc-800 px-1.5 py-0.5 rounded-md ml-0.5">staff</span>
         </div>
         <button
