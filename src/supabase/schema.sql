@@ -125,3 +125,68 @@ $$;
 CREATE OR REPLACE TRIGGER on_auth_user_created
   AFTER INSERT ON auth.users
   FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
+
+-- ============================================================
+-- RPCs: cuenta del cliente (/mi-cuenta)
+-- Ya viven en producción (creadas desde el SQL Editor del dashboard,
+-- sin pasar por este archivo). Documentadas aquí a partir del
+-- "Show definition" del dashboard el 2026-07-24; firma (params/tipos
+-- de retorno) reconstruida por inferencia — el dashboard solo mostró
+-- el cuerpo, no el CREATE FUNCTION completo. Verificar contra
+-- information_schema.routines si se necesita exactitud total.
+-- Dependen de las tablas climbers, sends (ver memoria de proyecto),
+-- que tampoco están definidas en este schema.sql desactualizado.
+-- ============================================================
+
+CREATE OR REPLACE FUNCTION public.get_my_stats()
+RETURNS JSONB LANGUAGE plpgsql SECURITY DEFINER AS $$
+DECLARE
+  v_uid UUID := auth.uid();
+  v_day_start TIMESTAMPTZ;
+  v_month_start TIMESTAMPTZ;
+  v_daily_points BIGINT;
+  v_monthly_points BIGINT;
+  v_daily_rank BIGINT;
+  v_monthly_rank BIGINT;
+BEGIN
+  IF v_uid IS NULL THEN RETURN '{"error":"not_authenticated"}'::JSONB; END IF;
+  v_day_start   := date_trunc('day',   now() AT TIME ZONE 'America/Mexico_City') AT TIME ZONE 'America/Mexico_City';
+  v_month_start := date_trunc('month', now() AT TIME ZONE 'America/Mexico_City') AT TIME ZONE 'America/Mexico_City';
+  SELECT COALESCE(SUM(points_daily),   0) INTO v_daily_points   FROM sends WHERE user_id = v_uid AND sent_at >= v_day_start;
+  SELECT COALESCE(SUM(points_monthly), 0) INTO v_monthly_points FROM sends WHERE user_id = v_uid AND sent_at >= v_month_start;
+  SELECT COUNT(*) + 1 INTO v_daily_rank FROM (
+    SELECT s.user_id FROM sends s JOIN climbers c ON c.id = s.user_id
+    WHERE s.sent_at >= v_day_start AND c.visible_in_leaderboard = true
+    GROUP BY s.user_id HAVING SUM(s.points_daily) > v_daily_points
+  ) sub;
+  SELECT COUNT(*) + 1 INTO v_monthly_rank FROM (
+    SELECT s.user_id FROM sends s JOIN climbers c ON c.id = s.user_id
+    WHERE s.sent_at >= v_month_start AND c.visible_in_leaderboard = true AND s.points_monthly > 0
+    GROUP BY s.user_id HAVING SUM(s.points_monthly) > v_monthly_points
+  ) sub;
+  RETURN jsonb_build_object(
+    'daily_points',  v_daily_points,
+    'monthly_points', v_monthly_points,
+    'daily_rank',  CASE WHEN v_daily_points  > 0 THEN v_daily_rank  ELSE NULL END,
+    'monthly_rank', CASE WHEN v_monthly_points > 0 THEN v_monthly_rank ELSE NULL END
+  );
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION public.get_my_sends(lim INT DEFAULT 20)
+RETURNS TABLE (
+  id UUID,
+  sent_at TIMESTAMPTZ,
+  points_daily INT,
+  points_monthly INT,
+  grade TEXT,
+  color TEXT,
+  zone_name TEXT
+) LANGUAGE sql SECURITY DEFINER STABLE AS $$
+  SELECT s.id, s.sent_at, s.points_daily, s.points_monthly, r.grade, r.color, z.name AS zone_name
+  FROM sends s
+  JOIN routes r ON r.id = s.route_id
+  LEFT JOIN zones z ON z.id = r.zone_id
+  WHERE s.user_id = auth.uid()
+  ORDER BY s.sent_at DESC LIMIT lim;
+$$;
