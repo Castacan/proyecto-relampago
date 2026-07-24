@@ -3,6 +3,7 @@ import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../lib/auth'
 import { getGradePoints } from '../../lib/points'
 import { getDeviceId } from '../../lib/device'
+import ConfirmScanModal from '../ConfirmScanModal'
 import type { Climber, Route } from '../../types'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -10,6 +11,7 @@ const db = supabase as unknown as any
 
 interface Props {
   route: Route
+  qrId: string
   climber: Climber | null
   climberLoading: boolean
   onNeedAuth: () => void
@@ -23,10 +25,11 @@ interface SuccessData {
   points_monthly: number
 }
 
-export default function SendButton({ route, climber, climberLoading, onNeedAuth, onNeedOnboarding }: Props) {
+export default function SendButton({ route, qrId, climber, climberLoading, onNeedAuth, onNeedOnboarding }: Props) {
   const { session } = useAuth()
   const [sendState, setSendState] = useState<SendState>('idle')
   const [successData, setSuccessData] = useState<SuccessData | null>(null)
+  const [scanModalOpen, setScanModalOpen] = useState(false)
 
   const pts = getGradePoints(route.grade)
 
@@ -63,6 +66,11 @@ export default function SendButton({ route, climber, climberLoading, onNeedAuth,
       setSuccessData({ points_daily: res.points_daily!, points_monthly: res.points_monthly! })
       setSendState('success')
     }
+  }
+
+  function handleScanConfirmed() {
+    setScanModalOpen(false)
+    handleSend()
   }
 
   // Mientras carga la info del climber, no mostramos nada
@@ -132,11 +140,17 @@ export default function SendButton({ route, climber, climberLoading, onNeedAuth,
       {sendState === 'no_scan' && (
         <div className="w-full">
           <div className="py-3.5 rounded-2xl bg-zinc-800 border border-orange-500/30 text-center mb-3">
-            <p className="text-orange-400 font-bold text-sm">Vuelve a escanear el QR</p>
-            <p className="text-zinc-500 text-xs mt-0.5">Necesitas escanear el QR junto a la ruta para confirmar el send.</p>
+            <p className="text-orange-400 font-bold text-sm">Confirma que estás junto a la ruta</p>
+            <p className="text-zinc-500 text-xs mt-0.5">Escanea el QR de la ruta para confirmar el send.</p>
           </div>
+          <button
+            onClick={() => setScanModalOpen(true)}
+            className="w-full py-4 rounded-2xl bg-yellow-400 hover:bg-yellow-300 text-zinc-950 font-black text-sm transition-all active:scale-[0.97] mb-2"
+          >
+            📷 Escanear QR
+          </button>
           <button onClick={() => setSendState('idle')} className="w-full py-3 text-zinc-500 hover:text-zinc-300 text-sm font-medium transition-colors">
-            Intentar de nuevo
+            Cancelar
           </button>
         </div>
       )}
@@ -150,6 +164,16 @@ export default function SendButton({ route, climber, climberLoading, onNeedAuth,
             Intentar de nuevo
           </button>
         </div>
+      )}
+
+      {scanModalOpen && session?.user && (
+        <ConfirmScanModal
+          qrId={qrId}
+          routeId={route.id}
+          userId={session.user.id}
+          onConfirmed={handleScanConfirmed}
+          onClose={() => setScanModalOpen(false)}
+        />
       )}
     </div>
   )

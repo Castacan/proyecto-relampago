@@ -38,3 +38,8 @@ export async function signInWithMagicLink(email: string, redirectTo: string) {
   })
   return error
 }
+
+export async function verifyEmailOtp(email: string, token: string) {
+  const { error } = await supabase.auth.verifyOtp({ email, token, type: 'email' })
+  return error
+}

@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../lib/auth'
-import { signInWithMagicLink } from '../../lib/auth'
+import { signInWithMagicLink, verifyEmailOtp } from '../../lib/auth'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const db = supabase as unknown as any
@@ -28,6 +28,9 @@ export default function ClimberAuthSheet({ isOpen, onClose, onDone, startAtSetup
   const [saveError, setSaveError] = useState<string | null>(null)
   const [countdown, setCountdown] = useState(RESEND_DELAY)
   const [resending, setResending] = useState(false)
+  const [code, setCode] = useState('')
+  const [verifyingCode, setVerifyingCode] = useState(false)
+  const [codeError, setCodeError] = useState<string | null>(null)
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   // Cuando la sesión se activa (magic link clickeado), avanzar a setup
@@ -62,6 +65,8 @@ export default function ClimberAuthSheet({ isOpen, onClose, onDone, startAtSetup
       setDisplayName('')
       setVisible(true)
       setSaveError(null)
+      setCode('')
+      setCodeError(null)
     }
   }, [isOpen, startAtSetup])
 
@@ -94,6 +99,18 @@ export default function ClimberAuthSheet({ isOpen, onClose, onDone, startAtSetup
         })
       }, 1000)
     }
+  }
+
+  async function handleVerifyCode() {
+    if (code.trim().length < 6 || !email.trim()) return
+    setVerifyingCode(true)
+    setCodeError(null)
+    const error = await verifyEmailOtp(email.trim(), code.trim())
+    setVerifyingCode(false)
+    if (error) {
+      setCodeError('Código incorrecto o expirado. Intenta de nuevo.')
+    }
+    // Si es correcto, useAuth detecta la sesión y el useEffect de arriba avanza a 'setup'
   }
 
   async function handleSaveProfile() {
@@ -164,7 +181,34 @@ export default function ClimberAuthSheet({ isOpen, onClose, onDone, startAtSetup
               <p className="text-zinc-600 text-xs mt-3">El link expira en 1 hora.</p>
             </div>
 
-            <div className="mt-4 space-y-2">
+            <div className="mt-2 mb-5">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="flex-1 h-px bg-zinc-800" />
+                <span className="text-zinc-600 text-[11px] font-semibold uppercase tracking-widest">o ingresa el código</span>
+                <div className="flex-1 h-px bg-zinc-800" />
+              </div>
+              <input
+                type="text"
+                inputMode="numeric"
+                autoComplete="one-time-code"
+                value={code}
+                onChange={e => { setCode(e.target.value.replace(/\D/g, '').slice(0, 6)); setCodeError(null) }}
+                onKeyDown={e => { if (e.key === 'Enter') handleVerifyCode() }}
+                placeholder="000000"
+                maxLength={6}
+                className="w-full bg-zinc-800 text-white rounded-xl px-4 py-3.5 text-center text-2xl font-black tracking-[0.3em] mb-2 outline-none border border-zinc-700/50 hover:border-zinc-600 focus:border-yellow-400/60 transition-all placeholder:text-zinc-700"
+              />
+              {codeError && <p className="text-red-400 text-xs mb-2 text-center">{codeError}</p>}
+              <button
+                onClick={handleVerifyCode}
+                disabled={verifyingCode || code.length < 6}
+                className="w-full py-3.5 rounded-2xl bg-yellow-400 hover:bg-yellow-300 text-zinc-950 font-bold text-sm transition-all disabled:opacity-40 active:scale-95"
+              >
+                {verifyingCode ? 'Verificando...' : 'Confirmar código'}
+              </button>
+            </div>
+
+            <div className="space-y-2">
               {countdown > 0 ? (
                 <p className="text-center text-zinc-600 text-xs">
                   Puedes reenviar en {countdown}s

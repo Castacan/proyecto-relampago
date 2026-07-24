@@ -74,6 +74,12 @@ Sin esto, los magic links no redirigen correctamente.
 
 ## Paso 7 — Actualizar el template del correo en Supabase
 
+**Importante:** el template incluye `{{ .Token }}`, el código de 6 dígitos que la app
+usa como alternativa al link (para cuando el link se abre en el navegador embebido
+de la app de correo y no comparte sesión con el navegador real del teléfono — un
+problema común en Android/iOS). Si ya tenías este template pegado desde antes de
+2026-07-24, hay que actualizarlo para que incluya el código.
+
 1. Supabase Dashboard → **Authentication** → **Email Templates** → **Magic Link**.
 2. Reemplazar con el siguiente HTML:
 
@@ -117,8 +123,15 @@ Sin esto, los magic links no redirigen correctamente.
                 ENTRAR A JAIBAMURO ⚡
               </a>
 
-              <p style="color:#52525b;font-size:12px;text-align:center;margin:24px 0 0;line-height:1.6;">
-                Este link expira en 1 hora y solo puede usarse una vez.<br/>
+              <p style="color:#52525b;font-size:12px;text-align:center;margin:24px 0 8px;line-height:1.6;">
+                ¿El botón no abre bien desde tu app de correo? Usa este código en la pantalla donde pediste el acceso:
+              </p>
+              <p style="color:#facc15;font-size:28px;font-weight:900;text-align:center;letter-spacing:0.3em;margin:0 0 20px;font-family:monospace;">
+                {{ .Token }}
+              </p>
+
+              <p style="color:#52525b;font-size:12px;text-align:center;margin:0;line-height:1.6;">
+                El link y el código expiran en 1 hora y solo pueden usarse una vez.<br/>
                 Si no pediste este correo, puedes ignorarlo.
               </p>
             </td>
@@ -152,6 +165,7 @@ Sin esto, los magic links no redirigen correctamente.
 3. Ingresar un correo real.
 4. Verificar que el correo llegue desde `hola@relampago.mx` con el diseño correcto.
 5. Hacer clic en el botón → debe regresar a la ruta que estabas viendo.
+6. Por separado, probar el código: pedir el link de nuevo, copiar el código de 6 dígitos del correo y pegarlo en el campo "o ingresa el código" sin tocar el botón — debe iniciar sesión igual, sin salir de la pestaña.
 
 ---
 

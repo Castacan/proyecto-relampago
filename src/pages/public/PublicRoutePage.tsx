@@ -223,6 +223,7 @@ export default function PublicRoutePage() {
         {/* Send button */}
         <SendButton
           route={route}
+          qrId={qrId!}
           climber={climber}
           climberLoading={climberLoading}
           onNeedAuth={handleNeedAuth}
