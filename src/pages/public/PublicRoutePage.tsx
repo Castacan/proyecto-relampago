@@ -25,7 +25,6 @@ interface RouteData {
   blob_path: { x: number; y: number }[]
   setter_id: string | null
   zones: { name: string } | null
-  betas: { file_url: string }[]
 }
 
 interface QrData {
@@ -42,7 +41,6 @@ export default function PublicRoutePage() {
   const [qr, setQr] = useState<QrData | null>(null)
   const [loading, setLoading] = useState(true)
   const [notFound, setNotFound] = useState(false)
-  const [showBeta, setShowBeta] = useState(false)
   const [authSheetOpen, setAuthSheetOpen] = useState(false)
   const [startAtSetup, setStartAtSetup] = useState(false)
 
@@ -64,7 +62,7 @@ export default function PublicRoutePage() {
     if (!qrId) return
     supabase
       .from('qr_codes')
-      .select(`id, status, route_id, routes (id, color, grade, placed_at, zone_id, chain_id, status, retired_at, notes, blob_path, setter_id, zones (name), betas (file_url))`)
+      .select(`id, status, route_id, routes (id, color, grade, placed_at, zone_id, chain_id, status, retired_at, notes, blob_path, setter_id, zones (name))`)
       .eq('id', qrId)
       .single()
       .then(({ data, error }) => {
@@ -164,7 +162,6 @@ export default function PublicRoutePage() {
   const level = getFreshnessLevel(route.placed_at)
   const freshnessHex = getFreshnessColor(level)
   const label = getPublicLabel(level)
-  const beta = routeData.betas?.[0]
 
   return (
     <div className="min-h-screen bg-zinc-950 flex flex-col">
@@ -229,27 +226,6 @@ export default function PublicRoutePage() {
           onNeedAuth={handleNeedAuth}
           onNeedOnboarding={handleNeedOnboarding}
         />
-
-        {/* Beta */}
-        <div className="mb-7">
-          {!beta ? (
-            <div className="py-7 bg-zinc-900 rounded-2xl text-center border border-zinc-800/60">
-              <p className="text-3xl mb-2">🎬</p>
-              <p className="text-zinc-600 text-sm font-medium">Beta no disponible aún</p>
-            </div>
-          ) : !showBeta ? (
-            <button
-              onClick={() => setShowBeta(true)}
-              className="w-full py-6 bg-zinc-900 rounded-2xl border border-zinc-700/60 hover:bg-zinc-800 hover:border-zinc-600 active:scale-[0.98] transition-all"
-            >
-              <p className="text-2xl mb-1.5">👁</p>
-              <p className="text-zinc-200 text-sm font-bold">Ver beta</p>
-              <p className="text-zinc-500 text-xs mt-1">toca para revelar</p>
-            </button>
-          ) : (
-            <img src={beta.file_url} alt="Beta de la ruta" className="w-full rounded-2xl shadow-xl" />
-          )}
-        </div>
 
         {/* Vote section */}
         <div className="mt-auto">

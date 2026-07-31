@@ -1,8 +1,7 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { supabase } from '../../lib/supabase'
 import { getColorHex, ROUTE_COLORS, GRADES } from '../../lib/colors'
 import { getDaysOnWall, getFreshnessColor, getFreshnessLevel } from '../../lib/freshness'
-import { useProfile } from '../../hooks/useProfile'
 import type { Route, Zone } from '../../types'
 import QrScanner from '../QrScanner'
 
@@ -15,12 +14,8 @@ interface Props {
 }
 
 interface VoteCounts { up: number; down: number }
-interface Beta { id: string; file_url: string }
 
 export default function RouteDetail({ route, zones, onClose, onUpdate, onRetire }: Props) {
-  const { profile } = useProfile()
-  const fileInputRef = useRef<HTMLInputElement>(null)
-
   const [editing, setEditing] = useState(false)
   const [editColor, setEditColor] = useState(route.color)
   const [editGrade, setEditGrade] = useState(route.grade)
@@ -33,9 +28,6 @@ export default function RouteDetail({ route, zones, onClose, onUpdate, onRetire 
   const [confirmRetire, setConfirmRetire] = useState(false)
 
   const [votes, setVotes] = useState<VoteCounts>({ up: 0, down: 0 })
-  const [betas, setBetas] = useState<Beta[]>([])
-  const [uploading, setUploading] = useState(false)
-  const [showBeta, setShowBeta] = useState(false)
   const [qrId, setQrId] = useState<string | null | undefined>(undefined)
   const [showScanner, setShowScanner] = useState(false)
 
@@ -58,9 +50,6 @@ export default function RouteDetail({ route, zones, onClose, onUpdate, onRetire 
         down: data.filter(v => v.value === 'down').length,
       })
     })
-    supabase.from('betas').select('id, file_url').eq('route_id', route.id).order('created_at').then(({ data }) => {
-      if (data) setBetas(data as Beta[])
-    })
   }, [route.id])
 
   async function handleSaveEdit() {
@@ -81,26 +70,6 @@ export default function RouteDetail({ route, zones, onClose, onUpdate, onRetire 
     await supabase.from('qr_codes').update({ status: 'available', route_id: null }).eq('route_id', route.id)
     setRetiring(false)
     onRetire()
-  }
-
-  async function handleBetaUpload(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0]
-    if (!file || !profile) return
-    setUploading(true)
-    const ext = file.name.split('.').pop()
-    const path = `${route.id}/${Date.now()}.${ext}`
-    const { error } = await supabase.storage.from('betas').upload(path, file, { upsert: false })
-    if (!error) {
-      const { data: urlData } = supabase.storage.from('betas').getPublicUrl(path)
-      const { data: beta } = await supabase.from('betas').insert({
-        route_id: route.id,
-        file_url: urlData.publicUrl,
-        uploaded_by: profile.id,
-      }).select('id, file_url').single()
-      if (beta) setBetas(prev => [...prev, beta as Beta])
-    }
-    setUploading(false)
-    if (fileInputRef.current) fileInputRef.current.value = ''
   }
 
   function handleQrAssigned(id: string) {
@@ -181,50 +150,6 @@ export default function RouteDetail({ route, zones, onClose, onUpdate, onRetire 
                   <p className="text-zinc-500 text-xs mt-0.5">no me gusta</p>
                 </div>
               </div>
-            </div>
-
-            {/* Beta */}
-            <div className="mb-5">
-              <div className="flex items-center justify-between mb-3">
-                <p className="text-zinc-500 text-[11px] font-semibold uppercase tracking-widest">Beta</p>
-                <button
-                  onClick={() => fileInputRef.current?.click()}
-                  disabled={uploading}
-                  className="text-xs font-semibold text-yellow-400 hover:text-yellow-300 disabled:opacity-50 transition-colors"
-                >
-                  {uploading ? 'Subiendo...' : '+ Subir'}
-                </button>
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept="video/*,.gif"
-                  className="hidden"
-                  onChange={handleBetaUpload}
-                />
-              </div>
-
-              {betas.length === 0 ? (
-                <button
-                  onClick={() => fileInputRef.current?.click()}
-                  disabled={uploading}
-                  className="w-full py-5 bg-zinc-800/60 border border-dashed border-zinc-600 rounded-2xl text-zinc-500 text-sm hover:bg-zinc-800 hover:border-zinc-500 hover:text-zinc-300 transition-all disabled:opacity-50"
-                >
-                  {uploading ? 'Subiendo...' : '🎬 Toca para subir beta'}
-                </button>
-              ) : !showBeta ? (
-                <button
-                  onClick={() => setShowBeta(true)}
-                  className="w-full py-3.5 bg-zinc-800/60 rounded-2xl text-zinc-300 text-sm font-medium border border-zinc-700/50 hover:bg-zinc-800 hover:border-zinc-600 hover:text-white transition-all"
-                >
-                  Ver beta ({betas.length})
-                </button>
-              ) : (
-                <div className="space-y-2">
-                  {betas.map(b => (
-                    <img key={b.id} src={b.file_url} alt="Beta" className="w-full rounded-2xl" />
-                  ))}
-                </div>
-              )}
             </div>
 
             {route.notes && (
