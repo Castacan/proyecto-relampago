@@ -24,16 +24,17 @@ CREATE TABLE IF NOT EXISTS public.zones (
 
 -- Rutas de boulder
 CREATE TABLE IF NOT EXISTS public.routes (
-  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  color       TEXT NOT NULL,
-  grade       TEXT NOT NULL,
-  setter_id   UUID REFERENCES public.profiles(id),
-  zone_id     UUID REFERENCES public.zones(id),
-  status      TEXT DEFAULT 'active' CHECK (status IN ('active', 'retired')),
-  placed_at   TIMESTAMPTZ DEFAULT NOW(),
-  retired_at  TIMESTAMPTZ,
-  notes       TEXT,
-  blob_path   JSONB NOT NULL DEFAULT '[]'::jsonb
+  id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  color         TEXT NOT NULL,
+  grade         TEXT NOT NULL,
+  setter_id     UUID REFERENCES public.profiles(id),
+  zone_id       UUID REFERENCES public.zones(id),
+  status        TEXT DEFAULT 'active' CHECK (status IN ('active', 'retired')),
+  placed_at     TIMESTAMPTZ DEFAULT NOW(),
+  retired_at    TIMESTAMPTZ,
+  notes         TEXT,
+  blob_path     JSONB NOT NULL DEFAULT '[]'::jsonb,
+  route_number  BIGINT GENERATED ALWAYS AS IDENTITY -- orden real de creación, inmutable (ver migración abajo)
 );
 
 -- QR codes (inventario físico reutilizable)
@@ -125,6 +126,34 @@ $$;
 CREATE OR REPLACE TRIGGER on_auth_user_created
   AFTER INSERT ON auth.users
   FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
+
+-- ============================================================
+-- Migración: route_number (2026-07-31)
+-- routes.route_number ya existía como tabla en producción antes de esta
+-- columna. Se agrega vía backfill manual (no GENERATED ALWAYS AS IDENTITY
+-- directo) porque IDENTITY sobre una tabla con filas existentes no
+-- garantiza orden por placed_at — usamos ROW_NUMBER() para que el
+-- backfill respete el orden cronológico ya conocido, y de ahí en
+-- adelante una secuencia normal asigna el siguiente número a cada INSERT.
+-- Ejecutar UNA VEZ en el SQL Editor de Supabase:
+--
+-- ALTER TABLE public.routes ADD COLUMN route_number BIGINT;
+--
+-- UPDATE public.routes r
+-- SET route_number = sub.rn
+-- FROM (
+--   SELECT id, ROW_NUMBER() OVER (ORDER BY placed_at ASC, id ASC) AS rn
+--   FROM public.routes
+-- ) sub
+-- WHERE r.id = sub.id;
+--
+-- ALTER TABLE public.routes ALTER COLUMN route_number SET NOT NULL;
+--
+-- CREATE SEQUENCE IF NOT EXISTS public.routes_route_number_seq
+--   OWNED BY public.routes.route_number;
+-- SELECT setval('public.routes_route_number_seq', (SELECT COALESCE(MAX(route_number), 0) FROM public.routes));
+-- ALTER TABLE public.routes ALTER COLUMN route_number SET DEFAULT nextval('public.routes_route_number_seq');
+-- ============================================================
 
 -- ============================================================
 -- RPCs: cuenta del cliente (/mi-cuenta)

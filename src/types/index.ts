@@ -26,6 +26,7 @@ export interface Route {
   retired_at: string | null
   notes: string | null
   blob_path: { x: number; y: number }[]
+  route_number: number
 }
 
 export interface Profile {

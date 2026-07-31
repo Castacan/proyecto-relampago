@@ -24,6 +24,7 @@ interface RouteData {
   notes: string | null
   blob_path: { x: number; y: number }[]
   setter_id: string | null
+  route_number: number
   zones: { name: string } | null
 }
 
@@ -62,7 +63,7 @@ export default function PublicRoutePage() {
     if (!qrId) return
     supabase
       .from('qr_codes')
-      .select(`id, status, route_id, routes (id, color, grade, placed_at, zone_id, chain_id, status, retired_at, notes, blob_path, setter_id, zones (name))`)
+      .select(`id, status, route_id, routes (id, color, grade, placed_at, zone_id, chain_id, status, retired_at, notes, blob_path, setter_id, route_number, zones (name))`)
       .eq('id', qrId)
       .single()
       .then(({ data, error }) => {
@@ -157,6 +158,7 @@ export default function PublicRoutePage() {
     notes: routeData.notes,
     blob_path: routeData.blob_path ?? [],
     setter_id: routeData.setter_id,
+    route_number: routeData.route_number,
   }
   const colorHex = getColorHex(route.color)
   const level = getFreshnessLevel(route.placed_at)

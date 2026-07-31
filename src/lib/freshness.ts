@@ -3,15 +3,24 @@ const YELLOW_DAYS = 20
 
 export type FreshnessLevel = 'green' | 'yellow' | 'red'
 
+// Diferencia en días de calendario (medianoche a medianoche, hora local), no en bloques de 24h.
+function calendarDaysSince(dateStr: string): number {
+  const then = new Date(dateStr)
+  const now = new Date()
+  const thenMidnight = Date.UTC(then.getFullYear(), then.getMonth(), then.getDate())
+  const nowMidnight = Date.UTC(now.getFullYear(), now.getMonth(), now.getDate())
+  return Math.round((nowMidnight - thenMidnight) / (1000 * 60 * 60 * 24))
+}
+
 export function getFreshnessLevel(placedAt: string): FreshnessLevel {
-  const days = Math.floor((Date.now() - new Date(placedAt).getTime()) / (1000 * 60 * 60 * 24))
+  const days = calendarDaysSince(placedAt)
   if (days <= GREEN_DAYS) return 'green'
   if (days <= YELLOW_DAYS) return 'yellow'
   return 'red'
 }
 
 export function getDaysOnWall(placedAt: string): number {
-  return Math.floor((Date.now() - new Date(placedAt).getTime()) / (1000 * 60 * 60 * 24))
+  return calendarDaysSince(placedAt)
 }
 
 export function getFreshnessColor(level: FreshnessLevel): string {
