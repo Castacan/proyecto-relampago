@@ -219,3 +219,80 @@ RETURNS TABLE (
   WHERE s.user_id = auth.uid()
   ORDER BY s.sent_at DESC LIMIT lim;
 $$;
+
+-- ============================================================
+-- RPC: submit_send (obtenida vía pg_get_functiondef + export CSV,
+-- 2026-07-31; actualizada 2026-08-01 con bonus +1 mensual)
+-- Firma sin cambios: submit_send(p_route_id uuid, p_device_id text).
+-- Reglas de puntos:
+--   - points_daily: puntos por grado (V0=1 ... V9=10), una vez al día
+--     por ruta (dedup vía `already_sent_today`).
+--   - points_monthly: igual, deduplicado por mes; +1 bonus si la ruta
+--     enviada fue puesta el mismo día calendario (hora CDMX) que la
+--     ruta ACTIVA con route_number más alto (la más reciente de verdad,
+--     inmune a placed_at editado). El bonus vive dentro del mismo CASE
+--     de dedup mensual, así que si la ruta ya se envió este mes no se
+--     otorga de nuevo (evita farmear reenviando la "más nueva" a diario).
+-- Requiere scan reciente (<30 min) en `scans` por user_id o device_id.
+-- ============================================================
+
+CREATE OR REPLACE FUNCTION public.submit_send(p_route_id uuid, p_device_id text)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+AS $function$
+  DECLARE
+    v_uid UUID := auth.uid();
+    v_grade TEXT;
+    v_route_placed_at TIMESTAMPTZ;
+    v_pts INT;
+    v_pts_monthly INT;
+    v_day_start TIMESTAMPTZ;
+    v_month_start TIMESTAMPTZ;
+    v_newest_day DATE;
+    v_route_day DATE;
+    v_bonus INT;
+  BEGIN
+    IF v_uid IS NULL THEN RETURN '{"error":"not_authenticated"}'::JSONB; END IF;
+
+    SELECT grade, placed_at INTO v_grade, v_route_placed_at
+    FROM routes WHERE id = p_route_id AND status = 'active';
+    IF NOT FOUND THEN RETURN '{"error":"route_not_found"}'::JSONB; END IF;
+
+    v_day_start   := date_trunc('day',   now() AT TIME ZONE 'America/Mexico_City') AT TIME ZONE 'America/Mexico_City';
+    v_month_start := date_trunc('month', now() AT TIME ZONE 'America/Mexico_City') AT TIME ZONE 'America/Mexico_City';
+
+    IF NOT EXISTS (
+      SELECT 1 FROM scans
+      WHERE route_id = p_route_id
+        AND (user_id = v_uid OR device_id = p_device_id)
+        AND scanned_at > now() - interval '30 minutes'
+    ) THEN RETURN '{"error":"no_recent_scan"}'::JSONB; END IF;
+
+    IF EXISTS (
+      SELECT 1 FROM sends
+      WHERE user_id = v_uid AND route_id = p_route_id AND sent_at >= v_day_start
+    ) THEN RETURN '{"error":"already_sent_today"}'::JSONB; END IF;
+
+    v_pts := CASE v_grade
+      WHEN 'V0' THEN 1 WHEN 'V1' THEN 2 WHEN 'V2' THEN 3 WHEN 'V3' THEN 4
+      WHEN 'V4' THEN 5 WHEN 'V5' THEN 6 WHEN 'V6' THEN 7 WHEN 'V7' THEN 8
+      WHEN 'V8' THEN 9 WHEN 'V9' THEN 10 ELSE 1
+    END;
+
+    SELECT (placed_at AT TIME ZONE 'America/Mexico_City')::date INTO v_newest_day
+    FROM routes WHERE status = 'active' ORDER BY route_number DESC LIMIT 1;
+    v_route_day := (v_route_placed_at AT TIME ZONE 'America/Mexico_City')::date;
+    v_bonus := CASE WHEN v_route_day = v_newest_day THEN 1 ELSE 0 END;
+
+    v_pts_monthly := CASE WHEN EXISTS (
+      SELECT 1 FROM sends
+      WHERE user_id = v_uid AND route_id = p_route_id AND sent_at >= v_month_start
+    ) THEN 0 ELSE v_pts + v_bonus END;
+
+    INSERT INTO sends(user_id, route_id, points_daily, points_monthly)
+    VALUES (v_uid, p_route_id, v_pts, v_pts_monthly);
+
+    RETURN jsonb_build_object('success', true,
+      'points_daily', v_pts, 'points_monthly', v_pts_monthly, 'bonus', v_bonus);
+  END; $function$;
