@@ -72,6 +72,24 @@ export default function StaffLayout() {
           )}
         </NavLink>
 
+        <NavLink to="/staff/spraywall" className="flex-1 flex justify-center">
+          {({ isActive }) => (
+            <div className={`flex items-center gap-2 px-6 py-2.5 rounded-2xl transition-all text-sm font-bold ${
+              isActive
+                ? 'bg-yellow-400 text-zinc-950 shadow-lg shadow-yellow-400/25'
+                : 'bg-zinc-800 text-zinc-300 hover:bg-zinc-700 hover:text-white border border-zinc-700'
+            }`}>
+              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={isActive ? 2.5 : 2} strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="9" />
+                <circle cx="9" cy="10" r="1.3" fill="currentColor" stroke="none" />
+                <circle cx="15" cy="8.5" r="1.3" fill="currentColor" stroke="none" />
+                <circle cx="14" cy="15" r="1.3" fill="currentColor" stroke="none" />
+              </svg>
+              <span>Spraywall</span>
+            </div>
+          )}
+        </NavLink>
+
         {isAdmin && <NavLink to="/staff/stats" className="flex-1 flex justify-center">
           {({ isActive }) => (
             <div className={`flex items-center gap-2 px-6 py-2.5 rounded-2xl transition-all text-sm font-bold ${

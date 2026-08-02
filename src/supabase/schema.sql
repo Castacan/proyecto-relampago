@@ -296,3 +296,100 @@ AS $function$
     RETURN jsonb_build_object('success', true,
       'points_daily', v_pts, 'points_monthly', v_pts_monthly, 'bonus', v_bonus);
   END; $function$;
+
+-- ============================================================
+-- Spraywall (2026-08-01)
+-- Pared fija de agarres (nunca cambian), una sola foto base
+-- compartida por todas las rutas. Sin puntos/leaderboard/QR-scan —
+-- solo catálogo público + checklist personal de "enviado" para
+-- climbers logueados + propuestas de rutas por clientes (pending
+-- hasta aprobación de staff). Tablas propias, no tocan routes/zones
+-- del muro principal.
+--
+-- IMPORTANTE: a diferencia de zones_write_staff/routes_all_staff/
+-- qr_write_staff/betas_write_staff (arriba), que usan
+-- `auth.uid() IS NOT NULL` para "solo staff" — eso NO distingue
+-- staff de climbers, porque climbers.id también es auth.uid() (ver
+-- ClimberAuthSheet). Las policies de Spraywall SÍ verifican
+-- pertenencia a `profiles` explícitamente.
+-- ============================================================
+
+-- Config singleton: foto base compartida por todas las rutas
+CREATE TABLE IF NOT EXISTS public.spraywall_settings (
+  id          BOOLEAN PRIMARY KEY DEFAULT true CHECK (id = true),
+  photo_url   TEXT,
+  photo_w     INT,
+  photo_h     INT,
+  updated_at  TIMESTAMPTZ DEFAULT NOW(),
+  updated_by  UUID REFERENCES public.profiles(id)
+);
+INSERT INTO public.spraywall_settings (id) VALUES (true) ON CONFLICT (id) DO NOTHING;
+
+-- Rutas del spraywall
+CREATE TABLE IF NOT EXISTS public.spraywall_routes (
+  id                    UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name                  TEXT NOT NULL,
+  grade                 TEXT NOT NULL,
+  setter_name           TEXT NOT NULL,
+  notes                 TEXT,
+  holds                 JSONB NOT NULL DEFAULT '[]'::jsonb,
+  -- holds: [{ x: float(0-1), y: float(0-1), role: 'top'|'disponible'|'inicio_pie'|'inicio_mano', label?: string }]
+  status                TEXT NOT NULL DEFAULT 'active'
+                          CHECK (status IN ('pending','active','retired','rejected')),
+  created_by_profile_id UUID REFERENCES public.profiles(id),
+  created_by_climber_id UUID REFERENCES public.climbers(id),
+  created_at            TIMESTAMPTZ DEFAULT NOW(),
+  updated_at            TIMESTAMPTZ DEFAULT NOW(),
+  retired_at            TIMESTAMPTZ,
+  reviewed_at           TIMESTAMPTZ,
+  reviewed_by           UUID REFERENCES public.profiles(id),
+  CHECK ((created_by_profile_id IS NOT NULL)::int + (created_by_climber_id IS NOT NULL)::int = 1)
+);
+
+-- "Enviado" por climber (toggle: DELETE al desmarcar, INSERT nuevo al remarcar)
+CREATE TABLE IF NOT EXISTS public.spraywall_sends (
+  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  route_id    UUID NOT NULL REFERENCES public.spraywall_routes(id) ON DELETE CASCADE,
+  climber_id  UUID NOT NULL REFERENCES public.climbers(id) ON DELETE CASCADE,
+  sent_at     TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE (route_id, climber_id)
+);
+
+ALTER TABLE public.spraywall_settings ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.spraywall_routes   ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.spraywall_sends    ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "spraywall_settings_read_public" ON public.spraywall_settings
+  FOR SELECT USING (true);
+CREATE POLICY "spraywall_settings_write_staff" ON public.spraywall_settings
+  FOR ALL USING (EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid()));
+
+CREATE POLICY "spraywall_routes_read_public" ON public.spraywall_routes
+  FOR SELECT USING (status = 'active');
+CREATE POLICY "spraywall_routes_read_own_climber" ON public.spraywall_routes
+  FOR SELECT USING (created_by_climber_id = auth.uid());
+CREATE POLICY "spraywall_routes_all_staff" ON public.spraywall_routes
+  FOR ALL USING (EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid()));
+CREATE POLICY "spraywall_routes_insert_climber" ON public.spraywall_routes
+  FOR INSERT WITH CHECK (
+    created_by_climber_id = auth.uid()
+    AND created_by_profile_id IS NULL
+    AND status = 'pending'
+  );
+
+CREATE POLICY "spraywall_sends_own" ON public.spraywall_sends
+  FOR ALL USING (climber_id = auth.uid()) WITH CHECK (climber_id = auth.uid());
+CREATE POLICY "spraywall_sends_read_staff" ON public.spraywall_sends
+  FOR SELECT USING (EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid()));
+
+-- Storage: bucket público para la foto base (primer uso de Storage
+-- en este proyecto). Ejecutar junto con lo anterior en el SQL Editor.
+insert into storage.buckets (id, name, public)
+values ('spraywall-photos', 'spraywall-photos', true)
+on conflict (id) do nothing;
+
+create policy "spraywall_photos_write_staff" on storage.objects
+  for all using (
+    bucket_id = 'spraywall-photos'
+    and exists (select 1 from public.profiles where id = auth.uid())
+  );

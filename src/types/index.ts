@@ -112,3 +112,40 @@ export interface RecentEvent {
   color: string
   sent_at: string
 }
+
+export interface SpraywallHold {
+  x: number
+  y: number
+  role: 'top' | 'disponible' | 'inicio_pie' | 'inicio_mano'
+  label?: string
+}
+
+export interface SpraywallRoute {
+  id: string
+  name: string
+  grade: string
+  setter_name: string
+  notes: string | null
+  holds: SpraywallHold[]
+  status: 'pending' | 'active' | 'retired' | 'rejected'
+  created_by_profile_id: string | null
+  created_by_climber_id: string | null
+  created_at: string
+  updated_at: string
+  retired_at: string | null
+  reviewed_at: string | null
+  reviewed_by: string | null
+}
+
+export interface SpraywallSettings {
+  photo_url: string | null
+  photo_w: number | null
+  photo_h: number | null
+}
+
+export interface SpraywallSend {
+  id: string
+  route_id: string
+  climber_id: string
+  sent_at: string
+}

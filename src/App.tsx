@@ -12,6 +12,10 @@ import PublicWallPage from './pages/public/PublicWallPage'
 import PublicRoutePage from './pages/public/PublicRoutePage'
 import LeaderboardDisplay from './pages/public/LeaderboardDisplay'
 import MyAccountPage from './pages/public/MyAccountPage'
+import SpraywallListPage from './pages/public/SpraywallListPage'
+import SpraywallRoutePage from './pages/public/SpraywallRoutePage'
+import SpraywallProposePage from './pages/public/SpraywallProposePage'
+import SpraywallPage from './pages/staff/SpraywallPage'
 import { useAuth } from './lib/auth'
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -30,6 +34,9 @@ export default function App() {
         <Route path="/muro" element={<PublicWallPage />} />
         <Route path="/leaderboard/display" element={<LeaderboardDisplay />} />
         <Route path="/mi-cuenta" element={<MyAccountPage />} />
+        <Route path="/spraywall" element={<SpraywallListPage />} />
+        <Route path="/spraywall/proponer" element={<SpraywallProposePage />} />
+        <Route path="/spraywall/:routeId" element={<SpraywallRoutePage />} />
         <Route
           path="/staff"
           element={
@@ -44,6 +51,7 @@ export default function App() {
           <Route path="calibration" element={<ErrorBoundary><CalibrationPage /></ErrorBoundary>} />
           <Route path="admin" element={<ErrorBoundary><AdminPage /></ErrorBoundary>} />
           <Route path="volume-catalog" element={<ErrorBoundary><VolumeCatalogPage /></ErrorBoundary>} />
+          <Route path="spraywall" element={<ErrorBoundary><SpraywallPage /></ErrorBoundary>} />
         </Route>
         <Route path="/" element={<Navigate to="/muro" replace />} />
       </Routes>

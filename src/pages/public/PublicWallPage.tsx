@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, Link } from 'react-router-dom'
 import ZoneMap from '../../components/ZoneMap'
 import ChainCanvas from '../../components/ChainCanvas'
 import { useZones } from '../../hooks/useZones'
@@ -37,9 +37,17 @@ export default function PublicWallPage() {
           </div>
           <span className="text-white font-bold text-sm tracking-tight">Jaibamuro</span>
         </div>
-        <div className="flex items-center gap-2 bg-zinc-900 rounded-full px-3.5 py-1.5 border border-zinc-800/60">
-          <div className="w-1.5 h-1.5 rounded-full bg-green-400" />
-          <span className="text-zinc-300 text-xs font-semibold">{routes.length} rutas</span>
+        <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 bg-zinc-900 rounded-full px-3.5 py-1.5 border border-zinc-800/60">
+            <div className="w-1.5 h-1.5 rounded-full bg-green-400" />
+            <span className="text-zinc-300 text-xs font-semibold">{routes.length} rutas</span>
+          </div>
+          <Link
+            to="/spraywall"
+            className="bg-zinc-900 rounded-full px-3.5 py-1.5 border border-zinc-800/60 text-zinc-300 text-xs font-semibold hover:text-white hover:border-zinc-700 transition-colors"
+          >
+            Spraywall
+          </Link>
         </div>
       </header>
 
