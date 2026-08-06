@@ -1,5 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
+import { Navigate } from 'react-router-dom'
 import { useAllChains, useChain } from '../../hooks/useChain'
+import { useProfile } from '../../hooks/useProfile'
 import type { Zone, ZoneAnchor, PointPair } from '../../types'
 import { computeAnchorTransform } from '../../lib/chain'
 
@@ -180,6 +182,7 @@ function PhotoPanel({ zone, pairs, side, waitingForClick, onPhotoClick }: PhotoP
 }
 
 export default function CalibrationPage() {
+  const { profile } = useProfile()
   const { chains, loading: chainsLoading } = useAllChains()
   const [selectedChainId, setSelectedChainId] = useState<string | null>(null)
   const { zones, anchors: existingAnchors, loading: chainLoading, refetch } = useChain(selectedChainId)
@@ -257,6 +260,13 @@ export default function CalibrationPage() {
     setSaved(key)
     setTimeout(() => setSaved(null), 2500)
   }
+
+  if (profile === null) return (
+    <div className="flex justify-center items-center h-full bg-zinc-950">
+      <div className="w-6 h-6 rounded-full border-2 border-yellow-400 border-t-transparent animate-spin" />
+    </div>
+  )
+  if (profile.role !== 'admin') return <Navigate to="/staff" replace />
 
   return (
     <div className="h-full overflow-y-auto bg-zinc-950">

@@ -128,6 +128,166 @@ CREATE OR REPLACE TRIGGER on_auth_user_created
   FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
 
 -- ============================================================
+-- Documentación retroactiva (2026-08-06): columnas y tablas que ya
+-- existen en producción pero nunca se agregaron a este archivo cuando
+-- se crearon vía el SQL Editor del dashboard. Nada de esto necesita
+-- correrse — es documentación de lo que ya está corrido, usando
+-- CREATE TABLE IF NOT EXISTS / ADD COLUMN IF NOT EXISTS para que sea
+-- seguro re-ejecutar si algún día se necesita reconstruir la base
+-- desde cero. Verificado contra datos reales vía REST API directa
+-- (curl a /rest/v1/... con la anon key), no adivinado.
+-- ============================================================
+
+-- profiles: rol de staff (agregado junto con StatsPage/AdminPage guards)
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS role TEXT NOT NULL DEFAULT 'staff' CHECK (role IN ('staff', 'admin'));
+
+-- zones: cadena panorámica + ajustes de render por zona
+ALTER TABLE public.zones ADD COLUMN IF NOT EXISTS chain_id UUID;
+ALTER TABLE public.zones ADD COLUMN IF NOT EXISTS chain_position INT NOT NULL DEFAULT 0;
+ALTER TABLE public.zones ADD COLUMN IF NOT EXISTS render_scale FLOAT NOT NULL DEFAULT 1;
+ALTER TABLE public.zones ADD COLUMN IF NOT EXISTS render_y_offset FLOAT NOT NULL DEFAULT 0;
+
+-- routes: a qué cadena pertenece (para cross-zone rendering)
+ALTER TABLE public.routes ADD COLUMN IF NOT EXISTS chain_id UUID;
+
+-- Cadenas panorámicas (agrupan zonas en una tira horizontal/vertical)
+CREATE TABLE IF NOT EXISTS public.chains (
+  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name        TEXT NOT NULL,
+  axis        TEXT NOT NULL DEFAULT 'horizontal' CHECK (axis IN ('horizontal', 'vertical')),
+  entry_from  UUID REFERENCES public.zones(id)
+);
+
+-- Nota: zones.chain_id y routes.chain_id se agregaron arriba como UUID
+-- simple, sin FK explícita a chains(id) — no se verificó si producción
+-- tiene esa constraint activa. `ALTER TABLE ADD CONSTRAINT` no soporta
+-- `IF NOT EXISTS` en PostgreSQL (a diferencia de ADD COLUMN), así que
+-- si se necesita agregarla en una reconstrucción desde cero, hacerlo
+-- después de crear `chains` con un ALTER TABLE normal (sin IF NOT EXISTS).
+
+-- Calibración por puntos entre cada par de zonas contiguas en una cadena
+CREATE TABLE IF NOT EXISTS public.zone_anchors (
+  id                UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  chain_id          UUID NOT NULL REFERENCES public.chains(id) ON DELETE CASCADE,
+  zone_a_id         UUID NOT NULL REFERENCES public.zones(id),
+  zone_b_id         UUID NOT NULL REFERENCES public.zones(id),
+  a_overlap_start   FLOAT NOT NULL DEFAULT 0.8,
+  a_overlap_end     FLOAT NOT NULL DEFAULT 1.0,
+  b_overlap_start   FLOAT NOT NULL DEFAULT 0.0,
+  b_overlap_end     FLOAT NOT NULL DEFAULT 0.2,
+  point_pairs       JSONB NOT NULL DEFAULT '[]'::jsonb
+  -- point_pairs: [{ a: {x,y}, b: {x,y} }, ...] máx 8 pares, normalizado 0-1
+);
+
+-- Catálogo de formas de volumen reutilizables (dibujadas una vez, colocadas N veces)
+-- Debe crearse antes que `volumes`, que la referencia vía catalog_id.
+CREATE TABLE IF NOT EXISTS public.volume_catalog (
+  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name        TEXT NOT NULL,
+  shape       JSONB NOT NULL DEFAULT '[]'::jsonb,  -- [{x,y}] normalizado 0-1 en canvas 220×220
+  details     JSONB NOT NULL DEFAULT '[]'::jsonb,
+  quantity    INT,
+  created_at  TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Volúmenes colocados sobre el muro (desde el catálogo)
+CREATE TABLE IF NOT EXISTS public.volumes (
+  id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  zone_id       UUID NOT NULL REFERENCES public.zones(id),
+  chain_id      UUID REFERENCES public.chains(id),
+  status        TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'retired')),
+  placed_at     TIMESTAMPTZ DEFAULT NOW(),
+  retired_at    TIMESTAMPTZ,
+  perimeter     JSONB NOT NULL DEFAULT '[]'::jsonb,  -- [{x,y}] normalizado 0-1
+  details       JSONB NOT NULL DEFAULT '[]'::jsonb,  -- [[{x,y}], ...] trazos internos
+  zone_offsets  JSONB NOT NULL DEFAULT '{}'::jsonb,  -- {zoneId: {dx,dy}} reposicionamiento cross-zone
+  catalog_id    UUID REFERENCES public.volume_catalog(id),
+  rotation      FLOAT NOT NULL DEFAULT 0,
+  vol_scale     FLOAT NOT NULL DEFAULT 1
+);
+
+-- Cuentas de clientes (gamificación / leaderboard)
+CREATE TABLE IF NOT EXISTS public.climbers (
+  id                      UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
+  email                   TEXT NOT NULL,
+  display_name            TEXT NOT NULL,
+  visible_in_leaderboard  BOOLEAN NOT NULL DEFAULT true,
+  created_at              TIMESTAMPTZ DEFAULT NOW(),
+  updated_at              TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Escaneos de QR (ventana de 30 min que habilita submit_send)
+CREATE TABLE IF NOT EXISTS public.scans (
+  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id     UUID REFERENCES public.climbers(id),
+  device_id   TEXT NOT NULL,
+  route_id    UUID NOT NULL REFERENCES public.routes(id) ON DELETE CASCADE,
+  scanned_at  TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Envíos ("sends") registrados por submit_send — fuente del leaderboard
+CREATE TABLE IF NOT EXISTS public.sends (
+  id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id         UUID NOT NULL REFERENCES public.climbers(id) ON DELETE CASCADE,
+  route_id        UUID NOT NULL REFERENCES public.routes(id) ON DELETE CASCADE,
+  sent_at         TIMESTAMPTZ DEFAULT NOW(),
+  points_daily    INT NOT NULL,
+  points_monthly  INT NOT NULL
+);
+
+-- RLS: solo se documenta el estado conocido (lectura pública amplia,
+-- necesaria para /muro, /q/:qrId y el leaderboard). Las policies
+-- exactas de estas 7 tablas no se recuperaron todavía del dashboard
+-- (a diferencia de zones/routes/qr_codes/betas, ver hardening abajo) —
+-- pendiente si se necesita auditar a fondo.
+ALTER TABLE public.chains ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.zone_anchors ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.volumes ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.volume_catalog ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.climbers ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.scans ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.sends ENABLE ROW LEVEL SECURITY;
+
+-- ============================================================
+-- RLS hardening (2026-08-06): las policies "solo staff" originales de
+-- zones/routes/qr_codes/betas usaban `auth.uid() IS NOT NULL`, que NO
+-- distingue staff de climbers (un cliente logueado por magic link
+-- también pasa esa condición). Hallazgo de la auditoría de 2026-07-25,
+-- corregido aquí con el mismo patrón ya usado en Spraywall:
+-- `EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid())`.
+-- SQL a correr en el SQL Editor de Supabase:
+-- ============================================================
+
+DROP POLICY IF EXISTS "zones_write_staff" ON public.zones;
+CREATE POLICY "zones_write_staff" ON public.zones
+  FOR ALL USING (EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid()));
+
+DROP POLICY IF EXISTS "routes_all_staff" ON public.routes;
+CREATE POLICY "routes_all_staff" ON public.routes
+  FOR ALL USING (EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid()));
+
+DROP POLICY IF EXISTS "qr_write_staff" ON public.qr_codes;
+CREATE POLICY "qr_write_staff" ON public.qr_codes
+  FOR ALL USING (EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid()));
+
+DROP POLICY IF EXISTS "betas_write_staff" ON public.betas;
+CREATE POLICY "betas_write_staff" ON public.betas
+  FOR ALL USING (EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid()));
+
+-- ============================================================
+-- Pendiente (NO fabricado, no documentado a propósito): las RPCs
+-- get_daily_leaderboard, get_monthly_leaderboard y get_recent_events
+-- existen en producción (usadas por /leaderboard/display, confirmado
+-- vía curl directo a /rest/v1/rpc/... en sesiones previas) pero su
+-- definición SQL exacta nunca se extrajo del dashboard. A diferencia
+-- de submit_send/get_my_stats/get_my_sends, que sí se documentaron
+-- retroactivamente, estas tres siguen pendientes — requieren que el
+-- usuario haga el mismo export CSV de "Show definition" en el SQL
+-- Editor (el copy-paste normal se corta a la mitad en funciones
+-- largas). No inventar su cuerpo aquí.
+-- ============================================================
+
+-- ============================================================
 -- Migración: route_number (2026-07-31)
 -- routes.route_number ya existía como tabla en producción antes de esta
 -- columna. Se agrega vía backfill manual (no GENERATED ALWAYS AS IDENTITY
@@ -163,8 +323,7 @@ CREATE OR REPLACE TRIGGER on_auth_user_created
 -- de retorno) reconstruida por inferencia — el dashboard solo mostró
 -- el cuerpo, no el CREATE FUNCTION completo. Verificar contra
 -- information_schema.routines si se necesita exactitud total.
--- Dependen de las tablas climbers, sends (ver memoria de proyecto),
--- que tampoco están definidas en este schema.sql desactualizado.
+-- Dependen de climbers/sends, documentadas arriba.
 -- ============================================================
 
 CREATE OR REPLACE FUNCTION public.get_my_stats()

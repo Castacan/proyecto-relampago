@@ -1,6 +1,6 @@
 import { Component, type ReactNode } from 'react'
 
-interface Props { children: ReactNode }
+interface Props { children: ReactNode; label?: string }
 interface State { error: Error | null }
 
 export class ErrorBoundary extends Component<Props, State> {
@@ -14,7 +14,7 @@ export class ErrorBoundary extends Component<Props, State> {
     if (this.state.error) {
       return (
         <div className="p-4 text-red-400 text-xs font-mono whitespace-pre-wrap">
-          <p className="font-bold mb-2">Error en AdminPage:</p>
+          <p className="font-bold mb-2">Error en {this.props.label ?? 'esta página'}:</p>
           <p>{this.state.error.message}</p>
           <p className="mt-2 text-zinc-500">{this.state.error.stack}</p>
         </div>

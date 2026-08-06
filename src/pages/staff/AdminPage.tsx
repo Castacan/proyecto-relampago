@@ -1,8 +1,9 @@
 import { useState, useEffect, useCallback } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, Navigate } from 'react-router-dom'
 import QRCode from 'react-qr-code'
 import { supabase } from '../../lib/supabase'
 import { getColorHex } from '../../lib/colors'
+import { useProfile } from '../../hooks/useProfile'
 import type { Zone, Chain } from '../../types'
 
 interface RetiredRoute {
@@ -29,6 +30,7 @@ interface ChainState {
 
 export default function AdminPage() {
   const navigate = useNavigate()
+  const { profile } = useProfile()
   const [qrCount, setQrCount] = useState(10)
   const [generatedQrs, setGeneratedQrs] = useState<GeneratedQr[]>([])
   const [generating, setGenerating] = useState(false)
@@ -157,6 +159,13 @@ export default function AdminPage() {
     }
     setExportingCsv(false)
   }
+
+  if (profile === null) return (
+    <div className="flex justify-center items-center h-full bg-zinc-950">
+      <div className="w-6 h-6 rounded-full border-2 border-yellow-400 border-t-transparent animate-spin" />
+    </div>
+  )
+  if (profile.role !== 'admin') return <Navigate to="/staff" replace />
 
   return (
     <div className="h-full overflow-y-auto bg-zinc-950">

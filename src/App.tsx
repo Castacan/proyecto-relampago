@@ -48,10 +48,10 @@ export default function App() {
           <Route index element={<WallPage />} />
           <Route path="qr" element={<QrInventoryPage />} />
           <Route path="stats" element={<StatsPage />} />
-          <Route path="calibration" element={<ErrorBoundary><CalibrationPage /></ErrorBoundary>} />
-          <Route path="admin" element={<ErrorBoundary><AdminPage /></ErrorBoundary>} />
-          <Route path="volume-catalog" element={<ErrorBoundary><VolumeCatalogPage /></ErrorBoundary>} />
-          <Route path="spraywall" element={<ErrorBoundary><SpraywallPage /></ErrorBoundary>} />
+          <Route path="calibration" element={<ErrorBoundary label="Calibración"><CalibrationPage /></ErrorBoundary>} />
+          <Route path="admin" element={<ErrorBoundary label="Admin"><AdminPage /></ErrorBoundary>} />
+          <Route path="volume-catalog" element={<ErrorBoundary label="Catálogo de Volúmenes"><VolumeCatalogPage /></ErrorBoundary>} />
+          <Route path="spraywall" element={<ErrorBoundary label="Spraywall"><SpraywallPage /></ErrorBoundary>} />
         </Route>
         <Route path="/" element={<Navigate to="/muro" replace />} />
       </Routes>
