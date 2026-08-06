@@ -11,6 +11,8 @@ import { ErrorBoundary } from './components/ErrorBoundary'
 import PublicWallPage from './pages/public/PublicWallPage'
 import PublicRoutePage from './pages/public/PublicRoutePage'
 import LeaderboardDisplay from './pages/public/LeaderboardDisplay'
+import LeaderboardPage from './pages/public/LeaderboardPage'
+import HubPage from './pages/public/HubPage'
 import MyAccountPage from './pages/public/MyAccountPage'
 import SpraywallListPage from './pages/public/SpraywallListPage'
 import SpraywallRoutePage from './pages/public/SpraywallRoutePage'
@@ -33,6 +35,7 @@ export default function App() {
         <Route path="/q/:qrId" element={<PublicRoutePage />} />
         <Route path="/muro" element={<PublicWallPage />} />
         <Route path="/leaderboard/display" element={<LeaderboardDisplay />} />
+        <Route path="/leaderboard" element={<LeaderboardPage />} />
         <Route path="/mi-cuenta" element={<MyAccountPage />} />
         <Route path="/spraywall" element={<SpraywallListPage />} />
         <Route path="/spraywall/proponer" element={<SpraywallProposePage />} />
@@ -53,7 +56,7 @@ export default function App() {
           <Route path="volume-catalog" element={<ErrorBoundary label="Catálogo de Volúmenes"><VolumeCatalogPage /></ErrorBoundary>} />
           <Route path="spraywall" element={<ErrorBoundary label="Spraywall"><SpraywallPage /></ErrorBoundary>} />
         </Route>
-        <Route path="/" element={<Navigate to="/muro" replace />} />
+        <Route path="/" element={<HubPage />} />
       </Routes>
     </BrowserRouter>
   )
