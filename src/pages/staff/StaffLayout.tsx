@@ -31,10 +31,10 @@ export default function StaffLayout() {
       </main>
 
       {/* Bottom tab bar */}
-      <nav className="fixed bottom-0 left-0 right-0 h-16 bg-zinc-950 border-t border-zinc-800 flex items-center justify-around px-6 z-40">
-        <NavLink to="/staff" end className="flex-1 flex justify-center">
+      <nav className="fixed bottom-0 left-0 right-0 h-16 bg-zinc-950 border-t border-zinc-800 flex items-center gap-2 px-4 overflow-x-auto overscroll-x-contain z-40">
+        <NavLink to="/staff" end className="shrink-0 flex justify-center">
           {({ isActive }) => (
-            <div className={`flex items-center gap-2 px-6 py-2.5 rounded-2xl transition-all text-sm font-bold ${
+            <div className={`flex items-center gap-2 px-6 py-2.5 rounded-2xl transition-all text-sm font-bold whitespace-nowrap ${
               isActive
                 ? 'bg-yellow-400 text-zinc-950 shadow-lg shadow-yellow-400/25'
                 : 'bg-zinc-800 text-zinc-300 hover:bg-zinc-700 hover:text-white border border-zinc-700'
@@ -50,9 +50,9 @@ export default function StaffLayout() {
           )}
         </NavLink>
 
-        <NavLink to="/staff/qr" className="flex-1 flex justify-center">
+        <NavLink to="/staff/qr" className="shrink-0 flex justify-center">
           {({ isActive }) => (
-            <div className={`flex items-center gap-2 px-6 py-2.5 rounded-2xl transition-all text-sm font-bold ${
+            <div className={`flex items-center gap-2 px-6 py-2.5 rounded-2xl transition-all text-sm font-bold whitespace-nowrap ${
               isActive
                 ? 'bg-yellow-400 text-zinc-950 shadow-lg shadow-yellow-400/25'
                 : 'bg-zinc-800 text-zinc-300 hover:bg-zinc-700 hover:text-white border border-zinc-700'
@@ -72,9 +72,9 @@ export default function StaffLayout() {
           )}
         </NavLink>
 
-        <NavLink to="/staff/spraywall" className="flex-1 flex justify-center">
+        <NavLink to="/staff/spraywall" className="shrink-0 flex justify-center">
           {({ isActive }) => (
-            <div className={`flex items-center gap-2 px-6 py-2.5 rounded-2xl transition-all text-sm font-bold ${
+            <div className={`flex items-center gap-2 px-6 py-2.5 rounded-2xl transition-all text-sm font-bold whitespace-nowrap ${
               isActive
                 ? 'bg-yellow-400 text-zinc-950 shadow-lg shadow-yellow-400/25'
                 : 'bg-zinc-800 text-zinc-300 hover:bg-zinc-700 hover:text-white border border-zinc-700'
@@ -90,9 +90,9 @@ export default function StaffLayout() {
           )}
         </NavLink>
 
-        {isAdmin && <NavLink to="/staff/stats" className="flex-1 flex justify-center">
+        {isAdmin && <NavLink to="/staff/stats" className="shrink-0 flex justify-center">
           {({ isActive }) => (
-            <div className={`flex items-center gap-2 px-6 py-2.5 rounded-2xl transition-all text-sm font-bold ${
+            <div className={`flex items-center gap-2 px-6 py-2.5 rounded-2xl transition-all text-sm font-bold whitespace-nowrap ${
               isActive
                 ? 'bg-yellow-400 text-zinc-950 shadow-lg shadow-yellow-400/25'
                 : 'bg-zinc-800 text-zinc-300 hover:bg-zinc-700 hover:text-white border border-zinc-700'
@@ -108,9 +108,9 @@ export default function StaffLayout() {
         </NavLink>}
 
         {isAdmin && (
-          <NavLink to="/staff/admin" className="flex-1 flex justify-center">
+          <NavLink to="/staff/admin" className="shrink-0 flex justify-center">
             {({ isActive }) => (
-              <div className={`flex items-center gap-2 px-6 py-2.5 rounded-2xl transition-all text-sm font-bold ${
+              <div className={`flex items-center gap-2 px-6 py-2.5 rounded-2xl transition-all text-sm font-bold whitespace-nowrap ${
                 isActive
                   ? 'bg-yellow-400 text-zinc-950 shadow-lg shadow-yellow-400/25'
                   : 'bg-zinc-800 text-zinc-300 hover:bg-zinc-700 hover:text-white border border-zinc-700'
