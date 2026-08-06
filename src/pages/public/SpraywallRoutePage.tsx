@@ -36,27 +36,27 @@ export default function SpraywallRoutePage() {
   }, [routeId])
 
   if (loading || settingsLoading) return (
-    <div className="min-h-screen bg-zinc-950 flex items-center justify-center">
-      <div className="w-8 h-8 rounded-full border-2 border-yellow-400 border-t-transparent animate-spin" />
+    <div className="min-h-screen bg-fondo flex items-center justify-center">
+      <div className="w-8 h-8 rounded-full border-2 border-primario border-t-transparent animate-spin" />
     </div>
   )
 
   if (notFound || !route) return (
-    <div className="min-h-screen bg-zinc-950 flex flex-col items-center justify-center p-8 text-center">
+    <div className="min-h-screen bg-fondo flex flex-col items-center justify-center p-8 text-center">
       <div className="text-5xl mb-4">🤔</div>
-      <h1 className="text-white font-black text-xl mb-2 tracking-tight">Ruta no encontrada</h1>
-      <Link to="/spraywall" className="text-yellow-400 text-sm font-semibold mt-4">← Volver al listado</Link>
+      <h1 className="text-texto-principal font-black text-xl mb-2 tracking-tight">Ruta no encontrada</h1>
+      <Link to="/spraywall" className="text-primario text-sm font-semibold mt-4">← Volver al listado</Link>
     </div>
   )
 
   return (
-    <div className="min-h-screen bg-zinc-950 flex flex-col">
+    <div className="min-h-screen bg-fondo flex flex-col">
       <div className="shrink-0 flex items-center justify-between px-5 pt-4 pb-1">
         <Link to="/spraywall" className="flex items-center gap-1.5 text-zinc-500 hover:text-zinc-300 text-sm font-medium transition-colors">
           ← Spraywall
         </Link>
         {session?.user && (
-          <Link to="/mi-cuenta" className="w-8 h-8 rounded-full bg-zinc-800 border border-zinc-700/60 flex items-center justify-center text-zinc-300 text-xs font-black hover:border-zinc-500 transition-colors">
+          <Link to="/mi-cuenta" className="w-8 h-8 rounded-full bg-superficie-alta border border-zinc-700/60 flex items-center justify-center text-zinc-300 text-xs font-black hover:border-zinc-500 transition-colors">
             {climber?.display_name?.[0]?.toUpperCase() ?? '⚡'}
           </Link>
         )}
@@ -64,9 +64,9 @@ export default function SpraywallRoutePage() {
 
       <div className="flex-1 flex flex-col max-w-md mx-auto w-full px-5 py-4">
         <div className="mb-5">
-          <h1 className="text-white font-black text-2xl tracking-tight">{route.name}</h1>
+          <h1 className="text-texto-principal font-black text-2xl tracking-tight">{route.name}</h1>
           <p className="text-zinc-400 text-sm font-medium mt-1">
-            <span className="font-mono font-bold text-white">{route.grade}</span>
+            <span className="font-mono font-bold text-texto-principal">{route.grade}</span>
             <span className="text-zinc-600"> · Por {route.setter_name}</span>
           </p>
         </div>
@@ -90,7 +90,7 @@ export default function SpraywallRoutePage() {
         </div>
 
         {route.notes && (
-          <div className="mb-6 p-4 bg-zinc-900 border border-zinc-800/60 rounded-2xl">
+          <div className="mb-6 p-4 bg-superficie border border-zinc-800/60 rounded-2xl">
             <p className="text-zinc-400 text-sm">{route.notes}</p>
           </div>
         )}
@@ -107,7 +107,7 @@ export default function SpraywallRoutePage() {
 
       <div className="flex items-center justify-center px-5 py-4 border-t border-zinc-800/40">
         <div className="flex items-center gap-1.5">
-          <span className="text-yellow-400 text-xs">⚡</span>
+          <span className="text-primario text-xs">⚡</span>
           <span className="text-zinc-600 text-xs font-medium">Jaibamuro</span>
         </div>
       </div>

@@ -44,8 +44,8 @@ export default function VoteButtons({ routeId }: Props) {
 
   if (checking) return (
     <div className="flex gap-3">
-      <div className="flex-1 py-5 bg-zinc-900 rounded-2xl border border-zinc-800 animate-pulse" />
-      <div className="flex-1 py-5 bg-zinc-900 rounded-2xl border border-zinc-800 animate-pulse" />
+      <div className="flex-1 py-5 bg-superficie rounded-2xl border border-zinc-800 animate-pulse" />
+      <div className="flex-1 py-5 bg-superficie rounded-2xl border border-zinc-800 animate-pulse" />
     </div>
   )
 
@@ -57,7 +57,7 @@ export default function VoteButtons({ routeId }: Props) {
         className={`flex-1 py-5 rounded-2xl text-3xl border-2 transition-all active:scale-95 disabled:opacity-60 cursor-pointer ${
           myVote === 'up'
             ? 'bg-green-500/20 border-green-500 shadow-lg shadow-green-500/10'
-            : 'bg-zinc-900 border-zinc-800 hover:bg-green-500/10 hover:border-green-500/40'
+            : 'bg-superficie border-zinc-800 hover:bg-green-500/10 hover:border-green-500/40'
         }`}
       >
         👍
@@ -68,7 +68,7 @@ export default function VoteButtons({ routeId }: Props) {
         className={`flex-1 py-5 rounded-2xl text-3xl border-2 transition-all active:scale-95 disabled:opacity-60 cursor-pointer ${
           myVote === 'down'
             ? 'bg-red-500/20 border-red-500 shadow-lg shadow-red-500/10'
-            : 'bg-zinc-900 border-zinc-800 hover:bg-red-500/10 hover:border-red-500/40'
+            : 'bg-superficie border-zinc-800 hover:bg-red-500/10 hover:border-red-500/40'
         }`}
       >
         👎

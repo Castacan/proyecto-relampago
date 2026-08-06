@@ -35,17 +35,17 @@ export default function LeaderboardDisplay() {
 
   if (loading) {
     return (
-      <div className="w-screen h-screen bg-zinc-950 flex items-center justify-center">
-        <div className="w-10 h-10 rounded-full border-4 border-yellow-400 border-t-transparent animate-spin" />
+      <div className="w-screen h-screen bg-fondo flex items-center justify-center">
+        <div className="w-10 h-10 rounded-full border-4 border-primario border-t-transparent animate-spin" />
       </div>
     )
   }
 
   return (
-    <div className="w-screen h-screen bg-zinc-950 flex flex-col overflow-hidden font-sans select-none">
+    <div className="w-screen h-screen bg-fondo flex flex-col overflow-hidden font-sans select-none">
 
       {/* Ticker superior */}
-      <div className="shrink-0 h-14 bg-zinc-900 border-b border-zinc-800 flex items-center px-8 gap-4">
+      <div className="shrink-0 h-14 bg-superficie border-b border-zinc-800 flex items-center px-8 gap-4">
         {events.length > 0 && currentEvent ? (
           <>
             <div
@@ -53,7 +53,7 @@ export default function LeaderboardDisplay() {
               style={{ backgroundColor: getColorHex(currentEvent.color) }}
             />
             <p className="text-zinc-200 text-lg font-bold tracking-wide">
-              <span className="text-white">{currentEvent.display_name}</span>
+              <span className="text-texto-principal">{currentEvent.display_name}</span>
               {' '}mandó{' '}
               <span style={{ color: getColorHex(currentEvent.color) }}>{currentEvent.grade}</span>
               {' '}{currentEvent.color}
@@ -61,7 +61,7 @@ export default function LeaderboardDisplay() {
           </>
         ) : (
           <>
-            <div className="w-3 h-3 rounded-full bg-yellow-400 shrink-0" />
+            <div className="w-3 h-3 rounded-full bg-primario shrink-0" />
             <p className="text-zinc-500 text-lg font-semibold">Sé el primero en mandar hoy</p>
           </>
         )}
@@ -81,7 +81,7 @@ export default function LeaderboardDisplay() {
         {/* Leaderboard Diario */}
         <div className="flex-[65] flex flex-col px-10 py-8 border-r border-zinc-800">
           <div className="mb-8">
-            <h1 className="text-yellow-400 font-black tracking-tight" style={{ fontSize: '4rem', lineHeight: 1 }}>HOY</h1>
+            <h1 className="text-primario font-black tracking-tight" style={{ fontSize: '4rem', lineHeight: 1 }}>HOY</h1>
             <p className="text-zinc-400 text-2xl font-semibold mt-1">{dayLabel}</p>
           </div>
 
@@ -123,8 +123,8 @@ export default function LeaderboardDisplay() {
       </div>
 
       {/* Footer */}
-      <div className="shrink-0 h-10 bg-zinc-900 border-t border-zinc-800 flex items-center justify-center gap-2">
-        <span className="text-yellow-400 text-sm">⚡</span>
+      <div className="shrink-0 h-10 bg-superficie border-t border-zinc-800 flex items-center justify-center gap-2">
+        <span className="text-primario text-sm">⚡</span>
         <span className="text-zinc-600 text-sm font-medium">El Muro · Jaibamuro</span>
       </div>
     </div>
@@ -134,10 +134,10 @@ export default function LeaderboardDisplay() {
 function DailyRow({ rank, name, points }: { rank: number; name: string; points: number }) {
   const isFirst = rank === 1
   const fontSize = isFirst ? '2.25rem' : rank <= 3 ? '1.75rem' : '1.4rem'
-  const nameColor = isFirst ? 'text-white' : 'text-zinc-200'
-  const rankColor = isFirst ? 'text-yellow-400' : rank <= 3 ? 'text-zinc-300' : 'text-zinc-600'
-  const ptsColor = isFirst ? 'text-yellow-400' : 'text-zinc-400'
-  const bg = isFirst ? 'bg-zinc-900 border border-yellow-400/20' : 'bg-zinc-900/50'
+  const nameColor = isFirst ? 'text-texto-principal' : 'text-zinc-200'
+  const rankColor = isFirst ? 'text-primario' : rank <= 3 ? 'text-zinc-300' : 'text-zinc-600'
+  const ptsColor = isFirst ? 'text-primario' : 'text-zinc-400'
+  const bg = isFirst ? 'bg-superficie border border-primario/20' : 'bg-superficie/50'
 
   return (
     <div className={`flex items-center gap-4 px-5 py-3 rounded-2xl ${bg}`}>
@@ -157,11 +157,11 @@ function DailyRow({ rank, name, points }: { rank: number; name: string; points: 
 function MonthlyRow({ rank, name, points }: { rank: number; name: string; points: number }) {
   const isFirst = rank === 1
   const fontSize = isFirst ? '1.75rem' : '1.35rem'
-  const nameColor = isFirst ? 'text-white' : 'text-zinc-300'
-  const rankColor = isFirst ? 'text-yellow-400' : 'text-zinc-500'
+  const nameColor = isFirst ? 'text-texto-principal' : 'text-zinc-300'
+  const rankColor = isFirst ? 'text-primario' : 'text-zinc-500'
 
   return (
-    <div className={`flex items-center gap-3 px-4 py-2.5 rounded-xl ${isFirst ? 'bg-zinc-900 border border-zinc-700/50' : ''}`}>
+    <div className={`flex items-center gap-3 px-4 py-2.5 rounded-xl ${isFirst ? 'bg-superficie border border-zinc-700/50' : ''}`}>
       <span className={`font-black shrink-0 ${rankColor}`} style={{ fontSize, width: '2.75rem' }}>
         #{rank}
       </span>

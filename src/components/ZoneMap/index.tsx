@@ -105,7 +105,7 @@ function ZoneMapMini({ zones, routes, onZoneSelect, selectedZoneIds, onCollapse 
   const entries = buildDisplayEntries(zones, routes, selectedZoneIds ?? [])
 
   return (
-    <div className="absolute top-3 right-3 z-30 bg-zinc-950/95 backdrop-blur-sm rounded-2xl border border-zinc-800/60 shadow-2xl p-2.5">
+    <div className="absolute top-3 right-3 z-30 bg-fondo/95 backdrop-blur-sm rounded-2xl border border-zinc-800/60 shadow-2xl p-2.5">
       <div className="flex items-center justify-between mb-1.5 px-0.5">
         <p className="text-zinc-600 text-[8px] font-bold uppercase tracking-widest select-none">Mapa</p>
         {onCollapse && (
@@ -147,10 +147,10 @@ export default function ZoneMap({ zones, routes, onZoneSelect, assignQrHint, min
   const entries = buildDisplayEntries(zones, routes, selectedZoneIds ?? [])
 
   return (
-    <div className="w-full h-full flex flex-col bg-zinc-950">
+    <div className="w-full h-full flex flex-col bg-fondo">
       {assignQrHint && (
-        <div className="shrink-0 mx-4 mt-3 bg-yellow-400/10 border border-yellow-400/40 rounded-xl px-4 py-2.5 text-center">
-          <p className="text-yellow-400 text-sm font-semibold">Selecciona la zona donde colocaste la ruta</p>
+        <div className="shrink-0 mx-4 mt-3 bg-primario/10 border border-primario/40 rounded-xl px-4 py-2.5 text-center">
+          <p className="text-primario text-sm font-semibold">Selecciona la zona donde colocaste la ruta</p>
         </div>
       )}
 

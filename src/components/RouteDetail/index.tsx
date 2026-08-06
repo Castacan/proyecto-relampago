@@ -87,7 +87,7 @@ export default function RouteDetail({ route, zones, onClose, onUpdate, onRetire 
       />
     )}
     <div className="fixed inset-0 bg-black/75 backdrop-blur-sm flex items-end z-50" onClick={onClose}>
-      <div className="w-full bg-zinc-900 rounded-t-3xl p-6 max-h-[92vh] overflow-y-auto border-t border-zinc-800/80" onClick={e => e.stopPropagation()}>
+      <div className="w-full bg-superficie rounded-t-3xl p-6 max-h-[92vh] overflow-y-auto border-t border-zinc-800/80" onClick={e => e.stopPropagation()}>
 
         {/* Handle bar */}
         <div className="w-10 h-1 bg-zinc-700 rounded-full mx-auto mb-5" />
@@ -96,7 +96,7 @@ export default function RouteDetail({ route, zones, onClose, onUpdate, onRetire 
         <div className="flex items-center gap-3 mb-5">
           <div className="w-12 h-12 rounded-2xl border-2 border-white/10 shrink-0 shadow-lg" style={{ backgroundColor: colorHex }} />
           <div className="flex-1 min-w-0">
-            <h2 className="text-white font-black text-2xl leading-tight tracking-tight font-mono">
+            <h2 className="text-texto-principal font-black text-2xl leading-tight tracking-tight font-mono">
               {route.grade}
               <span className="text-zinc-500 font-semibold text-lg ml-2 font-sans">· {route.color.charAt(0).toUpperCase() + route.color.slice(1)}</span>
             </h2>
@@ -108,14 +108,14 @@ export default function RouteDetail({ route, zones, onClose, onUpdate, onRetire 
               className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
                 editing
                   ? 'bg-zinc-700 text-zinc-200 hover:bg-zinc-600'
-                  : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700 hover:text-zinc-200'
+                  : 'bg-superficie-alta text-zinc-400 hover:bg-superficie-alta-hover hover:text-zinc-200'
               }`}
             >
               {editing ? 'Cancelar' : 'Editar'}
             </button>
             <button
               onClick={onClose}
-              className="w-8 h-8 flex items-center justify-center rounded-full bg-zinc-800 hover:bg-zinc-700 text-zinc-400 hover:text-white transition-all text-lg leading-none"
+              className="w-8 h-8 flex items-center justify-center rounded-full bg-superficie-alta hover:bg-superficie-alta-hover text-zinc-400 hover:text-texto-principal transition-all text-lg leading-none"
             >
               ×
             </button>
@@ -136,24 +136,24 @@ export default function RouteDetail({ route, zones, onClose, onUpdate, onRetire 
 
             {/* Votos */}
             <div className="flex gap-3 mb-5">
-              <div className="flex-1 flex items-center gap-3 p-4 bg-zinc-800/60 rounded-2xl border border-zinc-700/40">
+              <div className="flex-1 flex items-center gap-3 p-4 bg-superficie-alta/60 rounded-2xl border border-zinc-700/40">
                 <span className="text-2xl">👍</span>
                 <div>
-                  <p className="text-white font-black text-2xl leading-none">{votes.up}</p>
+                  <p className="text-texto-principal font-black text-2xl leading-none">{votes.up}</p>
                   <p className="text-zinc-500 text-xs mt-0.5">me gusta</p>
                 </div>
               </div>
-              <div className="flex-1 flex items-center gap-3 p-4 bg-zinc-800/60 rounded-2xl border border-zinc-700/40">
+              <div className="flex-1 flex items-center gap-3 p-4 bg-superficie-alta/60 rounded-2xl border border-zinc-700/40">
                 <span className="text-2xl">👎</span>
                 <div>
-                  <p className="text-white font-black text-2xl leading-none">{votes.down}</p>
+                  <p className="text-texto-principal font-black text-2xl leading-none">{votes.down}</p>
                   <p className="text-zinc-500 text-xs mt-0.5">no me gusta</p>
                 </div>
               </div>
             </div>
 
             {route.notes && (
-              <div className="mb-5 p-4 bg-zinc-800/60 rounded-2xl border border-zinc-700/40">
+              <div className="mb-5 p-4 bg-superficie-alta/60 rounded-2xl border border-zinc-700/40">
                 <p className="text-zinc-500 text-[11px] font-semibold uppercase tracking-widest mb-2">Notas</p>
                 <p className="text-zinc-200 text-sm leading-relaxed">{route.notes}</p>
               </div>
@@ -167,7 +167,7 @@ export default function RouteDetail({ route, zones, onClose, onUpdate, onRetire 
             {qrId === null && (
               <button
                 onClick={() => setShowScanner(true)}
-                className="w-full flex items-center justify-center gap-2.5 py-3.5 rounded-2xl bg-zinc-800 border border-dashed border-zinc-600 text-zinc-300 hover:bg-zinc-700 hover:border-zinc-500 hover:text-white font-bold text-sm transition-all mb-3"
+                className="w-full flex items-center justify-center gap-2.5 py-3.5 rounded-2xl bg-superficie-alta border border-dashed border-zinc-600 text-zinc-300 hover:bg-superficie-alta-hover hover:border-zinc-500 hover:text-texto-principal font-bold text-sm transition-all mb-3"
               >
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
                   <path d="M3 7V5a2 2 0 0 1 2-2h2"/><path d="M17 3h2a2 2 0 0 1 2 2v2"/>
@@ -179,7 +179,7 @@ export default function RouteDetail({ route, zones, onClose, onUpdate, onRetire 
               </button>
             )}
             {qrId && (
-              <div className="flex items-center gap-2 mb-3 px-3 py-2.5 bg-zinc-800/60 rounded-xl border border-zinc-700/40">
+              <div className="flex items-center gap-2 mb-3 px-3 py-2.5 bg-superficie-alta/60 rounded-xl border border-zinc-700/40">
                 <div className="w-2 h-2 rounded-full bg-green-400 shrink-0" />
                 <span className="text-zinc-400 text-xs font-mono truncate">{qrId}</span>
               </div>
@@ -190,8 +190,8 @@ export default function RouteDetail({ route, zones, onClose, onUpdate, onRetire 
               disabled={retiring}
               className={`w-full py-3.5 rounded-2xl font-bold text-sm transition-all ${
                 confirmRetire
-                  ? 'bg-red-500 hover:bg-red-400 text-white shadow-lg shadow-red-500/20'
-                  : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700 hover:text-zinc-200'
+                  ? 'bg-red-500 hover:bg-red-400 text-texto-principal shadow-lg shadow-red-500/20'
+                  : 'bg-superficie-alta text-zinc-400 hover:bg-superficie-alta-hover hover:text-zinc-200'
               } disabled:opacity-50`}
             >
               {retiring ? 'Retirando...' : confirmRetire ? '¿Confirmar retiro?' : 'Retirar ruta'}
@@ -216,7 +216,7 @@ export default function RouteDetail({ route, zones, onClose, onUpdate, onRetire 
                     }`}
                     style={{ backgroundColor: c.hex }}
                   />
-                  <span className={`text-[10px] font-medium transition-colors ${editColor === c.key ? 'text-white' : 'text-zinc-500 group-hover:text-zinc-300'}`}>{c.label}</span>
+                  <span className={`text-[10px] font-medium transition-colors ${editColor === c.key ? 'text-texto-principal' : 'text-zinc-500 group-hover:text-zinc-300'}`}>{c.label}</span>
                 </button>
               ))}
             </div>
@@ -229,8 +229,8 @@ export default function RouteDetail({ route, zones, onClose, onUpdate, onRetire 
                   onClick={() => setEditGrade(g)}
                   className={`px-3.5 py-2 rounded-xl text-sm font-bold font-mono transition-all ${
                     editGrade === g
-                      ? 'bg-yellow-400 text-zinc-950 shadow-md shadow-yellow-400/20 scale-105'
-                      : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700 hover:text-white'
+                      ? 'bg-primario text-texto-en-acento shadow-md shadow-primario/20 scale-105'
+                      : 'bg-superficie-alta text-zinc-400 hover:bg-superficie-alta-hover hover:text-texto-principal'
                   }`}
                 >
                   {g}
@@ -242,7 +242,7 @@ export default function RouteDetail({ route, zones, onClose, onUpdate, onRetire 
             <select
               value={editZoneId}
               onChange={e => setEditZoneId(e.target.value)}
-              className="w-full bg-zinc-800 text-white rounded-xl px-4 py-3 text-sm mb-6 outline-none border border-zinc-700/50 hover:border-zinc-600 focus:border-yellow-400/60 transition-all cursor-pointer"
+              className="w-full bg-superficie-alta text-texto-principal rounded-xl px-4 py-3 text-sm mb-6 outline-none border border-zinc-700/50 hover:border-zinc-600 focus:border-primario/60 transition-all cursor-pointer"
             >
               {zones.map(z => <option key={z.id} value={z.id}>{z.name}</option>)}
             </select>
@@ -253,7 +253,7 @@ export default function RouteDetail({ route, zones, onClose, onUpdate, onRetire 
               value={editDate}
               onChange={e => setEditDate(e.target.value)}
               max={new Date().toISOString().slice(0, 10)}
-              className="w-full bg-zinc-800 text-white rounded-xl px-4 py-3 text-sm mb-6 outline-none border border-zinc-700/50 hover:border-zinc-600 focus:border-yellow-400/60 transition-all [color-scheme:dark]"
+              className="w-full bg-superficie-alta text-texto-principal rounded-xl px-4 py-3 text-sm mb-6 outline-none border border-zinc-700/50 hover:border-zinc-600 focus:border-primario/60 transition-all [color-scheme:dark]"
             />
 
             <p className="text-zinc-500 text-[11px] font-semibold uppercase tracking-widest mb-3">Notas</p>
@@ -261,13 +261,13 @@ export default function RouteDetail({ route, zones, onClose, onUpdate, onRetire 
               value={editNotes}
               onChange={e => setEditNotes(e.target.value)}
               rows={2}
-              className="w-full bg-zinc-800 text-white rounded-xl px-4 py-3 text-sm mb-6 outline-none resize-none border border-zinc-700/50 hover:border-zinc-600 focus:border-yellow-400/60 transition-all"
+              className="w-full bg-superficie-alta text-texto-principal rounded-xl px-4 py-3 text-sm mb-6 outline-none resize-none border border-zinc-700/50 hover:border-zinc-600 focus:border-primario/60 transition-all"
             />
 
             <button
               onClick={handleSaveEdit}
               disabled={saving}
-              className="w-full py-3.5 rounded-2xl bg-yellow-400 hover:bg-yellow-300 text-zinc-950 font-bold text-sm transition-all disabled:opacity-50 shadow-lg shadow-yellow-400/20"
+              className="w-full py-3.5 rounded-2xl bg-primario hover:bg-primario-hover text-texto-en-acento font-bold text-sm transition-all disabled:opacity-50 shadow-lg shadow-primario/20"
             >
               {saving ? 'Guardando...' : 'Guardar cambios'}
             </button>

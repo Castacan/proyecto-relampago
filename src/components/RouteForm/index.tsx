@@ -51,17 +51,17 @@ export default function RouteForm({ blobPath, zones, initialColor = 'amarillo', 
   return (
     <div className="fixed inset-0 bg-black/75 backdrop-blur-sm flex items-end z-50" onClick={onCancel}>
       <div
-        className="w-full bg-zinc-900 rounded-t-3xl p-6 max-h-[90vh] overflow-y-auto border-t border-zinc-800/80"
+        className="w-full bg-superficie rounded-t-3xl p-6 max-h-[90vh] overflow-y-auto border-t border-zinc-800/80"
         onClick={e => e.stopPropagation()}
       >
         {/* Handle bar */}
         <div className="w-10 h-1 bg-zinc-700 rounded-full mx-auto mb-5" />
 
         <div className="flex items-center justify-between mb-6">
-          <h2 className="text-white font-bold text-xl tracking-tight">Nueva ruta</h2>
+          <h2 className="text-texto-principal font-bold text-xl tracking-tight">Nueva ruta</h2>
           <button
             onClick={onCancel}
-            className="w-8 h-8 flex items-center justify-center rounded-full bg-zinc-800 hover:bg-zinc-700 text-zinc-400 hover:text-white transition-all text-lg leading-none"
+            className="w-8 h-8 flex items-center justify-center rounded-full bg-superficie-alta hover:bg-superficie-alta-hover text-zinc-400 hover:text-texto-principal transition-all text-lg leading-none"
           >
             ×
           </button>
@@ -84,7 +84,7 @@ export default function RouteForm({ blobPath, zones, initialColor = 'amarillo', 
                 }`}
                 style={{ backgroundColor: c.hex }}
               />
-              <span className={`text-[10px] font-medium transition-colors ${color === c.key ? 'text-white' : 'text-zinc-500 group-hover:text-zinc-300'}`}>
+              <span className={`text-[10px] font-medium transition-colors ${color === c.key ? 'text-texto-principal' : 'text-zinc-500 group-hover:text-zinc-300'}`}>
                 {c.label}
               </span>
             </button>
@@ -100,8 +100,8 @@ export default function RouteForm({ blobPath, zones, initialColor = 'amarillo', 
               onClick={() => setGrade(g)}
               className={`px-3.5 py-2 rounded-xl text-sm font-bold font-mono transition-all ${
                 grade === g
-                  ? 'bg-yellow-400 text-zinc-950 shadow-md shadow-yellow-400/20 scale-105'
-                  : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700 hover:text-white'
+                  ? 'bg-primario text-texto-en-acento shadow-md shadow-primario/20 scale-105'
+                  : 'bg-superficie-alta text-zinc-400 hover:bg-superficie-alta-hover hover:text-texto-principal'
               }`}
             >
               {g}
@@ -114,7 +114,7 @@ export default function RouteForm({ blobPath, zones, initialColor = 'amarillo', 
         <select
           value={zoneId}
           onChange={e => setZoneId(e.target.value)}
-          className="w-full bg-zinc-800 text-white rounded-xl px-4 py-3 text-sm mb-6 outline-none border border-zinc-700/50 hover:border-zinc-600 focus:border-yellow-400/60 focus:ring-2 focus:ring-yellow-400/20 transition-all cursor-pointer"
+          className="w-full bg-superficie-alta text-texto-principal rounded-xl px-4 py-3 text-sm mb-6 outline-none border border-zinc-700/50 hover:border-zinc-600 focus:border-primario/60 focus:ring-2 focus:ring-primario/20 transition-all cursor-pointer"
         >
           {zones.map(z => <option key={z.id} value={z.id}>{getZoneDisplayName(z)}</option>)}
         </select>
@@ -126,15 +126,15 @@ export default function RouteForm({ blobPath, zones, initialColor = 'amarillo', 
           onChange={e => setNotes(e.target.value)}
           rows={2}
           placeholder="Beta de setter, notas de ajuste..."
-          className="w-full bg-zinc-800 text-white rounded-xl px-4 py-3 text-sm mb-6 outline-none resize-none placeholder-zinc-600 border border-zinc-700/50 hover:border-zinc-600 focus:border-yellow-400/60 focus:ring-2 focus:ring-yellow-400/20 transition-all"
+          className="w-full bg-superficie-alta text-texto-principal rounded-xl px-4 py-3 text-sm mb-6 outline-none resize-none placeholder-zinc-600 border border-zinc-700/50 hover:border-zinc-600 focus:border-primario/60 focus:ring-2 focus:ring-primario/20 transition-all"
         />
 
         {/* Preview */}
-        <div className="flex items-center gap-3 mb-6 p-4 bg-zinc-800/60 rounded-2xl border border-zinc-700/40">
+        <div className="flex items-center gap-3 mb-6 p-4 bg-superficie-alta/60 rounded-2xl border border-zinc-700/40">
           <div className="w-9 h-9 rounded-full border-2 border-white/20 shrink-0 shadow-md" style={{ backgroundColor: getColorHex(color) }} />
-          <span className="text-white font-semibold text-sm">{color.charAt(0).toUpperCase() + color.slice(1)}</span>
+          <span className="text-texto-principal font-semibold text-sm">{color.charAt(0).toUpperCase() + color.slice(1)}</span>
           <span className="text-zinc-600">·</span>
-          <span className="text-white font-black font-mono text-base">{grade}</span>
+          <span className="text-texto-principal font-black font-mono text-base">{grade}</span>
           <span className="text-zinc-600">·</span>
           <span className="text-zinc-300 text-sm">{getZoneDisplayName(zones.find(z => z.id === zoneId) ?? zones[0])}</span>
         </div>
@@ -148,14 +148,14 @@ export default function RouteForm({ blobPath, zones, initialColor = 'amarillo', 
         <div className="flex gap-3">
           <button
             onClick={onCancel}
-            className="flex-1 py-3.5 rounded-2xl bg-zinc-800 text-zinc-300 font-semibold text-sm hover:bg-zinc-700 hover:text-white transition-all"
+            className="flex-1 py-3.5 rounded-2xl bg-superficie-alta text-zinc-300 font-semibold text-sm hover:bg-superficie-alta-hover hover:text-texto-principal transition-all"
           >
             Cancelar
           </button>
           <button
             onClick={handleSave}
             disabled={saving}
-            className="flex-1 py-3.5 rounded-2xl bg-yellow-400 text-zinc-950 font-bold text-sm hover:bg-yellow-300 active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-yellow-400/20"
+            className="flex-1 py-3.5 rounded-2xl bg-primario text-texto-en-acento font-bold text-sm hover:bg-primario-hover active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-primario/20"
           >
             {saving ? 'Guardando...' : 'Guardar ruta'}
           </button>

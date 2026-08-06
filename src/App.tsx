@@ -20,7 +20,7 @@ import { useAuth } from './lib/auth'
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { session, loading } = useAuth()
-  if (loading) return <div className="flex h-screen items-center justify-center text-white bg-zinc-950">Cargando...</div>
+  if (loading) return <div className="flex h-screen items-center justify-center text-texto-principal bg-fondo">Cargando...</div>
   if (!session) return <Navigate to="/login" replace />
   return <>{children}</>
 }

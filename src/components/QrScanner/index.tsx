@@ -109,11 +109,11 @@ export default function QrScanner({ routeId, onAssigned, onClose }: Props) {
   }
 
   return (
-    <div className="fixed inset-0 z-[60] bg-zinc-950 flex flex-col">
+    <div className="fixed inset-0 z-[60] bg-fondo flex flex-col">
       {/* Header */}
       <div className="flex items-center justify-between px-4 h-14 shrink-0 border-b border-zinc-800">
-        <span className="text-white font-bold text-sm">Escanear QR</span>
-        <button onClick={handleClose} className="w-8 h-8 flex items-center justify-center rounded-full bg-zinc-800 hover:bg-zinc-700 text-zinc-400 hover:text-white transition-all text-xl leading-none">
+        <span className="text-texto-principal font-bold text-sm">Escanear QR</span>
+        <button onClick={handleClose} className="w-8 h-8 flex items-center justify-center rounded-full bg-superficie-alta hover:bg-superficie-alta-hover text-zinc-400 hover:text-texto-principal transition-all text-xl leading-none">
           ×
         </button>
       </div>
@@ -124,11 +124,11 @@ export default function QrScanner({ routeId, onAssigned, onClose }: Props) {
           <video ref={videoRef} className="w-full h-full object-cover" playsInline muted />
           <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
             <div className="w-56 h-56 relative">
-              <div className="absolute inset-0 border-2 border-yellow-400/60 rounded-2xl" />
-              <div className="absolute top-0 left-0 w-8 h-8 border-t-4 border-l-4 border-yellow-400 rounded-tl-2xl" />
-              <div className="absolute top-0 right-0 w-8 h-8 border-t-4 border-r-4 border-yellow-400 rounded-tr-2xl" />
-              <div className="absolute bottom-0 left-0 w-8 h-8 border-b-4 border-l-4 border-yellow-400 rounded-bl-2xl" />
-              <div className="absolute bottom-0 right-0 w-8 h-8 border-b-4 border-r-4 border-yellow-400 rounded-br-2xl" />
+              <div className="absolute inset-0 border-2 border-primario/60 rounded-2xl" />
+              <div className="absolute top-0 left-0 w-8 h-8 border-t-4 border-l-4 border-primario rounded-tl-2xl" />
+              <div className="absolute top-0 right-0 w-8 h-8 border-t-4 border-r-4 border-primario rounded-tr-2xl" />
+              <div className="absolute bottom-0 left-0 w-8 h-8 border-b-4 border-l-4 border-primario rounded-bl-2xl" />
+              <div className="absolute bottom-0 right-0 w-8 h-8 border-b-4 border-r-4 border-primario rounded-br-2xl" />
             </div>
             <p className="text-zinc-300 text-sm mt-6">Apunta al código QR del papel</p>
           </div>
@@ -138,7 +138,7 @@ export default function QrScanner({ routeId, onAssigned, onClose }: Props) {
       {/* Detected */}
       {state === 'detected' && (
         <div className="flex-1 flex flex-col items-center justify-center px-6 gap-5">
-          <div className="w-16 h-16 rounded-full bg-yellow-400/15 border border-yellow-400/30 flex items-center justify-center">
+          <div className="w-16 h-16 rounded-full bg-primario/15 border border-primario/30 flex items-center justify-center">
             <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#facc15" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round">
               <path d="M3 7V5a2 2 0 0 1 2-2h2"/><path d="M17 3h2a2 2 0 0 1 2 2v2"/>
               <path d="M21 17v2a2 2 0 0 1-2 2h-2"/><path d="M7 21H5a2 2 0 0 1-2-2v-2"/>
@@ -147,20 +147,20 @@ export default function QrScanner({ routeId, onAssigned, onClose }: Props) {
             </svg>
           </div>
           <div className="text-center">
-            <p className="text-white font-bold mb-1">QR detectado</p>
+            <p className="text-texto-principal font-bold mb-1">QR detectado</p>
             <p className="text-zinc-500 text-[11px] font-mono break-all">{detectedId}</p>
           </div>
           <p className="text-zinc-400 text-sm text-center">¿Asignar este QR a la ruta actual?</p>
           <button
             onClick={handleConfirm}
             disabled={saving}
-            className="w-full bg-yellow-400 text-zinc-950 font-black text-sm py-3.5 rounded-2xl hover:bg-yellow-300 transition-all disabled:opacity-50 shadow-lg shadow-yellow-400/20"
+            className="w-full bg-primario text-texto-en-acento font-black text-sm py-3.5 rounded-2xl hover:bg-primario-hover transition-all disabled:opacity-50 shadow-lg shadow-primario/20"
           >
             {saving ? 'Asignando...' : 'Confirmar asignación'}
           </button>
           <button
             onClick={handleClose}
-            className="w-full bg-zinc-800 text-zinc-300 font-bold text-sm py-3.5 rounded-2xl hover:bg-zinc-700 transition-all"
+            className="w-full bg-superficie-alta text-zinc-300 font-bold text-sm py-3.5 rounded-2xl hover:bg-superficie-alta-hover transition-all"
           >
             Cancelar
           </button>
@@ -176,7 +176,7 @@ export default function QrScanner({ routeId, onAssigned, onClose }: Props) {
           <p className="text-red-400 text-sm text-center">{message}</p>
           <button
             onClick={handleClose}
-            className="w-full bg-zinc-800 text-zinc-300 font-bold text-sm py-3.5 rounded-2xl hover:bg-zinc-700 transition-all"
+            className="w-full bg-superficie-alta text-zinc-300 font-bold text-sm py-3.5 rounded-2xl hover:bg-superficie-alta-hover transition-all"
           >
             Cerrar
           </button>

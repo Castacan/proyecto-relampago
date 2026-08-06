@@ -99,29 +99,29 @@ export default function PublicRoutePage() {
   }
 
   if (loading) return (
-    <div className="min-h-screen bg-zinc-950 flex items-center justify-center">
-      <div className="w-8 h-8 rounded-full border-2 border-yellow-400 border-t-transparent animate-spin" />
+    <div className="min-h-screen bg-fondo flex items-center justify-center">
+      <div className="w-8 h-8 rounded-full border-2 border-primario border-t-transparent animate-spin" />
     </div>
   )
 
   if (notFound) return (
-    <div className="min-h-screen bg-zinc-950 flex flex-col items-center justify-center p-8 text-center">
+    <div className="min-h-screen bg-fondo flex flex-col items-center justify-center p-8 text-center">
       <div className="text-5xl mb-4">🤔</div>
-      <h1 className="text-white font-black text-xl mb-2 tracking-tight">QR no reconocido</h1>
+      <h1 className="text-texto-principal font-black text-xl mb-2 tracking-tight">QR no reconocido</h1>
       <p className="text-zinc-500 text-sm">Este código no existe en el sistema.</p>
     </div>
   )
 
   if (qr!.status === 'available') {
     return (
-      <div className="min-h-screen bg-zinc-950 flex flex-col items-center justify-center p-8 text-center">
-        <div className="w-16 h-16 bg-zinc-800 rounded-2xl flex items-center justify-center mb-5 text-3xl border border-zinc-700/50">📦</div>
-        <h1 className="text-white font-black text-xl mb-2 tracking-tight">Sin ruta asignada</h1>
+      <div className="min-h-screen bg-fondo flex flex-col items-center justify-center p-8 text-center">
+        <div className="w-16 h-16 bg-superficie-alta rounded-2xl flex items-center justify-center mb-5 text-3xl border border-zinc-700/50">📦</div>
+        <h1 className="text-texto-principal font-black text-xl mb-2 tracking-tight">Sin ruta asignada</h1>
         <p className="text-zinc-500 text-sm mb-8">Este QR todavía no tiene ruta.</p>
         {session ? (
           <Link
             to={`/staff?qr=${qrId}`}
-            className="px-6 py-3.5 bg-yellow-400 hover:bg-yellow-300 text-zinc-950 font-bold rounded-2xl text-sm shadow-lg shadow-yellow-400/20 active:scale-95 transition-all"
+            className="px-6 py-3.5 bg-primario hover:bg-primario-hover text-texto-en-acento font-bold rounded-2xl text-sm shadow-lg shadow-primario/20 active:scale-95 transition-all"
           >
             🎨 Crear ruta para este QR
           </Link>
@@ -134,11 +134,11 @@ export default function PublicRoutePage() {
 
   if (qr!.status === 'in_use' && !qr!.routes) {
     return (
-      <div className="min-h-screen bg-zinc-950 flex flex-col items-center justify-center p-8 text-center">
-        <div className="w-16 h-16 bg-zinc-800 rounded-2xl flex items-center justify-center mb-5 text-3xl border border-zinc-700/50">🏁</div>
-        <h1 className="text-white font-black text-xl mb-2 tracking-tight">Esta ruta ya no está</h1>
+      <div className="min-h-screen bg-fondo flex flex-col items-center justify-center p-8 text-center">
+        <div className="w-16 h-16 bg-superficie-alta rounded-2xl flex items-center justify-center mb-5 text-3xl border border-zinc-700/50">🏁</div>
+        <h1 className="text-texto-principal font-black text-xl mb-2 tracking-tight">Esta ruta ya no está</h1>
         <p className="text-zinc-500 text-sm mb-8">La ruta fue retirada. ¡Hay nuevas esperándote!</p>
-        <Link to="/muro" className="px-6 py-3.5 bg-yellow-400 hover:bg-yellow-300 text-zinc-950 font-bold rounded-2xl text-sm shadow-lg shadow-yellow-400/20 active:scale-95 transition-all">
+        <Link to="/muro" className="px-6 py-3.5 bg-primario hover:bg-primario-hover text-texto-en-acento font-bold rounded-2xl text-sm shadow-lg shadow-primario/20 active:scale-95 transition-all">
           Ver el muro →
         </Link>
       </div>
@@ -166,7 +166,7 @@ export default function PublicRoutePage() {
   const label = getPublicLabel(level)
 
   return (
-    <div className="min-h-screen bg-zinc-950 flex flex-col">
+    <div className="min-h-screen bg-fondo flex flex-col">
       {/* Color bar top */}
       <div className="h-1.5 shrink-0" style={{ backgroundColor: colorHex }} />
 
@@ -181,7 +181,7 @@ export default function PublicRoutePage() {
         {session?.user && (
           <Link
             to="/mi-cuenta"
-            className="w-8 h-8 rounded-full bg-zinc-800 border border-zinc-700/60 flex items-center justify-center text-zinc-300 text-xs font-black hover:border-zinc-500 transition-colors"
+            className="w-8 h-8 rounded-full bg-superficie-alta border border-zinc-700/60 flex items-center justify-center text-zinc-300 text-xs font-black hover:border-zinc-500 transition-colors"
           >
             {climber?.display_name?.[0]?.toUpperCase() ?? '⚡'}
           </Link>
@@ -202,7 +202,7 @@ export default function PublicRoutePage() {
             style={{ backgroundColor: colorHex, boxShadow: `0 8px 32px ${colorHex}50` }}
           />
           <div>
-            <h1 className="text-white font-black text-5xl font-mono leading-none tracking-tight">{route.grade}</h1>
+            <h1 className="text-texto-principal font-black text-5xl font-mono leading-none tracking-tight">{route.grade}</h1>
             <p className="text-zinc-400 text-sm font-medium mt-1.5">
               {route.color.charAt(0).toUpperCase() + route.color.slice(1)}
               {routeData.zones ? <span className="text-zinc-600"> · {routeData.zones.name}</span> : ''}
@@ -239,7 +239,7 @@ export default function PublicRoutePage() {
       {/* Footer */}
       <div className="flex items-center justify-center px-5 py-4 border-t border-zinc-800/40">
         <div className="flex items-center gap-1.5">
-          <span className="text-yellow-400 text-xs">⚡</span>
+          <span className="text-primario text-xs">⚡</span>
           <span className="text-zinc-600 text-xs font-medium">Jaibamuro</span>
         </div>
       </div>

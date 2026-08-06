@@ -104,10 +104,10 @@ export default function ConfirmScanModal({ qrId, routeId, userId, onConfirmed, o
   }
 
   return (
-    <div className="fixed inset-0 z-[60] bg-zinc-950 flex flex-col">
+    <div className="fixed inset-0 z-[60] bg-fondo flex flex-col">
       <div className="flex items-center justify-between px-4 h-14 shrink-0 border-b border-zinc-800">
-        <span className="text-white font-bold text-sm">Confirmar con QR</span>
-        <button onClick={handleClose} className="w-8 h-8 flex items-center justify-center rounded-full bg-zinc-800 hover:bg-zinc-700 text-zinc-400 hover:text-white transition-all text-xl leading-none">
+        <span className="text-texto-principal font-bold text-sm">Confirmar con QR</span>
+        <button onClick={handleClose} className="w-8 h-8 flex items-center justify-center rounded-full bg-superficie-alta hover:bg-superficie-alta-hover text-zinc-400 hover:text-texto-principal transition-all text-xl leading-none">
           ×
         </button>
       </div>
@@ -117,11 +117,11 @@ export default function ConfirmScanModal({ qrId, routeId, userId, onConfirmed, o
           <video ref={videoRef} className="w-full h-full object-cover" playsInline muted />
           <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
             <div className="w-56 h-56 relative">
-              <div className={`absolute inset-0 border-2 rounded-2xl transition-colors ${state === 'mismatch' ? 'border-red-500/70' : 'border-yellow-400/60'}`} />
-              <div className="absolute top-0 left-0 w-8 h-8 border-t-4 border-l-4 border-yellow-400 rounded-tl-2xl" />
-              <div className="absolute top-0 right-0 w-8 h-8 border-t-4 border-r-4 border-yellow-400 rounded-tr-2xl" />
-              <div className="absolute bottom-0 left-0 w-8 h-8 border-b-4 border-l-4 border-yellow-400 rounded-bl-2xl" />
-              <div className="absolute bottom-0 right-0 w-8 h-8 border-b-4 border-r-4 border-yellow-400 rounded-br-2xl" />
+              <div className={`absolute inset-0 border-2 rounded-2xl transition-colors ${state === 'mismatch' ? 'border-red-500/70' : 'border-primario/60'}`} />
+              <div className="absolute top-0 left-0 w-8 h-8 border-t-4 border-l-4 border-primario rounded-tl-2xl" />
+              <div className="absolute top-0 right-0 w-8 h-8 border-t-4 border-r-4 border-primario rounded-tr-2xl" />
+              <div className="absolute bottom-0 left-0 w-8 h-8 border-b-4 border-l-4 border-primario rounded-bl-2xl" />
+              <div className="absolute bottom-0 right-0 w-8 h-8 border-b-4 border-r-4 border-primario rounded-br-2xl" />
             </div>
             {state === 'mismatch' ? (
               <p className="text-red-400 text-sm mt-6 font-semibold">Ese QR no es de esta ruta</p>
@@ -134,7 +134,7 @@ export default function ConfirmScanModal({ qrId, routeId, userId, onConfirmed, o
 
       {state === 'saving' && (
         <div className="flex-1 flex flex-col items-center justify-center gap-4">
-          <div className="w-8 h-8 rounded-full border-2 border-yellow-400 border-t-transparent animate-spin" />
+          <div className="w-8 h-8 rounded-full border-2 border-primario border-t-transparent animate-spin" />
           <p className="text-zinc-400 text-sm">Confirmando...</p>
         </div>
       )}
@@ -147,7 +147,7 @@ export default function ConfirmScanModal({ qrId, routeId, userId, onConfirmed, o
           <p className="text-red-400 text-sm text-center">{message}</p>
           <button
             onClick={handleClose}
-            className="w-full bg-zinc-800 text-zinc-300 font-bold text-sm py-3.5 rounded-2xl hover:bg-zinc-700 transition-all"
+            className="w-full bg-superficie-alta text-zinc-300 font-bold text-sm py-3.5 rounded-2xl hover:bg-superficie-alta-hover transition-all"
           >
             Cerrar
           </button>

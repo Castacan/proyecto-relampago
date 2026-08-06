@@ -1312,7 +1312,7 @@ export default function ChainCanvas({
 
       {zoom !== 1 && (
         <div className="absolute top-3 left-1/2 -translate-x-1/2 pointer-events-none z-10">
-          <div className="bg-zinc-900/80 backdrop-blur-sm text-zinc-400 text-[10px] font-bold px-2.5 py-1 rounded-full border border-zinc-700/50">
+          <div className="bg-superficie/80 backdrop-blur-sm text-zinc-400 text-[10px] font-bold px-2.5 py-1 rounded-full border border-zinc-700/50">
             {Math.round(zoom * 100)}% · doble tap para resetear
           </div>
         </div>

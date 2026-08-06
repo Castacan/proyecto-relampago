@@ -29,22 +29,22 @@ export default function PublicWallPage() {
   }
 
   return (
-    <div className="relative w-full h-screen bg-zinc-950 flex flex-col">
-      <header className="shrink-0 flex items-center justify-between px-4 h-12 bg-zinc-950/95 backdrop-blur-sm border-b border-zinc-800/40 z-10">
+    <div className="relative w-full h-screen bg-fondo flex flex-col">
+      <header className="shrink-0 flex items-center justify-between px-4 h-12 bg-fondo/95 backdrop-blur-sm border-b border-zinc-800/40 z-10">
         <div className="flex items-center gap-2">
-          <div className="w-7 h-7 bg-yellow-400 rounded-lg flex items-center justify-center">
+          <div className="w-7 h-7 bg-primario rounded-lg flex items-center justify-center">
             <span className="text-sm leading-none">⚡</span>
           </div>
-          <span className="text-white font-bold text-sm tracking-tight">Jaibamuro</span>
+          <span className="text-texto-principal font-bold text-sm tracking-tight">Jaibamuro</span>
         </div>
         <div className="flex items-center gap-2">
-          <div className="flex items-center gap-2 bg-zinc-900 rounded-full px-3.5 py-1.5 border border-zinc-800/60">
+          <div className="flex items-center gap-2 bg-superficie rounded-full px-3.5 py-1.5 border border-zinc-800/60">
             <div className="w-1.5 h-1.5 rounded-full bg-green-400" />
             <span className="text-zinc-300 text-xs font-semibold">{routes.length} rutas</span>
           </div>
           <Link
             to="/spraywall"
-            className="bg-zinc-900 rounded-full px-3.5 py-1.5 border border-zinc-800/60 text-zinc-300 text-xs font-semibold hover:text-white hover:border-zinc-700 transition-colors"
+            className="bg-superficie rounded-full px-3.5 py-1.5 border border-zinc-800/60 text-zinc-300 text-xs font-semibold hover:text-texto-principal hover:border-zinc-700 transition-colors"
           >
             Spraywall
           </Link>
@@ -54,7 +54,7 @@ export default function PublicWallPage() {
       <div className="relative flex-1 overflow-hidden min-h-0">
         {chainLoading || !defaultChainId ? (
           <div className="w-full h-full flex items-center justify-center">
-            <div className="w-6 h-6 rounded-full border-2 border-yellow-400 border-t-transparent animate-spin" />
+            <div className="w-6 h-6 rounded-full border-2 border-primario border-t-transparent animate-spin" />
           </div>
         ) : (
           <>
@@ -88,15 +88,15 @@ export default function PublicWallPage() {
             ) : (
               <button
                 onClick={() => setShowMap(true)}
-                className="absolute top-3 right-3 z-30 bg-zinc-950/95 backdrop-blur-sm border border-zinc-800/60 rounded-xl px-3 py-2 text-zinc-500 hover:text-zinc-300 transition-colors"
+                className="absolute top-3 right-3 z-30 bg-fondo/95 backdrop-blur-sm border border-zinc-800/60 rounded-xl px-3 py-2 text-zinc-500 hover:text-zinc-300 transition-colors"
               >
                 <span className="text-[9px] font-bold uppercase tracking-widest">Mapa</span>
               </button>
             )}
 
             {activeZoneId && (
-              <div className="absolute top-3 left-3 z-30 flex items-center gap-2 bg-zinc-900/95 backdrop-blur-sm border border-zinc-700/60 rounded-xl px-3.5 py-2.5 pointer-events-none">
-                <span className="text-white text-sm font-semibold truncate max-w-36">
+              <div className="absolute top-3 left-3 z-30 flex items-center gap-2 bg-superficie/95 backdrop-blur-sm border border-zinc-700/60 rounded-xl px-3.5 py-2.5 pointer-events-none">
+                <span className="text-texto-principal text-sm font-semibold truncate max-w-36">
                   {chainZones.find(z => z.id === activeZoneId)?.name ?? '—'}
                 </span>
               </div>

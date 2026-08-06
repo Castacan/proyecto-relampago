@@ -19,7 +19,7 @@ export default function SpraywallLegend({ interactive = false, activeRole, onSel
               } ${interactive && !isActive ? 'group-hover:scale-105' : ''}`}
               style={{ borderColor: r.hex, backgroundColor: 'transparent' }}
             />
-            <span className={`text-xs font-medium ${interactive && isActive ? 'text-white' : 'text-zinc-400'}`}>
+            <span className={`text-xs font-medium ${interactive && isActive ? 'text-texto-principal' : 'text-zinc-400'}`}>
               {r.label}
             </span>
           </>

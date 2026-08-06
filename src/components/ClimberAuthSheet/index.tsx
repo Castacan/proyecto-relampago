@@ -135,14 +135,14 @@ export default function ClimberAuthSheet({ isOpen, onClose, onDone, startAtSetup
   return (
     <div className="fixed inset-0 bg-black/75 backdrop-blur-sm flex items-end z-50" onClick={onClose}>
       <div
-        className="w-full bg-zinc-900 rounded-t-3xl px-6 pt-6 pb-12 border-t border-zinc-800/80 max-w-md mx-auto"
+        className="w-full bg-superficie rounded-t-3xl px-6 pt-6 pb-12 border-t border-zinc-800/80 max-w-md mx-auto"
         onClick={e => e.stopPropagation()}
       >
         <div className="w-10 h-1 bg-zinc-700 rounded-full mx-auto mb-6" />
 
         {step === 'email' && (
           <>
-            <h2 className="text-white font-black text-xl tracking-tight mb-1">Suma tus puntos</h2>
+            <h2 className="text-texto-principal font-black text-xl tracking-tight mb-1">Suma tus puntos</h2>
             <p className="text-zinc-500 text-sm mb-6">Inicia sesión para registrar tus sends y aparecer en el leaderboard.</p>
             <p className="text-zinc-500 text-[11px] font-semibold uppercase tracking-widest mb-2">Tu correo</p>
             <input
@@ -151,7 +151,7 @@ export default function ClimberAuthSheet({ isOpen, onClose, onDone, startAtSetup
               onChange={e => setEmail(e.target.value)}
               onKeyDown={e => { if (e.key === 'Enter') handleSendLink() }}
               placeholder="correo@ejemplo.com"
-              className="w-full bg-zinc-800 text-white rounded-xl px-4 py-3.5 text-sm mb-4 outline-none border border-zinc-700/50 hover:border-zinc-600 focus:border-yellow-400/60 transition-all placeholder:text-zinc-600"
+              className="w-full bg-superficie-alta text-texto-principal rounded-xl px-4 py-3.5 text-sm mb-4 outline-none border border-zinc-700/50 hover:border-zinc-600 focus:border-primario/60 transition-all placeholder:text-zinc-600"
               autoComplete="email"
               inputMode="email"
             />
@@ -159,7 +159,7 @@ export default function ClimberAuthSheet({ isOpen, onClose, onDone, startAtSetup
             <button
               onClick={handleSendLink}
               disabled={sending || !email.trim()}
-              className="w-full py-4 rounded-2xl bg-yellow-400 hover:bg-yellow-300 text-zinc-950 font-bold text-sm transition-all disabled:opacity-40 active:scale-95"
+              className="w-full py-4 rounded-2xl bg-primario hover:bg-primario-hover text-texto-en-acento font-bold text-sm transition-all disabled:opacity-40 active:scale-95"
             >
               {sending ? 'Enviando...' : 'Enviar link mágico'}
             </button>
@@ -173,9 +173,9 @@ export default function ClimberAuthSheet({ isOpen, onClose, onDone, startAtSetup
           <>
             <div className="text-center py-4">
               <div className="text-4xl mb-4">📬</div>
-              <h2 className="text-white font-black text-xl tracking-tight mb-2">Revisa tu correo</h2>
+              <h2 className="text-texto-principal font-black text-xl tracking-tight mb-2">Revisa tu correo</h2>
               <p className="text-zinc-400 text-sm leading-relaxed">
-                Te enviamos un link a <span className="text-white font-semibold">{email}</span>.
+                Te enviamos un link a <span className="text-texto-principal font-semibold">{email}</span>.
                 <br />Ábrelo en este mismo celular para continuar.
               </p>
               <p className="text-zinc-600 text-xs mt-3">El link expira en 1 hora.</p>
@@ -183,9 +183,9 @@ export default function ClimberAuthSheet({ isOpen, onClose, onDone, startAtSetup
 
             <div className="mt-2 mb-5">
               <div className="flex items-center gap-3 mb-4">
-                <div className="flex-1 h-px bg-zinc-800" />
+                <div className="flex-1 h-px bg-superficie-alta" />
                 <span className="text-zinc-600 text-[11px] font-semibold uppercase tracking-widest">o ingresa el código</span>
-                <div className="flex-1 h-px bg-zinc-800" />
+                <div className="flex-1 h-px bg-superficie-alta" />
               </div>
               <input
                 type="text"
@@ -196,13 +196,13 @@ export default function ClimberAuthSheet({ isOpen, onClose, onDone, startAtSetup
                 onKeyDown={e => { if (e.key === 'Enter') handleVerifyCode() }}
                 placeholder="000000"
                 maxLength={6}
-                className="w-full bg-zinc-800 text-white rounded-xl px-4 py-3.5 text-center text-2xl font-black tracking-[0.3em] mb-2 outline-none border border-zinc-700/50 hover:border-zinc-600 focus:border-yellow-400/60 transition-all placeholder:text-zinc-700"
+                className="w-full bg-superficie-alta text-texto-principal rounded-xl px-4 py-3.5 text-center text-2xl font-black tracking-[0.3em] mb-2 outline-none border border-zinc-700/50 hover:border-zinc-600 focus:border-primario/60 transition-all placeholder:text-zinc-700"
               />
               {codeError && <p className="text-red-400 text-xs mb-2 text-center">{codeError}</p>}
               <button
                 onClick={handleVerifyCode}
                 disabled={verifyingCode || code.length < 6}
-                className="w-full py-3.5 rounded-2xl bg-yellow-400 hover:bg-yellow-300 text-zinc-950 font-bold text-sm transition-all disabled:opacity-40 active:scale-95"
+                className="w-full py-3.5 rounded-2xl bg-primario hover:bg-primario-hover text-texto-en-acento font-bold text-sm transition-all disabled:opacity-40 active:scale-95"
               >
                 {verifyingCode ? 'Verificando...' : 'Confirmar código'}
               </button>
@@ -217,7 +217,7 @@ export default function ClimberAuthSheet({ isOpen, onClose, onDone, startAtSetup
                 <button
                   onClick={handleResend}
                   disabled={resending}
-                  className="w-full py-3 rounded-2xl bg-zinc-800 border border-zinc-700/50 text-zinc-300 text-sm font-semibold hover:bg-zinc-700 transition-all disabled:opacity-40 active:scale-95"
+                  className="w-full py-3 rounded-2xl bg-superficie-alta border border-zinc-700/50 text-zinc-300 text-sm font-semibold hover:bg-superficie-alta-hover transition-all disabled:opacity-40 active:scale-95"
                 >
                   {resending ? 'Reenviando...' : 'Reenviar link'}
                 </button>
@@ -234,7 +234,7 @@ export default function ClimberAuthSheet({ isOpen, onClose, onDone, startAtSetup
 
         {(step === 'setup' || step === 'saving') && (
           <>
-            <h2 className="text-white font-black text-xl tracking-tight mb-1">¡Ya casi!</h2>
+            <h2 className="text-texto-principal font-black text-xl tracking-tight mb-1">¡Ya casi!</h2>
             <p className="text-zinc-500 text-sm mb-6">Elige cómo aparecerás en el leaderboard.</p>
             <p className="text-zinc-500 text-[11px] font-semibold uppercase tracking-widest mb-2">Tu nombre o alias</p>
             <input
@@ -243,17 +243,17 @@ export default function ClimberAuthSheet({ isOpen, onClose, onDone, startAtSetup
               onChange={e => setDisplayName(e.target.value)}
               placeholder="Ej: Carlos M., LaGarra, etc."
               maxLength={24}
-              className="w-full bg-zinc-800 text-white rounded-xl px-4 py-3.5 text-sm mb-5 outline-none border border-zinc-700/50 hover:border-zinc-600 focus:border-yellow-400/60 transition-all placeholder:text-zinc-600"
+              className="w-full bg-superficie-alta text-texto-principal rounded-xl px-4 py-3.5 text-sm mb-5 outline-none border border-zinc-700/50 hover:border-zinc-600 focus:border-primario/60 transition-all placeholder:text-zinc-600"
             />
             <button
               onClick={() => setVisible(v => !v)}
-              className="w-full flex items-center gap-3 py-3.5 px-4 rounded-2xl bg-zinc-800 border border-zinc-700/50 mb-5 text-left transition-all hover:bg-zinc-700"
+              className="w-full flex items-center gap-3 py-3.5 px-4 rounded-2xl bg-superficie-alta border border-zinc-700/50 mb-5 text-left transition-all hover:bg-superficie-alta-hover"
             >
-              <div className={`w-5 h-5 rounded border-2 flex items-center justify-center shrink-0 transition-all ${visible ? 'bg-yellow-400 border-yellow-400' : 'border-zinc-600'}`}>
-                {visible && <span className="text-zinc-950 text-xs font-black">✓</span>}
+              <div className={`w-5 h-5 rounded border-2 flex items-center justify-center shrink-0 transition-all ${visible ? 'bg-primario border-primario' : 'border-zinc-600'}`}>
+                {visible && <span className="text-texto-en-acento text-xs font-black">✓</span>}
               </div>
               <div>
-                <p className="text-white text-sm font-semibold">Aparecer en la pantalla del gym</p>
+                <p className="text-texto-principal text-sm font-semibold">Aparecer en la pantalla del gym</p>
                 <p className="text-zinc-500 text-xs">Tu nombre se mostrará en el leaderboard público.</p>
               </div>
             </button>
@@ -264,7 +264,7 @@ export default function ClimberAuthSheet({ isOpen, onClose, onDone, startAtSetup
             <button
               onClick={handleSaveProfile}
               disabled={step === 'saving' || !displayName.trim()}
-              className="w-full py-4 rounded-2xl bg-yellow-400 hover:bg-yellow-300 text-zinc-950 font-bold text-sm transition-all disabled:opacity-40 active:scale-95"
+              className="w-full py-4 rounded-2xl bg-primario hover:bg-primario-hover text-texto-en-acento font-bold text-sm transition-all disabled:opacity-40 active:scale-95"
             >
               {step === 'saving' ? 'Guardando...' : 'Entrar al leaderboard'}
             </button>

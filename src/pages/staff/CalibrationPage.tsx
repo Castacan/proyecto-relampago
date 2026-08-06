@@ -101,9 +101,9 @@ function PhotoPanel({ zone, pairs, side, waitingForClick, onPhotoClick }: PhotoP
       </p>
       <div
         ref={containerRef}
-        className={`relative w-full aspect-video bg-zinc-800 rounded-xl overflow-hidden border transition-all ${
+        className={`relative w-full aspect-video bg-superficie-alta rounded-xl overflow-hidden border transition-all ${
           waitingForClick
-            ? 'border-yellow-400 cursor-crosshair shadow-[0_0_0_2px_rgba(250,204,21,0.3)]'
+            ? 'border-primario cursor-crosshair shadow-[0_0_0_2px_rgba(250,204,21,0.3)]'
             : 'border-zinc-700/50 cursor-default'
         }`}
         onClick={handleClick}
@@ -127,13 +127,13 @@ function PhotoPanel({ zone, pairs, side, waitingForClick, onPhotoClick }: PhotoP
           return (
             <div
               key={i}
-              className="absolute w-4 h-4 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-zinc-950 pointer-events-none"
+              className="absolute w-4 h-4 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-texto-en-acento pointer-events-none"
               style={{
                 ...dotStyle(p),
                 backgroundColor: PAIR_COLORS[i % PAIR_COLORS.length],
               }}
             >
-              <span className="absolute inset-0 flex items-center justify-center text-[8px] font-black text-white leading-none">
+              <span className="absolute inset-0 flex items-center justify-center text-[8px] font-black text-texto-principal leading-none">
                 {i + 1}
               </span>
             </div>
@@ -171,7 +171,7 @@ function PhotoPanel({ zone, pairs, side, waitingForClick, onPhotoClick }: PhotoP
         {/* Indicador cuando está esperando click */}
         {waitingForClick && (
           <div className="absolute top-2 left-0 right-0 flex justify-center pointer-events-none">
-            <div className="bg-yellow-400 text-zinc-950 text-[10px] font-black px-2 py-0.5 rounded-full">
+            <div className="bg-primario text-texto-en-acento text-[10px] font-black px-2 py-0.5 rounded-full">
               Toca un punto
             </div>
           </div>
@@ -262,26 +262,26 @@ export default function CalibrationPage() {
   }
 
   if (profile === null) return (
-    <div className="flex justify-center items-center h-full bg-zinc-950">
-      <div className="w-6 h-6 rounded-full border-2 border-yellow-400 border-t-transparent animate-spin" />
+    <div className="flex justify-center items-center h-full bg-fondo">
+      <div className="w-6 h-6 rounded-full border-2 border-primario border-t-transparent animate-spin" />
     </div>
   )
   if (profile.role !== 'admin') return <Navigate to="/staff" replace />
 
   return (
-    <div className="h-full overflow-y-auto bg-zinc-950">
+    <div className="h-full overflow-y-auto bg-fondo">
       <div className="px-4 pt-5 pb-8">
-        <h1 className="text-white font-black text-2xl tracking-tight mb-1">Calibración</h1>
+        <h1 className="text-texto-principal font-black text-2xl tracking-tight mb-1">Calibración</h1>
         <p className="text-zinc-500 text-sm mb-6">
           Toca el mismo punto físico en ambas fotos para crear un par. Añade 3-6 pares para mayor precisión.
         </p>
 
         {chainsLoading ? (
           <div className="flex justify-center py-10">
-            <div className="w-5 h-5 rounded-full border-2 border-yellow-400 border-t-transparent animate-spin" />
+            <div className="w-5 h-5 rounded-full border-2 border-primario border-t-transparent animate-spin" />
           </div>
         ) : chains.length === 0 ? (
-          <div className="bg-zinc-900 rounded-2xl p-5 border border-zinc-800 text-center">
+          <div className="bg-superficie rounded-2xl p-5 border border-zinc-800 text-center">
             <p className="text-zinc-500 text-sm">No hay cadenas creadas.</p>
           </div>
         ) : (
@@ -293,8 +293,8 @@ export default function CalibrationPage() {
                   onClick={() => setSelectedChainId(c.id)}
                   className={`px-4 py-2 rounded-xl text-sm font-bold transition-all ${
                     selectedChainId === c.id
-                      ? 'bg-yellow-400 text-zinc-950'
-                      : 'bg-zinc-800 text-zinc-300 hover:bg-zinc-700 border border-zinc-700'
+                      ? 'bg-primario text-texto-en-acento'
+                      : 'bg-superficie-alta text-zinc-300 hover:bg-superficie-alta-hover border border-zinc-700'
                   }`}
                 >
                   {c.name}
@@ -305,10 +305,10 @@ export default function CalibrationPage() {
             {selectedChainId && (
               chainLoading ? (
                 <div className="flex justify-center py-10">
-                  <div className="w-5 h-5 rounded-full border-2 border-yellow-400 border-t-transparent animate-spin" />
+                  <div className="w-5 h-5 rounded-full border-2 border-primario border-t-transparent animate-spin" />
                 </div>
               ) : sortedZones.length < 2 ? (
-                <div className="bg-zinc-900 rounded-2xl p-5 border border-zinc-800 text-center">
+                <div className="bg-superficie rounded-2xl p-5 border border-zinc-800 text-center">
                   <p className="text-zinc-500 text-sm">Necesitas al menos 2 zonas en esta cadena.</p>
                 </div>
               ) : (
@@ -325,10 +325,10 @@ export default function CalibrationPage() {
                     const waitingB = !!pending
 
                     return (
-                      <div key={key} className="bg-zinc-900 rounded-2xl p-4 border border-zinc-800/80">
+                      <div key={key} className="bg-superficie rounded-2xl p-4 border border-zinc-800/80">
                         <div className="flex items-center justify-between mb-4">
                           <div>
-                            <p className="text-white font-bold text-sm">{za.name} → {zb.name}</p>
+                            <p className="text-texto-principal font-bold text-sm">{za.name} → {zb.name}</p>
                             {pairs.length > 0 && (
                               <p className="text-zinc-500 text-xs mt-0.5">
                                 {pairs.length} par{pairs.length !== 1 ? 'es' : ''} ·
@@ -343,7 +343,7 @@ export default function CalibrationPage() {
                             className={`px-4 py-1.5 rounded-xl text-xs font-bold transition-all ${
                               wasSaved
                                 ? 'bg-green-500/20 text-green-400 border border-green-500/30'
-                                : 'bg-yellow-400 text-zinc-950 hover:bg-yellow-300 disabled:opacity-40'
+                                : 'bg-primario text-texto-en-acento hover:bg-primario-hover disabled:opacity-40'
                             }`}
                           >
                             {isSaving ? 'Guardando…' : wasSaved ? '✓ Guardado' : 'Guardar'}
@@ -354,7 +354,7 @@ export default function CalibrationPage() {
                         <div className="mb-3 text-center">
                           {pending ? (
                             <div className="flex items-center justify-center gap-2">
-                              <span className="text-yellow-400 text-xs font-bold">
+                              <span className="text-primario text-xs font-bold">
                                 Paso 2: toca el mismo punto en {zb.name}
                               </span>
                               <button
@@ -397,7 +397,7 @@ export default function CalibrationPage() {
                             {pairs.map((_, pi) => (
                               <div
                                 key={pi}
-                                className="flex items-center gap-1.5 bg-zinc-800 rounded-full px-2.5 py-1"
+                                className="flex items-center gap-1.5 bg-superficie-alta rounded-full px-2.5 py-1"
                               >
                                 <div
                                   className="w-2.5 h-2.5 rounded-full"

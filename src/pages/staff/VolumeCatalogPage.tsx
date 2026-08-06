@@ -14,10 +14,10 @@ type DrawMode = 'perimeter' | 'details'
 
 function ShapePreview({ item, size = 56 }: { item: Pick<VolumeCatalogItem, 'shape' | 'details'>; size?: number }) {
   const { shape, details = [] } = item
-  if (!shape.length) return <div className="bg-zinc-800 rounded-xl" style={{ width: size, height: size }} />
+  if (!shape.length) return <div className="bg-superficie-alta rounded-xl" style={{ width: size, height: size }} />
   const pts = shape.map(p => `${p.x * size},${p.y * size}`).join(' ')
   return (
-    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className="rounded-xl overflow-hidden bg-zinc-800">
+    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className="rounded-xl overflow-hidden bg-superficie-alta">
       <polygon points={pts} fill="rgba(110,110,110,0.55)" stroke="rgba(180,180,180,0.6)" strokeWidth={1.5} />
       {details.map((stroke, i) => (
         <polyline
@@ -275,26 +275,26 @@ export default function VolumeCatalogPage() {
   }
 
   if (profile === null) return (
-    <div className="flex justify-center items-center h-full bg-zinc-950">
-      <div className="w-6 h-6 rounded-full border-2 border-yellow-400 border-t-transparent animate-spin" />
+    <div className="flex justify-center items-center h-full bg-fondo">
+      <div className="w-6 h-6 rounded-full border-2 border-primario border-t-transparent animate-spin" />
     </div>
   )
   if (profile.role !== 'admin') return <Navigate to="/staff" replace />
 
   return (
-    <div className="h-full overflow-y-auto bg-zinc-950">
+    <div className="h-full overflow-y-auto bg-fondo">
       <div className="px-4 pt-5 pb-10">
         <div className="flex items-center gap-3 mb-6">
-          <button onClick={() => navigate('/staff/admin')} className="text-zinc-400 hover:text-white transition-colors">
+          <button onClick={() => navigate('/staff/admin')} className="text-zinc-400 hover:text-texto-principal transition-colors">
             ← Admin
           </button>
-          <h1 className="text-white font-black text-xl tracking-tight">Catálogo de Volúmenes</h1>
+          <h1 className="text-texto-principal font-black text-xl tracking-tight">Catálogo de Volúmenes</h1>
         </div>
 
         {/* Draw / Edit area */}
-        <div className="bg-zinc-900 rounded-2xl p-4 border border-zinc-800/80 mb-4">
+        <div className="bg-superficie rounded-2xl p-4 border border-zinc-800/80 mb-4">
           <div className="flex items-center justify-between mb-1">
-            <h2 className="text-white font-bold text-base">
+            <h2 className="text-texto-principal font-bold text-base">
               {isEditing ? `Editando: ${name || '…'}` : 'Dibujar nueva forma'}
             </h2>
             {(hasPerimeter || savedDetails.length > 0 || isEditing) && (
@@ -314,11 +314,11 @@ export default function VolumeCatalogPage() {
 
           {/* Mode toggle — solo al crear, no al editar */}
           {hasPerimeter && !isEditing && (
-            <div className="flex gap-1 mb-3 bg-zinc-800 p-1 rounded-xl">
+            <div className="flex gap-1 mb-3 bg-superficie-alta p-1 rounded-xl">
               <button
                 onClick={() => setDrawMode('perimeter')}
                 className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all ${
-                  drawMode === 'perimeter' ? 'bg-zinc-600 text-white' : 'text-zinc-500 hover:text-zinc-300'
+                  drawMode === 'perimeter' ? 'bg-zinc-600 text-texto-principal' : 'text-zinc-500 hover:text-zinc-300'
                 }`}
               >
                 Contorno
@@ -326,7 +326,7 @@ export default function VolumeCatalogPage() {
               <button
                 onClick={() => setDrawMode('details')}
                 className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all ${
-                  drawMode === 'details' ? 'bg-zinc-600 text-white' : 'text-zinc-500 hover:text-zinc-300'
+                  drawMode === 'details' ? 'bg-zinc-600 text-texto-principal' : 'text-zinc-500 hover:text-zinc-300'
                 }`}
               >
                 + Detalles
@@ -338,7 +338,7 @@ export default function VolumeCatalogPage() {
             ref={canvasRef}
             width={CANVAS_RES}
             height={CANVAS_RES}
-            className="rounded-2xl border-2 border-zinc-700 bg-zinc-800 touch-none cursor-crosshair"
+            className="rounded-2xl border-2 border-zinc-700 bg-superficie-alta touch-none cursor-crosshair"
             style={{ width: '100%', maxWidth: 300, aspectRatio: '1 / 1', display: 'block', margin: '0 auto' }}
             onMouseDown={onStart}
             onMouseMove={onMove}
@@ -353,7 +353,7 @@ export default function VolumeCatalogPage() {
               {savedDetails.length > 0 && (
                 <button
                   onClick={() => setSavedDetails(prev => prev.slice(0, -1))}
-                  className="w-full py-2.5 rounded-xl font-bold text-xs bg-zinc-800 text-zinc-400 hover:bg-zinc-700 hover:text-zinc-200 border border-zinc-700 transition-all"
+                  className="w-full py-2.5 rounded-xl font-bold text-xs bg-superficie-alta text-zinc-400 hover:bg-superficie-alta-hover hover:text-zinc-200 border border-zinc-700 transition-all"
                 >
                   Deshacer último trazo
                 </button>
@@ -363,7 +363,7 @@ export default function VolumeCatalogPage() {
                 placeholder="Nombre del volumen (ej. Triángulo grande)"
                 value={name}
                 onChange={e => setName(e.target.value)}
-                className="w-full bg-zinc-800 text-white rounded-xl px-4 py-3 text-sm outline-none border border-zinc-700/50 focus:border-yellow-400/60 transition-all"
+                className="w-full bg-superficie-alta text-texto-principal rounded-xl px-4 py-3 text-sm outline-none border border-zinc-700/50 focus:border-primario/60 transition-all"
               />
               <div className="flex items-center gap-3">
                 <label className="text-zinc-500 text-xs font-medium shrink-0">Inventario</label>
@@ -373,7 +373,7 @@ export default function VolumeCatalogPage() {
                   placeholder="Ilimitado"
                   value={quantity}
                   onChange={e => setQuantity(e.target.value)}
-                  className="w-28 bg-zinc-800 text-white rounded-xl px-3 py-2 text-sm outline-none border border-zinc-700/50 focus:border-yellow-400/60 transition-all"
+                  className="w-28 bg-superficie-alta text-texto-principal rounded-xl px-3 py-2 text-sm outline-none border border-zinc-700/50 focus:border-primario/60 transition-all"
                 />
                 <span className="text-zinc-600 text-xs">piezas (opcional)</span>
               </div>
@@ -383,7 +383,7 @@ export default function VolumeCatalogPage() {
               <button
                 onClick={isEditing ? saveEdit : saveShape}
                 disabled={saving || !name.trim()}
-                className="w-full py-3 rounded-2xl font-bold text-sm bg-yellow-400 text-zinc-950 hover:bg-yellow-300 disabled:opacity-40 transition-all"
+                className="w-full py-3 rounded-2xl font-bold text-sm bg-primario text-texto-en-acento hover:bg-primario-hover disabled:opacity-40 transition-all"
               >
                 {saving ? 'Guardando...' : isEditing ? 'Guardar cambios' : 'Guardar en catálogo'}
               </button>
@@ -394,21 +394,21 @@ export default function VolumeCatalogPage() {
         </div>
 
         {/* Catalog list */}
-        <div className="bg-zinc-900 rounded-2xl p-4 border border-zinc-800/80">
-          <h2 className="text-white font-bold text-base mb-4">Catálogo ({catalog.length})</h2>
+        <div className="bg-superficie rounded-2xl p-4 border border-zinc-800/80">
+          <h2 className="text-texto-principal font-bold text-base mb-4">Catálogo ({catalog.length})</h2>
           {loading ? (
             <div className="flex justify-center py-4">
-              <div className="w-5 h-5 rounded-full border-2 border-yellow-400 border-t-transparent animate-spin" />
+              <div className="w-5 h-5 rounded-full border-2 border-primario border-t-transparent animate-spin" />
             </div>
           ) : catalog.length === 0 ? (
             <p className="text-zinc-600 text-xs text-center py-4">Sin formas guardadas</p>
           ) : (
             <div className="space-y-3">
               {catalog.map(item => (
-                <div key={item.id} className={`flex items-center gap-3 bg-zinc-800 rounded-2xl p-3 ${editingItemId === item.id ? 'ring-2 ring-yellow-400/60' : ''}`}>
+                <div key={item.id} className={`flex items-center gap-3 bg-superficie-alta rounded-2xl p-3 ${editingItemId === item.id ? 'ring-2 ring-primario/60' : ''}`}>
                   <ShapePreview item={item} size={56} />
                   <div className="flex-1 min-w-0">
-                    <p className="text-white text-sm font-bold truncate">{item.name}</p>
+                    <p className="text-texto-principal text-sm font-bold truncate">{item.name}</p>
                     <p className="text-zinc-500 text-xs">
                       {item.quantity != null ? `Inv: ${item.quantity}` : 'Sin límite'}
                       {(item.details?.length ?? 0) > 0 ? ` · ${item.details.length} det.` : ' · sin detalles'}
@@ -417,7 +417,7 @@ export default function VolumeCatalogPage() {
                   <div className="flex flex-col gap-1.5 shrink-0">
                     <button
                       onClick={() => startEdit(item)}
-                      className="text-zinc-400 hover:text-yellow-400 text-xs font-bold transition-colors px-2 py-1 rounded"
+                      className="text-zinc-400 hover:text-primario text-xs font-bold transition-colors px-2 py-1 rounded"
                     >
                       Editar
                     </button>

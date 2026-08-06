@@ -193,13 +193,13 @@ export default function WallPage() {
   }
 
   if (chainLoading || allZones.length === 0) return (
-    <div className="w-full h-full flex items-center justify-center bg-zinc-950">
-      <div className="w-6 h-6 rounded-full border-2 border-yellow-400 border-t-transparent animate-spin" />
+    <div className="w-full h-full flex items-center justify-center bg-fondo">
+      <div className="w-6 h-6 rounded-full border-2 border-primario border-t-transparent animate-spin" />
     </div>
   )
 
   if (!defaultChainId || chainZones.length === 0) return (
-    <div className="w-full h-full flex items-center justify-center bg-zinc-950 px-8 text-center">
+    <div className="w-full h-full flex items-center justify-center bg-fondo px-8 text-center">
       <div>
         <p className="text-zinc-400 text-sm font-medium mb-2">No hay cadenas configuradas.</p>
         <p className="text-zinc-600 text-xs">Ve a Admin → Calibración para configurar las zonas.</p>
@@ -256,15 +256,15 @@ export default function WallPage() {
       ) : (
         <button
           onClick={() => setShowMap(true)}
-          className="absolute top-3 right-3 z-30 bg-zinc-950/95 backdrop-blur-sm border border-zinc-800/60 rounded-xl px-3 py-2 text-zinc-500 hover:text-zinc-300 transition-colors"
+          className="absolute top-3 right-3 z-30 bg-fondo/95 backdrop-blur-sm border border-zinc-800/60 rounded-xl px-3 py-2 text-zinc-500 hover:text-zinc-300 transition-colors"
         >
           <span className="text-[9px] font-bold uppercase tracking-widest">Mapa</span>
         </button>
       )}
 
       {/* Badge zona activa */}
-      <div className="absolute top-3 left-3 z-30 flex items-center gap-2 bg-zinc-900/95 backdrop-blur-sm border border-zinc-700/60 rounded-xl px-3.5 py-2.5 pointer-events-none">
-        <span className="text-white text-sm font-semibold truncate max-w-36">
+      <div className="absolute top-3 left-3 z-30 flex items-center gap-2 bg-superficie/95 backdrop-blur-sm border border-zinc-700/60 rounded-xl px-3.5 py-2.5 pointer-events-none">
+        <span className="text-texto-principal text-sm font-semibold truncate max-w-36">
           {activeZone?.name ?? '—'}
         </span>
         <span className="text-zinc-500 text-xs font-medium">
@@ -277,7 +277,7 @@ export default function WallPage() {
       {/* QR assignment banner */}
       {assignQrId && ui !== 'form' && (
         <div className="absolute top-14 left-0 right-0 flex justify-center pointer-events-none z-20">
-          <div className="bg-yellow-400 text-zinc-950 px-5 py-2 rounded-full text-xs font-bold shadow-lg shadow-yellow-400/20">
+          <div className="bg-primario text-texto-en-acento px-5 py-2 rounded-full text-xs font-bold shadow-lg shadow-primario/20">
             QR {assignQrId} — dibuja la ruta para asignarlo
           </div>
         </div>
@@ -286,9 +286,9 @@ export default function WallPage() {
       {/* Draw hint — route */}
       {ui === 'drawing' && (
         <div className="absolute top-14 left-0 right-0 flex justify-center pointer-events-none z-20">
-          <div className="flex items-center gap-2.5 bg-zinc-950/95 backdrop-blur-sm px-5 py-2.5 rounded-full border border-zinc-800/60 shadow-xl">
+          <div className="flex items-center gap-2.5 bg-fondo/95 backdrop-blur-sm px-5 py-2.5 rounded-full border border-zinc-800/60 shadow-xl">
             <div className="w-3 h-3 rounded-full border border-white/30 shrink-0" style={{ backgroundColor: getColorHex(paintColor) }} />
-            <span className="text-yellow-400 text-xs font-semibold">Dibuja la ruta con el dedo</span>
+            <span className="text-primario text-xs font-semibold">Dibuja la ruta con el dedo</span>
           </div>
         </div>
       )}
@@ -296,9 +296,9 @@ export default function WallPage() {
       {/* Review hint — route */}
       {ui === 'review' && (
         <div className="absolute top-14 left-0 right-0 flex justify-center pointer-events-none z-20">
-          <div className="flex items-center gap-2.5 bg-zinc-950/95 backdrop-blur-sm px-5 py-2.5 rounded-full border border-zinc-800/60 shadow-xl">
+          <div className="flex items-center gap-2.5 bg-fondo/95 backdrop-blur-sm px-5 py-2.5 rounded-full border border-zinc-800/60 shadow-xl">
             <div className="w-3 h-3 rounded-full border border-white/30 shrink-0" style={{ backgroundColor: getColorHex(paintColor) }} />
-            <span className="text-white text-xs font-semibold">¿Se ve bien?</span>
+            <span className="text-texto-principal text-xs font-semibold">¿Se ve bien?</span>
           </div>
         </div>
       )}
@@ -306,9 +306,9 @@ export default function WallPage() {
       {/* Reposition hint */}
       {ui === 'vol-reposition' && (
         <div className="absolute top-14 left-0 right-0 flex justify-center pointer-events-none z-20">
-          <div className="flex items-center gap-2.5 bg-zinc-950/95 backdrop-blur-sm px-5 py-2.5 rounded-full border border-yellow-400/40 shadow-xl">
-            <div className="w-3 h-3 rounded-full bg-yellow-400 shrink-0" />
-            <span className="text-yellow-400 text-xs font-semibold">Arrastra el volumen a su posición correcta</span>
+          <div className="flex items-center gap-2.5 bg-fondo/95 backdrop-blur-sm px-5 py-2.5 rounded-full border border-primario/40 shadow-xl">
+            <div className="w-3 h-3 rounded-full bg-primario shrink-0" />
+            <span className="text-primario text-xs font-semibold">Arrastra el volumen a su posición correcta</span>
           </div>
         </div>
       )}
@@ -316,9 +316,9 @@ export default function WallPage() {
       {/* Vol-place hint */}
       {ui === 'vol-place' && selectedCatalogItem && (
         <div className="absolute top-14 left-0 right-0 flex justify-center pointer-events-none z-20">
-          <div className="flex items-center gap-2.5 bg-zinc-950/95 backdrop-blur-sm px-5 py-2.5 rounded-full border border-zinc-800/60 shadow-xl">
+          <div className="flex items-center gap-2.5 bg-fondo/95 backdrop-blur-sm px-5 py-2.5 rounded-full border border-zinc-800/60 shadow-xl">
             <div className="w-3 h-3 rounded-full bg-zinc-400 shrink-0" />
-            <span className="text-white text-xs font-semibold">Toca donde quieres colocar «{selectedCatalogItem.name}»</span>
+            <span className="text-texto-principal text-xs font-semibold">Toca donde quieres colocar «{selectedCatalogItem.name}»</span>
           </div>
         </div>
       )}
@@ -326,9 +326,9 @@ export default function WallPage() {
       {/* Vol-adjust hint */}
       {ui === 'vol-adjust' && (
         <div className="absolute top-14 left-0 right-0 flex justify-center pointer-events-none z-20">
-          <div className="flex items-center gap-2.5 bg-zinc-950/95 backdrop-blur-sm px-5 py-2.5 rounded-full border border-yellow-400/40 shadow-xl">
-            <div className="w-3 h-3 rounded-full bg-yellow-400 shrink-0" />
-            <span className="text-yellow-400 text-xs font-semibold">↻ rotar · ⤡ escalar · cuerpo para mover</span>
+          <div className="flex items-center gap-2.5 bg-fondo/95 backdrop-blur-sm px-5 py-2.5 rounded-full border border-primario/40 shadow-xl">
+            <div className="w-3 h-3 rounded-full bg-primario shrink-0" />
+            <span className="text-primario text-xs font-semibold">↻ rotar · ⤡ escalar · cuerpo para mover</span>
           </div>
         </div>
       )}
@@ -342,14 +342,14 @@ export default function WallPage() {
             <div className="flex gap-2.5 pointer-events-auto">
               <button
                 onClick={() => setUi('vol-catalog')}
-                className="flex items-center gap-2 px-4 py-3.5 rounded-2xl font-bold text-sm shadow-xl bg-zinc-800 text-zinc-300 border-2 border-zinc-700 hover:bg-zinc-700 hover:text-white active:scale-95 transition-all"
+                className="flex items-center gap-2 px-4 py-3.5 rounded-2xl font-bold text-sm shadow-xl bg-superficie-alta text-zinc-300 border-2 border-zinc-700 hover:bg-superficie-alta-hover hover:text-texto-principal active:scale-95 transition-all"
               >
                 <div className="w-4 h-4 rounded bg-zinc-500/60 border border-zinc-400/50" />
                 Volumen
               </button>
               <button
                 onClick={() => setUi('color-pick')}
-                className="flex items-center gap-2.5 px-6 py-3.5 rounded-2xl font-black text-base shadow-2xl shadow-yellow-400/30 bg-yellow-400 text-zinc-950 hover:bg-yellow-300 active:scale-95 transition-all border-2 border-yellow-300/40"
+                className="flex items-center gap-2.5 px-6 py-3.5 rounded-2xl font-black text-base shadow-2xl shadow-primario/30 bg-primario text-texto-en-acento hover:bg-primario-hover active:scale-95 transition-all border-2 border-primario-hover/40"
               >
                 <span className="text-xl leading-none font-black">+</span>
                 Nueva ruta
@@ -360,13 +360,13 @@ export default function WallPage() {
             <div className="flex gap-3 pointer-events-auto">
               <button
                 onClick={() => { setNewBlobPath(null); setUi('drawing') }}
-                className="px-5 py-3.5 rounded-2xl font-bold text-sm shadow-xl bg-zinc-800 text-zinc-300 border-2 border-zinc-700 hover:bg-zinc-700 hover:text-white active:scale-95 transition-all"
+                className="px-5 py-3.5 rounded-2xl font-bold text-sm shadow-xl bg-superficie-alta text-zinc-300 border-2 border-zinc-700 hover:bg-superficie-alta-hover hover:text-texto-principal active:scale-95 transition-all"
               >
                 Rehacer
               </button>
               <button
                 onClick={() => setUi('form')}
-                className="px-6 py-3.5 rounded-2xl font-bold text-sm shadow-2xl shadow-yellow-400/30 bg-yellow-400 text-zinc-950 hover:bg-yellow-300 active:scale-95 transition-all border-2 border-yellow-300/40"
+                className="px-6 py-3.5 rounded-2xl font-bold text-sm shadow-2xl shadow-primario/30 bg-primario text-texto-en-acento hover:bg-primario-hover active:scale-95 transition-all border-2 border-primario-hover/40"
               >
                 Continuar →
               </button>
@@ -376,13 +376,13 @@ export default function WallPage() {
             <div className="flex gap-3 pointer-events-auto">
               <button
                 onClick={cancelAll}
-                className="px-4 py-3.5 rounded-2xl font-bold text-sm shadow-xl bg-zinc-800 text-zinc-300 border-2 border-zinc-700 hover:bg-zinc-700 hover:text-white active:scale-95 transition-all"
+                className="px-4 py-3.5 rounded-2xl font-bold text-sm shadow-xl bg-superficie-alta text-zinc-300 border-2 border-zinc-700 hover:bg-superficie-alta-hover hover:text-texto-principal active:scale-95 transition-all"
               >
                 Cancelar
               </button>
               <button
                 onClick={saveReposition}
-                className="px-6 py-3.5 rounded-2xl font-bold text-sm shadow-2xl bg-yellow-400 text-zinc-950 hover:bg-yellow-300 active:scale-95 transition-all border-2 border-yellow-300/40"
+                className="px-6 py-3.5 rounded-2xl font-bold text-sm shadow-2xl bg-primario text-texto-en-acento hover:bg-primario-hover active:scale-95 transition-all border-2 border-primario-hover/40"
               >
                 Guardar posición
               </button>
@@ -392,7 +392,7 @@ export default function WallPage() {
             <div className="flex gap-3 pointer-events-auto">
               <button
                 onClick={cancelAll}
-                className="px-4 py-3.5 rounded-2xl font-bold text-sm shadow-xl bg-zinc-800 text-zinc-300 border-2 border-zinc-700 hover:bg-zinc-700 hover:text-white active:scale-95 transition-all"
+                className="px-4 py-3.5 rounded-2xl font-bold text-sm shadow-xl bg-superficie-alta text-zinc-300 border-2 border-zinc-700 hover:bg-superficie-alta-hover hover:text-texto-principal active:scale-95 transition-all"
               >
                 Cancelar
               </button>
@@ -402,13 +402,13 @@ export default function WallPage() {
             <div className="flex gap-3 pointer-events-auto">
               <button
                 onClick={cancelAll}
-                className="px-4 py-3.5 rounded-2xl font-bold text-sm shadow-xl bg-zinc-800 text-zinc-300 border-2 border-zinc-700 hover:bg-zinc-700 hover:text-white active:scale-95 transition-all"
+                className="px-4 py-3.5 rounded-2xl font-bold text-sm shadow-xl bg-superficie-alta text-zinc-300 border-2 border-zinc-700 hover:bg-superficie-alta-hover hover:text-texto-principal active:scale-95 transition-all"
               >
                 Cancelar
               </button>
               <button
                 onClick={saveAdjust}
-                className="px-6 py-3.5 rounded-2xl font-bold text-sm shadow-2xl bg-yellow-400 text-zinc-950 hover:bg-yellow-300 active:scale-95 transition-all border-2 border-yellow-300/40"
+                className="px-6 py-3.5 rounded-2xl font-bold text-sm shadow-2xl bg-primario text-texto-en-acento hover:bg-primario-hover active:scale-95 transition-all border-2 border-primario-hover/40"
               >
                 Guardar
               </button>
@@ -417,7 +417,7 @@ export default function WallPage() {
           ) : (
             <button
               onClick={cancelAll}
-              className="pointer-events-auto px-6 py-3.5 rounded-2xl font-bold text-sm shadow-xl bg-zinc-800 text-zinc-300 border-2 border-zinc-700 hover:bg-zinc-700 hover:text-white active:scale-95 transition-all"
+              className="pointer-events-auto px-6 py-3.5 rounded-2xl font-bold text-sm shadow-xl bg-superficie-alta text-zinc-300 border-2 border-zinc-700 hover:bg-superficie-alta-hover hover:text-texto-principal active:scale-95 transition-all"
             >
               Cancelar
             </button>
@@ -428,9 +428,9 @@ export default function WallPage() {
       {/* Color picker sheet */}
       {ui === 'color-pick' && (
         <div className="fixed inset-0 bg-black/75 backdrop-blur-sm flex items-end z-50" onClick={cancelAll}>
-          <div className="w-full bg-zinc-900 rounded-t-3xl px-6 pt-6 pb-24 border-t border-zinc-800/80" onClick={e => e.stopPropagation()}>
+          <div className="w-full bg-superficie rounded-t-3xl px-6 pt-6 pb-24 border-t border-zinc-800/80" onClick={e => e.stopPropagation()}>
             <div className="w-10 h-1 bg-zinc-700 rounded-full mx-auto mb-5" />
-            <h2 className="text-white font-bold text-lg tracking-tight mb-5">¿De qué color son las presas?</h2>
+            <h2 className="text-texto-principal font-bold text-lg tracking-tight mb-5">¿De qué color son las presas?</h2>
             <div className="grid grid-cols-6 gap-3 mb-6">
               {ROUTE_COLORS.map(c => (
                 <button key={c.key} onClick={() => setPaintColor(c.key)} className="flex flex-col items-center gap-2 group cursor-pointer">
@@ -440,15 +440,15 @@ export default function WallPage() {
                     }`}
                     style={{ backgroundColor: c.hex }}
                   />
-                  <span className={`text-[10px] font-medium transition-colors ${paintColor === c.key ? 'text-white' : 'text-zinc-500 group-hover:text-zinc-300'}`}>{c.label}</span>
+                  <span className={`text-[10px] font-medium transition-colors ${paintColor === c.key ? 'text-texto-principal' : 'text-zinc-500 group-hover:text-zinc-300'}`}>{c.label}</span>
                 </button>
               ))}
             </div>
             <button
               onClick={() => setUi('drawing')}
-              className="w-full py-4 rounded-2xl bg-yellow-400 hover:bg-yellow-300 text-zinc-950 font-bold text-sm flex items-center justify-center gap-2.5 transition-all shadow-lg shadow-yellow-400/20"
+              className="w-full py-4 rounded-2xl bg-primario hover:bg-primario-hover text-texto-en-acento font-bold text-sm flex items-center justify-center gap-2.5 transition-all shadow-lg shadow-primario/20"
             >
-              <div className="w-5 h-5 rounded-full border-2 border-zinc-950/30 shrink-0" style={{ backgroundColor: getColorHex(paintColor) }} />
+              <div className="w-5 h-5 rounded-full border-2 border-texto-en-acento/30 shrink-0" style={{ backgroundColor: getColorHex(paintColor) }} />
               Listo, a dibujar
             </button>
           </div>
@@ -458,9 +458,9 @@ export default function WallPage() {
       {/* Vol-catalog sheet: pick draw mode or catalog item */}
       {ui === 'vol-catalog' && (
         <div className="fixed inset-0 bg-black/75 backdrop-blur-sm flex items-end z-50" onClick={cancelAll}>
-          <div className="w-full bg-zinc-900 rounded-t-3xl px-6 pt-6 pb-24 border-t border-zinc-800/80" onClick={e => e.stopPropagation()}>
+          <div className="w-full bg-superficie rounded-t-3xl px-6 pt-6 pb-24 border-t border-zinc-800/80" onClick={e => e.stopPropagation()}>
             <div className="w-10 h-1 bg-zinc-700 rounded-full mx-auto mb-5" />
-            <h2 className="text-white font-bold text-lg tracking-tight mb-4">Agregar volumen</h2>
+            <h2 className="text-texto-principal font-bold text-lg tracking-tight mb-4">Agregar volumen</h2>
             {catalog.length > 0 && (
               <>
                 <div className="space-y-2 max-h-64 overflow-y-auto">
@@ -473,9 +473,9 @@ export default function WallPage() {
                         key={item.id}
                         onClick={() => { if (!atMax) { setSelectedCatalogItem(item); setUi('vol-place') } }}
                         disabled={atMax}
-                        className={`w-full flex items-center gap-3 py-3 px-4 rounded-2xl text-white transition-all text-left ${atMax ? 'bg-zinc-800/40 opacity-50 cursor-not-allowed' : 'bg-zinc-800 hover:bg-zinc-700'}`}
+                        className={`w-full flex items-center gap-3 py-3 px-4 rounded-2xl text-texto-principal transition-all text-left ${atMax ? 'bg-superficie-alta/40 opacity-50 cursor-not-allowed' : 'bg-superficie-alta hover:bg-superficie-alta-hover'}`}
                       >
-                        <svg width="44" height="44" viewBox="0 0 44 44" className="shrink-0 rounded-lg bg-zinc-900">
+                        <svg width="44" height="44" viewBox="0 0 44 44" className="shrink-0 rounded-lg bg-superficie">
                           <polygon points={pts} fill="rgba(110,110,110,0.55)" stroke="rgba(180,180,180,0.6)" strokeWidth={1.5} />
                           {(item.details ?? []).map((stroke, si) => (
                             <polyline key={si} points={stroke.map(p => `${p.x*44},${p.y*44}`).join(' ')} fill="none" stroke="rgba(35,35,35,0.9)" strokeWidth={2} strokeLinecap="round" />
@@ -508,13 +508,13 @@ export default function WallPage() {
       {/* Volume action sheet */}
       {ui === 'vol-action' && actionVol && (
         <div className="fixed inset-0 bg-black/75 backdrop-blur-sm flex items-end z-50" onClick={cancelAll}>
-          <div className="w-full bg-zinc-900 rounded-t-3xl px-6 pt-6 pb-24 border-t border-zinc-800/80" onClick={e => e.stopPropagation()}>
+          <div className="w-full bg-superficie rounded-t-3xl px-6 pt-6 pb-24 border-t border-zinc-800/80" onClick={e => e.stopPropagation()}>
             <div className="w-10 h-1 bg-zinc-700 rounded-full mx-auto mb-5" />
-            <h2 className="text-white font-bold text-lg tracking-tight mb-6">Volumen</h2>
+            <h2 className="text-texto-principal font-bold text-lg tracking-tight mb-6">Volumen</h2>
             {actionVol.catalog_id ? (
               <button
                 onClick={startAdjust}
-                className="w-full py-4 rounded-2xl bg-zinc-700 hover:bg-zinc-600 text-white font-bold text-sm flex items-center justify-center gap-2.5 transition-all mb-3"
+                className="w-full py-4 rounded-2xl bg-zinc-700 hover:bg-zinc-600 text-texto-principal font-bold text-sm flex items-center justify-center gap-2.5 transition-all mb-3"
               >
                 <span className="text-base">↻</span>
                 Ajustar (mover, rotar, escalar)
@@ -522,7 +522,7 @@ export default function WallPage() {
             ) : (
               <button
                 onClick={startReposition}
-                className="w-full py-4 rounded-2xl bg-zinc-700 hover:bg-zinc-600 text-white font-bold text-sm flex items-center justify-center gap-2.5 transition-all mb-3"
+                className="w-full py-4 rounded-2xl bg-zinc-700 hover:bg-zinc-600 text-texto-principal font-bold text-sm flex items-center justify-center gap-2.5 transition-all mb-3"
               >
                 <span className="text-base">↔</span>
                 Mover en esta zona
@@ -530,7 +530,7 @@ export default function WallPage() {
             )}
             <button
               onClick={() => { setSelectedVolume(actionVol); cancelAll() }}
-              className="w-full py-4 rounded-2xl bg-zinc-800 hover:bg-zinc-700 text-zinc-300 font-bold text-sm flex items-center justify-center gap-2.5 transition-all mb-3"
+              className="w-full py-4 rounded-2xl bg-superficie-alta hover:bg-superficie-alta-hover text-zinc-300 font-bold text-sm flex items-center justify-center gap-2.5 transition-all mb-3"
             >
               <span className="text-base">···</span>
               Ver detalles / Retirar

@@ -86,12 +86,12 @@ export default function SpraywallForm({
   }
 
   return (
-    <div className="min-h-screen bg-zinc-950 flex flex-col">
+    <div className="min-h-screen bg-fondo flex flex-col">
       <div className="shrink-0 flex items-center justify-between px-5 pt-4 pb-3">
-        <h1 className="text-white font-black text-lg tracking-tight">
+        <h1 className="text-texto-principal font-black text-lg tracking-tight">
           {initialRoute ? 'Editar ruta' : authorRole === 'climber' ? 'Proponer ruta' : 'Nueva ruta'}
         </h1>
-        <button onClick={onCancel} className="w-8 h-8 flex items-center justify-center rounded-full bg-zinc-800 hover:bg-zinc-700 text-zinc-400 hover:text-white transition-all text-lg leading-none">
+        <button onClick={onCancel} className="w-8 h-8 flex items-center justify-center rounded-full bg-superficie-alta hover:bg-superficie-alta-hover text-zinc-400 hover:text-texto-principal transition-all text-lg leading-none">
           ×
         </button>
       </div>
@@ -101,7 +101,7 @@ export default function SpraywallForm({
           value={name}
           onChange={e => setName(e.target.value)}
           placeholder="Nombre de la ruta (ej. Amarillo)"
-          className="w-full bg-zinc-900 text-white rounded-xl px-4 py-3 text-sm mb-3 outline-none placeholder-zinc-600 border border-zinc-700/50 focus:border-yellow-400/60 focus:ring-2 focus:ring-yellow-400/20 transition-all"
+          className="w-full bg-superficie text-texto-principal rounded-xl px-4 py-3 text-sm mb-3 outline-none placeholder-zinc-600 border border-zinc-700/50 focus:border-primario/60 focus:ring-2 focus:ring-primario/20 transition-all"
         />
 
         <div className="flex flex-wrap gap-2 mb-4">
@@ -110,7 +110,7 @@ export default function SpraywallForm({
               key={g}
               onClick={() => setGrade(g)}
               className={`px-3.5 py-2 rounded-xl text-sm font-bold font-mono transition-all ${
-                grade === g ? 'bg-yellow-400 text-zinc-950 scale-105' : 'bg-zinc-800 text-zinc-400 hover:text-white'
+                grade === g ? 'bg-primario text-texto-en-acento scale-105' : 'bg-superficie-alta text-zinc-400 hover:text-texto-principal'
               }`}
             >
               {g}
@@ -140,13 +140,13 @@ export default function SpraywallForm({
         </div>
 
         {selected && (
-          <div className="flex items-center gap-2 mb-4 p-3 bg-zinc-900 border border-zinc-700/50 rounded-xl">
+          <div className="flex items-center gap-2 mb-4 p-3 bg-superficie border border-zinc-700/50 rounded-xl">
             <input
               value={labelInput}
               onChange={e => setLabelInput(e.target.value)}
               onBlur={applyLabel}
               placeholder="Etiqueta opcional (ej. x2)"
-              className="flex-1 bg-zinc-800 text-white rounded-lg px-3 py-2 text-xs outline-none placeholder-zinc-600"
+              className="flex-1 bg-superficie-alta text-texto-principal rounded-lg px-3 py-2 text-xs outline-none placeholder-zinc-600"
             />
             <button onClick={deleteSelected} className="px-3 py-2 rounded-lg bg-red-500/10 text-red-400 text-xs font-bold hover:bg-red-500/20 transition-all">
               Eliminar
@@ -160,7 +160,7 @@ export default function SpraywallForm({
           onChange={e => setNotes(e.target.value)}
           rows={2}
           placeholder="Beta, condición de agarres, etc."
-          className="w-full bg-zinc-900 text-white rounded-xl px-4 py-3 text-sm mb-4 outline-none resize-none placeholder-zinc-600 border border-zinc-700/50 focus:border-yellow-400/60 focus:ring-2 focus:ring-yellow-400/20 transition-all"
+          className="w-full bg-superficie text-texto-principal rounded-xl px-4 py-3 text-sm mb-4 outline-none resize-none placeholder-zinc-600 border border-zinc-700/50 focus:border-primario/60 focus:ring-2 focus:ring-primario/20 transition-all"
         />
 
         {error && (
@@ -170,13 +170,13 @@ export default function SpraywallForm({
         )}
 
         <div className="flex gap-3 pb-6">
-          <button onClick={onCancel} className="flex-1 py-3.5 rounded-2xl bg-zinc-800 text-zinc-300 font-semibold text-sm hover:bg-zinc-700 hover:text-white transition-all">
+          <button onClick={onCancel} className="flex-1 py-3.5 rounded-2xl bg-superficie-alta text-zinc-300 font-semibold text-sm hover:bg-superficie-alta-hover hover:text-texto-principal transition-all">
             Cancelar
           </button>
           <button
             onClick={handleSave}
             disabled={saving}
-            className="flex-1 py-3.5 rounded-2xl bg-yellow-400 text-zinc-950 font-bold text-sm hover:bg-yellow-300 active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-yellow-400/20"
+            className="flex-1 py-3.5 rounded-2xl bg-primario text-texto-en-acento font-bold text-sm hover:bg-primario-hover active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-primario/20"
           >
             {saving ? 'Guardando...' : initialRoute ? 'Guardar cambios' : authorRole === 'climber' ? 'Enviar propuesta' : 'Guardar ruta'}
           </button>

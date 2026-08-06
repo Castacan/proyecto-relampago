@@ -31,21 +31,21 @@ export default function SpraywallRouteDetail({ route, photoUrl, photoW, photoH, 
 
   return (
     <div className="fixed inset-0 bg-black/75 backdrop-blur-sm flex items-end z-50" onClick={onClose}>
-      <div className="w-full bg-zinc-900 rounded-t-3xl p-6 max-h-[92vh] overflow-y-auto border-t border-zinc-800/80" onClick={e => e.stopPropagation()}>
+      <div className="w-full bg-superficie rounded-t-3xl p-6 max-h-[92vh] overflow-y-auto border-t border-zinc-800/80" onClick={e => e.stopPropagation()}>
         <div className="w-10 h-1 bg-zinc-700 rounded-full mx-auto mb-5" />
 
         <div className="flex items-center gap-3 mb-5">
           <div className="flex-1 min-w-0">
-            <h2 className="text-white font-black text-xl leading-tight tracking-tight">{route.name}</h2>
+            <h2 className="text-texto-principal font-black text-xl leading-tight tracking-tight">{route.name}</h2>
             <p className="text-zinc-400 text-sm font-medium">
               <span className="font-mono font-bold">{route.grade}</span> · Por {route.setter_name}
             </p>
           </div>
           <div className="flex gap-2 items-center shrink-0">
-            <button onClick={onEdit} className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-zinc-800 text-zinc-400 hover:bg-zinc-700 hover:text-zinc-200 transition-all">
+            <button onClick={onEdit} className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-superficie-alta text-zinc-400 hover:bg-superficie-alta-hover hover:text-zinc-200 transition-all">
               Editar
             </button>
-            <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-full bg-zinc-800 hover:bg-zinc-700 text-zinc-400 hover:text-white transition-all text-lg leading-none">
+            <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-full bg-superficie-alta hover:bg-superficie-alta-hover text-zinc-400 hover:text-texto-principal transition-all text-lg leading-none">
               ×
             </button>
           </div>
@@ -60,7 +60,7 @@ export default function SpraywallRouteDetail({ route, photoUrl, photoW, photoH, 
         </div>
 
         {route.notes && (
-          <div className="mb-5 p-4 bg-zinc-800/60 rounded-2xl border border-zinc-700/40">
+          <div className="mb-5 p-4 bg-superficie-alta/60 rounded-2xl border border-zinc-700/40">
             <p className="text-zinc-500 text-[11px] font-semibold uppercase tracking-widest mb-2">Notas</p>
             <p className="text-zinc-200 text-sm leading-relaxed">{route.notes}</p>
           </div>
@@ -73,8 +73,8 @@ export default function SpraywallRouteDetail({ route, photoUrl, photoW, photoH, 
               disabled={retiring}
               className={`w-full py-3.5 rounded-2xl font-bold text-sm transition-all ${
                 confirmRetire
-                  ? 'bg-red-500 hover:bg-red-400 text-white shadow-lg shadow-red-500/20'
-                  : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700 hover:text-zinc-200'
+                  ? 'bg-red-500 hover:bg-red-400 text-texto-principal shadow-lg shadow-red-500/20'
+                  : 'bg-superficie-alta text-zinc-400 hover:bg-superficie-alta-hover hover:text-zinc-200'
               } disabled:opacity-50`}
             >
               {retiring ? 'Retirando...' : confirmRetire ? '¿Confirmar retiro?' : 'Retirar ruta'}

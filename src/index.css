@@ -3,11 +3,81 @@
 @theme {
   --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
   --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+
+  /* ============================================================
+   * Design tokens (2026-08-06) — capa semántica previa al rebrand
+   * JAIBAMURO. Valores de HOY (= paleta zinc/amarillo actual), cero
+   * cambio visual en este commit. Cuando se aplique la línea gráfica
+   * oficial (Fase 1.3 del rediseño), este bloque es lo único que
+   * cambia de valor — no hay que tocar componentes otra vez.
+   *
+   * Migración de clases: solo se migraron sitewide las familias que
+   * SÍ van a cambiar de valor con el rebrand (fondo/superficies/
+   * acento/texto principal) — sustitución 1:1 mecánica y segura.
+   * Los grises de borde y texto secundario (zinc-300..700) se
+   * quedaron como clases nativas de Tailwind: no cambian de valor
+   * con el rebrand, así que migrarlos hoy sin poder verificar cada
+   * pantalla visualmente era riesgo sin beneficio. --color-borde y
+   * --color-texto-secundario quedan declarados y disponibles para
+   * código nuevo, pero no se retro-aplicaron a los ~200 usos ya
+   * existentes de zinc-400/500/600/700/800 como borde/texto.
+   * ============================================================ */
+
+  /* Fondo y superficies — jerarquía de profundidad (zinc-950/900/800/700 hoy) */
+  --color-fondo: #09090b;
+  --color-superficie: #18181b;
+  --color-superficie-alta: #27272a;
+  --color-superficie-alta-hover: #3f3f46;
+
+  /* Texto */
+  --color-texto-principal: #ffffff;
+  --color-texto-secundario: #71717a;
+  /* Near-black FIJO usado como texto/borde sobre elementos de acento
+   * (botones amarillos, spinners, swatches). NO cambia con el rebrand
+   * aunque hoy coincida en valor con --color-fondo — son dos cosas
+   * distintas: uno es "fondo de página", el otro es "texto oscuro
+   * sobre superficie clara/de acento". */
+  --color-texto-en-acento: #09090b;
+
+  /* Acento — amarillo hoy, naranja en el rebrand */
+  --color-primario: #facc15;
+  --color-primario-hover: #fde047;
+
+  /* Acento secundario — sin uso real todavía (turquesa en el rebrand) */
+  --color-secundario: #3b82f6;
+
+  /* Borde — disponible, no retro-aplicado (ver nota arriba) */
+  --color-borde: #3f3f46;
+
+  /* Semáforo de frescura — deliberadamente INDEPENDIENTE del rebrand
+   * de marca (ver DISEÑO_JAIBAMURO.md sección 2.5: "se mantienen sin
+   * cambio"). src/lib/freshness.ts sigue con sus valores propios; estos
+   * tokens son para feedback de UI genérico (validación, toasts), no
+   * están conectados a freshness.ts. */
+  --color-exito: #22c55e;
+  --color-atencion: #eab308;
+  --color-alerta: #ef4444;
+
+  /* Escala tipográfica semántica — additiva, no retro-aplicada. El
+   * body/UI ya usa consistentemente text-sm/text-xs de Tailwind;
+   * estas quedan disponibles para código nuevo que quiera nombrar
+   * intención en vez de tamaño. */
+  --text-h1: 1.875rem;
+  --text-h2: 1.5rem;
+  --text-h3: 1.25rem;
+  --text-body: 0.875rem;
+  --text-caption: 0.75rem;
+  --text-label: 0.6875rem;
+
+  /* Radios y spacing: NO se agregan tokens nuevos — el uso actual ya
+   * es consistente sobre la escala nativa de Tailwind (rounded-xl/2xl/
+   * full dominan; spacing 4/8/16/24/32/48/64 = p-1/2/4/6/8/12/16 ya
+   * existen tal cual). Formalizar alias redundantes no aporta nada. */
 }
 
 @layer base {
   body {
-    background-color: #09090b;
+    background-color: var(--color-fondo);
     color: #fafafa;
     font-family: var(--font-sans);
     -webkit-font-smoothing: antialiased;

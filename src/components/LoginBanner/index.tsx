@@ -19,14 +19,14 @@ export default function LoginBanner({ onEnter }: Props) {
   }
 
   return (
-    <div className="shrink-0 flex items-center gap-3 bg-zinc-900/95 border-b border-zinc-800/60 px-4 py-2.5">
-      <span className="text-yellow-400 text-xs shrink-0">⚡</span>
+    <div className="shrink-0 flex items-center gap-3 bg-superficie/95 border-b border-zinc-800/60 px-4 py-2.5">
+      <span className="text-primario text-xs shrink-0">⚡</span>
       <span className="flex-1 text-zinc-400 text-xs leading-snug">
         Inicia sesión para sumar puntos al leaderboard
       </span>
       <button
         onClick={onEnter}
-        className="text-yellow-400 text-xs font-bold shrink-0 hover:text-yellow-300 transition-colors"
+        className="text-primario text-xs font-bold shrink-0 hover:text-primario-hover transition-colors"
       >
         Entrar
       </button>

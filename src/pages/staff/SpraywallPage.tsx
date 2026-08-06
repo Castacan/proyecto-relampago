@@ -103,11 +103,11 @@ export default function SpraywallPage() {
   }
 
   return (
-    <div className="h-full overflow-y-auto bg-zinc-950">
+    <div className="h-full overflow-y-auto bg-fondo">
       <div className="px-4 pt-5 pb-4">
-        <h1 className="text-white font-black text-2xl tracking-tight mb-4">Spraywall</h1>
+        <h1 className="text-texto-principal font-black text-2xl tracking-tight mb-4">Spraywall</h1>
 
-        <div className="flex gap-2 mb-5 bg-zinc-900 rounded-2xl p-1 border border-zinc-800/60">
+        <div className="flex gap-2 mb-5 bg-superficie rounded-2xl p-1 border border-zinc-800/60">
           {([
             { key: 'rutas', label: 'Rutas' },
             { key: 'propuestas', label: `Propuestas${pendingRoutes.length ? ` (${pendingRoutes.length})` : ''}` },
@@ -117,7 +117,7 @@ export default function SpraywallPage() {
               key={t.key}
               onClick={() => setTab(t.key)}
               className={`flex-1 py-2.5 rounded-xl text-xs font-bold transition-all ${
-                tab === t.key ? 'bg-yellow-400 text-zinc-950' : 'text-zinc-400 hover:text-white'
+                tab === t.key ? 'bg-primario text-texto-en-acento' : 'text-zinc-400 hover:text-texto-principal'
               }`}
             >
               {t.label}
@@ -130,7 +130,7 @@ export default function SpraywallPage() {
             <button
               onClick={openNewRoute}
               disabled={!settings?.photo_url}
-              className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl bg-yellow-400 hover:bg-yellow-300 text-zinc-950 font-bold text-sm mb-4 active:scale-[0.98] transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+              className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl bg-primario hover:bg-primario-hover text-texto-en-acento font-bold text-sm mb-4 active:scale-[0.98] transition-all disabled:opacity-40 disabled:cursor-not-allowed"
             >
               + Nueva ruta
             </button>
@@ -139,7 +139,7 @@ export default function SpraywallPage() {
             )}
             {activeLoading && (
               <div className="flex justify-center py-10">
-                <div className="w-6 h-6 rounded-full border-2 border-yellow-400 border-t-transparent animate-spin" />
+                <div className="w-6 h-6 rounded-full border-2 border-primario border-t-transparent animate-spin" />
               </div>
             )}
             <div className="flex flex-col gap-2.5">
@@ -147,13 +147,13 @@ export default function SpraywallPage() {
                 <button
                   key={route.id}
                   onClick={() => setDetailRoute(route)}
-                  className="flex items-center gap-3 p-4 bg-zinc-900 border border-zinc-800/60 rounded-2xl hover:border-zinc-700 transition-all text-left"
+                  className="flex items-center gap-3 p-4 bg-superficie border border-zinc-800/60 rounded-2xl hover:border-zinc-700 transition-all text-left"
                 >
-                  <div className="w-11 h-11 rounded-xl bg-zinc-800 flex items-center justify-center shrink-0">
-                    <span className="text-white font-black font-mono text-sm">{route.grade}</span>
+                  <div className="w-11 h-11 rounded-xl bg-superficie-alta flex items-center justify-center shrink-0">
+                    <span className="text-texto-principal font-black font-mono text-sm">{route.grade}</span>
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-white font-semibold text-sm truncate">{route.name}</p>
+                    <p className="text-texto-principal font-semibold text-sm truncate">{route.name}</p>
                     <p className="text-zinc-500 text-xs mt-0.5">Por {route.setter_name}</p>
                   </div>
                   {route.status === 'retired' && (
@@ -169,7 +169,7 @@ export default function SpraywallPage() {
           <>
             {pendingLoading && (
               <div className="flex justify-center py-10">
-                <div className="w-6 h-6 rounded-full border-2 border-yellow-400 border-t-transparent animate-spin" />
+                <div className="w-6 h-6 rounded-full border-2 border-primario border-t-transparent animate-spin" />
               </div>
             )}
             {!pendingLoading && pendingRoutes.length === 0 && (
@@ -177,13 +177,13 @@ export default function SpraywallPage() {
             )}
             <div className="flex flex-col gap-3">
               {pendingRoutes.map(route => (
-                <div key={route.id} className="p-4 bg-zinc-900 border border-zinc-800/60 rounded-2xl">
+                <div key={route.id} className="p-4 bg-superficie border border-zinc-800/60 rounded-2xl">
                   <div className="flex items-center gap-3 mb-3">
-                    <div className="w-11 h-11 rounded-xl bg-zinc-800 flex items-center justify-center shrink-0">
-                      <span className="text-white font-black font-mono text-sm">{route.grade}</span>
+                    <div className="w-11 h-11 rounded-xl bg-superficie-alta flex items-center justify-center shrink-0">
+                      <span className="text-texto-principal font-black font-mono text-sm">{route.grade}</span>
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-white font-semibold text-sm truncate">{route.name}</p>
+                      <p className="text-texto-principal font-semibold text-sm truncate">{route.name}</p>
                       <p className="text-zinc-500 text-xs mt-0.5">Propuesta por {route.setter_name}</p>
                     </div>
                   </div>
@@ -202,7 +202,7 @@ export default function SpraywallPage() {
                     </button>
                     <button
                       onClick={() => handleApprove(route)}
-                      className="flex-1 py-2.5 rounded-xl bg-yellow-400 text-zinc-950 font-bold text-xs hover:bg-yellow-300 transition-all"
+                      className="flex-1 py-2.5 rounded-xl bg-primario text-texto-en-acento font-bold text-xs hover:bg-primario-hover transition-all"
                     >
                       Aprobar
                     </button>
@@ -215,10 +215,10 @@ export default function SpraywallPage() {
 
         {tab === 'foto' && (
           <div>
-            <div className="w-full aspect-[4/3] rounded-2xl overflow-hidden border border-zinc-800/60 mb-4 bg-zinc-900">
+            <div className="w-full aspect-[4/3] rounded-2xl overflow-hidden border border-zinc-800/60 mb-4 bg-superficie">
               {settingsLoading ? (
                 <div className="w-full h-full flex items-center justify-center">
-                  <div className="w-6 h-6 rounded-full border-2 border-yellow-400 border-t-transparent animate-spin" />
+                  <div className="w-6 h-6 rounded-full border-2 border-primario border-t-transparent animate-spin" />
                 </div>
               ) : settings?.photo_url ? (
                 <SpraywallCanvas photoUrl={settings.photo_url} photoW={settings.photo_w} photoH={settings.photo_h} holds={[]} mode="view" />
@@ -236,7 +236,7 @@ export default function SpraywallPage() {
             <button
               onClick={() => fileInputRef.current?.click()}
               disabled={uploading}
-              className="w-full py-3.5 rounded-2xl bg-yellow-400 hover:bg-yellow-300 text-zinc-950 font-bold text-sm active:scale-[0.98] transition-all disabled:opacity-50"
+              className="w-full py-3.5 rounded-2xl bg-primario hover:bg-primario-hover text-texto-en-acento font-bold text-sm active:scale-[0.98] transition-all disabled:opacity-50"
             >
               {uploading ? 'Subiendo...' : settings?.photo_url ? 'Reemplazar foto' : 'Subir foto'}
             </button>

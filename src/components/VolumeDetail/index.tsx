@@ -47,7 +47,7 @@ export default function VolumeDetail({ volume, zones, onClose, onRetire, onUpdat
 
   return (
     <div className="fixed inset-0 bg-black/75 backdrop-blur-sm flex items-end z-50" onClick={onClose}>
-      <div className="w-full bg-zinc-900 rounded-t-3xl p-6 border-t border-zinc-800/80" onClick={e => e.stopPropagation()}>
+      <div className="w-full bg-superficie rounded-t-3xl p-6 border-t border-zinc-800/80" onClick={e => e.stopPropagation()}>
         <div className="w-10 h-1 bg-zinc-700 rounded-full mx-auto mb-5" />
 
         <div className="flex items-center gap-3 mb-5">
@@ -57,27 +57,27 @@ export default function VolumeDetail({ volume, zones, onClose, onRetire, onUpdat
             </svg>
           </div>
           <div className="flex-1 min-w-0">
-            <h2 className="text-white font-black text-xl leading-tight tracking-tight">Volumen</h2>
+            <h2 className="text-texto-principal font-black text-xl leading-tight tracking-tight">Volumen</h2>
             <p className="text-zinc-400 text-sm font-medium">{zone?.name ?? '—'}</p>
           </div>
           <button
             onClick={onClose}
-            className="w-8 h-8 flex items-center justify-center rounded-full bg-zinc-800 hover:bg-zinc-700 text-zinc-400 hover:text-white transition-all text-lg leading-none"
+            className="w-8 h-8 flex items-center justify-center rounded-full bg-superficie-alta hover:bg-superficie-alta-hover text-zinc-400 hover:text-texto-principal transition-all text-lg leading-none"
           >
             ×
           </button>
         </div>
 
         {catalogItem && (
-          <div className="flex items-center gap-3 mb-4 p-3 rounded-2xl bg-zinc-800/60 border border-zinc-700/40">
-            <svg width="36" height="36" viewBox="0 0 36 36" className="shrink-0 rounded-lg bg-zinc-900">
+          <div className="flex items-center gap-3 mb-4 p-3 rounded-2xl bg-superficie-alta/60 border border-zinc-700/40">
+            <svg width="36" height="36" viewBox="0 0 36 36" className="shrink-0 rounded-lg bg-superficie">
               <polygon
                 points={catalogItem.shape.map(p => `${p.x * 36},${p.y * 36}`).join(' ')}
                 fill="rgba(110,110,110,0.55)" stroke="rgba(180,180,180,0.6)" strokeWidth={1.5}
               />
             </svg>
             <div>
-              <p className="text-white text-sm font-bold">{catalogItem.name}</p>
+              <p className="text-texto-principal text-sm font-bold">{catalogItem.name}</p>
               <p className="text-zinc-500 text-xs">
                 {Math.round(volume.rotation ?? 0)}° · ×{((volume.vol_scale ?? 1)).toFixed(2)}
               </p>
@@ -85,7 +85,7 @@ export default function VolumeDetail({ volume, zones, onClose, onRetire, onUpdat
           </div>
         )}
 
-        <div className="flex items-center gap-3 mb-5 p-4 rounded-2xl bg-zinc-800/60 border border-zinc-700/40">
+        <div className="flex items-center gap-3 mb-5 p-4 rounded-2xl bg-superficie-alta/60 border border-zinc-700/40">
           <div className="w-2 h-2 rounded-full shrink-0 bg-zinc-400" />
           <span className="font-black text-3xl font-mono leading-none text-zinc-200">{days}</span>
           <span className="text-zinc-400 text-sm font-medium">días en la pared</span>
@@ -98,12 +98,12 @@ export default function VolumeDetail({ volume, zones, onClose, onRetire, onUpdat
             value={editDate}
             onChange={e => setEditDate(e.target.value)}
             max={new Date().toISOString().slice(0, 10)}
-            className="flex-1 bg-zinc-800 text-white rounded-xl px-4 py-3 text-sm outline-none border border-zinc-700/50 hover:border-zinc-600 focus:border-yellow-400/60 transition-all [color-scheme:dark]"
+            className="flex-1 bg-superficie-alta text-texto-principal rounded-xl px-4 py-3 text-sm outline-none border border-zinc-700/50 hover:border-zinc-600 focus:border-primario/60 transition-all [color-scheme:dark]"
           />
           <button
             onClick={handleSaveDate}
             disabled={savingDate || editDate === volume.placed_at.slice(0, 10)}
-            className="px-4 py-3 rounded-xl bg-zinc-700 hover:bg-zinc-600 text-white text-sm font-bold transition-all disabled:opacity-40"
+            className="px-4 py-3 rounded-xl bg-zinc-700 hover:bg-zinc-600 text-texto-principal text-sm font-bold transition-all disabled:opacity-40"
           >
             {savingDate ? '…' : 'Guardar'}
           </button>
@@ -114,8 +114,8 @@ export default function VolumeDetail({ volume, zones, onClose, onRetire, onUpdat
           disabled={retiring}
           className={`w-full py-3.5 rounded-2xl font-bold text-sm transition-all ${
             confirmRetire
-              ? 'bg-red-500 hover:bg-red-400 text-white shadow-lg shadow-red-500/20'
-              : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700 hover:text-zinc-200'
+              ? 'bg-red-500 hover:bg-red-400 text-texto-principal shadow-lg shadow-red-500/20'
+              : 'bg-superficie-alta text-zinc-400 hover:bg-superficie-alta-hover hover:text-zinc-200'
           } disabled:opacity-50`}
         >
           {retiring ? 'Retirando...' : confirmRetire ? '¿Confirmar retiro?' : 'Retirar volumen'}

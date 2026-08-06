@@ -16,7 +16,7 @@ export default function SpraywallSendButton({ climber, climberLoading, sent, sen
     return (
       <button
         onClick={onNeedAuth}
-        className="w-full py-4 rounded-2xl bg-zinc-800 border border-zinc-700/50 text-zinc-300 font-bold text-sm flex items-center justify-center gap-2.5 transition-all active:scale-[0.98] hover:bg-zinc-700"
+        className="w-full py-4 rounded-2xl bg-superficie-alta border border-zinc-700/50 text-zinc-300 font-bold text-sm flex items-center justify-center gap-2.5 transition-all active:scale-[0.98] hover:bg-superficie-alta-hover"
       >
         <span className="text-lg">⚡</span>
         Inicia sesión para llevar tu registro
@@ -29,7 +29,7 @@ export default function SpraywallSendButton({ climber, climberLoading, sent, sen
     return (
       <button
         onClick={onToggle}
-        className="w-full py-4 rounded-2xl bg-zinc-800 border border-green-500/30 text-center transition-all active:scale-[0.98]"
+        className="w-full py-4 rounded-2xl bg-superficie-alta border border-green-500/30 text-center transition-all active:scale-[0.98]"
       >
         <p className="text-green-400 font-bold text-base">✓ Enviada</p>
         {date && <p className="text-zinc-500 text-xs mt-1">Primera vez: {date} · toca para desmarcar</p>}
@@ -40,7 +40,7 @@ export default function SpraywallSendButton({ climber, climberLoading, sent, sen
   return (
     <button
       onClick={onToggle}
-      className="w-full py-5 rounded-2xl bg-yellow-400 hover:bg-yellow-300 text-zinc-950 font-black text-lg transition-all active:scale-[0.97] shadow-lg shadow-yellow-400/25 flex items-center justify-center gap-3"
+      className="w-full py-5 rounded-2xl bg-primario hover:bg-primario-hover text-texto-en-acento font-black text-lg transition-all active:scale-[0.97] shadow-lg shadow-primario/25 flex items-center justify-center gap-3"
     >
       <span className="text-xl">🏆</span>
       MARCAR COMO ENVIADA

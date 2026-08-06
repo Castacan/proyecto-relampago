@@ -82,7 +82,7 @@ export default function SendButton({ route, qrId, climber, climberLoading, onNee
       {!session?.user && (
         <button
           onClick={onNeedAuth}
-          className="w-full py-4 rounded-2xl bg-zinc-800 border border-zinc-700/50 text-zinc-300 font-bold text-sm flex items-center justify-center gap-2.5 transition-all active:scale-[0.98] hover:bg-zinc-700"
+          className="w-full py-4 rounded-2xl bg-superficie-alta border border-zinc-700/50 text-zinc-300 font-bold text-sm flex items-center justify-center gap-2.5 transition-all active:scale-[0.98] hover:bg-superficie-alta-hover"
         >
           <span className="text-lg">⚡</span>
           Inicia sesión para sumar {pts} {pts === 1 ? 'punto' : 'puntos'}
@@ -93,7 +93,7 @@ export default function SendButton({ route, qrId, climber, climberLoading, onNee
       {session?.user && !climber && !climberLoading && (
         <button
           onClick={onNeedOnboarding}
-          className="w-full py-4 rounded-2xl bg-zinc-800 border border-zinc-700/50 text-zinc-300 font-bold text-sm flex items-center justify-center gap-2.5 transition-all active:scale-[0.98] hover:bg-zinc-700"
+          className="w-full py-4 rounded-2xl bg-superficie-alta border border-zinc-700/50 text-zinc-300 font-bold text-sm flex items-center justify-center gap-2.5 transition-all active:scale-[0.98] hover:bg-superficie-alta-hover"
         >
           <span className="text-lg">⚡</span>
           Completa tu perfil para sumar {pts} {pts === 1 ? 'punto' : 'puntos'}
@@ -104,23 +104,23 @@ export default function SendButton({ route, qrId, climber, climberLoading, onNee
       {climber && sendState === 'idle' && (
         <button
           onClick={handleSend}
-          className="w-full py-5 rounded-2xl bg-yellow-400 hover:bg-yellow-300 text-zinc-950 font-black text-lg transition-all active:scale-[0.97] shadow-lg shadow-yellow-400/25 flex items-center justify-center gap-3"
+          className="w-full py-5 rounded-2xl bg-primario hover:bg-primario-hover text-texto-en-acento font-black text-lg transition-all active:scale-[0.97] shadow-lg shadow-primario/25 flex items-center justify-center gap-3"
         >
           <span className="text-xl">🏆</span>
           YA LO COMPLETÉ
-          <span className="text-sm font-bold bg-zinc-950/15 px-2 py-0.5 rounded-lg">+{pts} pts</span>
+          <span className="text-sm font-bold bg-fondo/15 px-2 py-0.5 rounded-lg">+{pts} pts</span>
         </button>
       )}
 
       {climber && sendState === 'loading' && (
-        <div className="w-full py-5 rounded-2xl bg-yellow-400/50 text-zinc-950 font-black text-lg flex items-center justify-center gap-3">
-          <div className="w-5 h-5 rounded-full border-2 border-zinc-950/50 border-t-transparent animate-spin" />
+        <div className="w-full py-5 rounded-2xl bg-primario/50 text-texto-en-acento font-black text-lg flex items-center justify-center gap-3">
+          <div className="w-5 h-5 rounded-full border-2 border-texto-en-acento/50 border-t-transparent animate-spin" />
           Registrando...
         </div>
       )}
 
       {sendState === 'success' && successData && (
-        <div className="w-full py-4 rounded-2xl bg-zinc-800 border border-green-500/30 text-center">
+        <div className="w-full py-4 rounded-2xl bg-superficie-alta border border-green-500/30 text-center">
           <p className="text-green-400 font-black text-xl mb-1">+{successData.points_daily} pts</p>
           <p className="text-zinc-400 text-sm">
             {successData.points_monthly > 0
@@ -131,7 +131,7 @@ export default function SendButton({ route, qrId, climber, climberLoading, onNee
       )}
 
       {sendState === 'already_sent' && (
-        <div className="w-full py-4 rounded-2xl bg-zinc-800 border border-zinc-700/50 text-center">
+        <div className="w-full py-4 rounded-2xl bg-superficie-alta border border-zinc-700/50 text-center">
           <p className="text-zinc-300 font-bold text-base">✓ Ya la marcaste hoy</p>
           <p className="text-zinc-600 text-xs mt-1">Puedes volver a marcarla mañana.</p>
         </div>
@@ -139,13 +139,13 @@ export default function SendButton({ route, qrId, climber, climberLoading, onNee
 
       {sendState === 'no_scan' && (
         <div className="w-full">
-          <div className="py-3.5 rounded-2xl bg-zinc-800 border border-orange-500/30 text-center mb-3">
+          <div className="py-3.5 rounded-2xl bg-superficie-alta border border-orange-500/30 text-center mb-3">
             <p className="text-orange-400 font-bold text-sm">Confirma que estás junto a la ruta</p>
             <p className="text-zinc-500 text-xs mt-0.5">Escanea el QR de la ruta para confirmar el send.</p>
           </div>
           <button
             onClick={() => setScanModalOpen(true)}
-            className="w-full py-4 rounded-2xl bg-yellow-400 hover:bg-yellow-300 text-zinc-950 font-black text-sm transition-all active:scale-[0.97] mb-2"
+            className="w-full py-4 rounded-2xl bg-primario hover:bg-primario-hover text-texto-en-acento font-black text-sm transition-all active:scale-[0.97] mb-2"
           >
             📷 Escanear QR
           </button>
@@ -157,7 +157,7 @@ export default function SendButton({ route, qrId, climber, climberLoading, onNee
 
       {sendState === 'error' && (
         <div className="w-full">
-          <div className="py-3.5 rounded-2xl bg-zinc-800 border border-red-500/30 text-center mb-3">
+          <div className="py-3.5 rounded-2xl bg-superficie-alta border border-red-500/30 text-center mb-3">
             <p className="text-red-400 font-bold text-sm">Algo salió mal</p>
           </div>
           <button onClick={() => setSendState('idle')} className="w-full py-3 text-zinc-500 hover:text-zinc-300 text-sm font-medium transition-colors">

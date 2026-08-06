@@ -78,7 +78,7 @@ export default function SpraywallCanvas({
   }
 
   return (
-    <div ref={containerRef} className="w-full h-full relative bg-zinc-900">
+    <div ref={containerRef} className="w-full h-full relative bg-superficie">
       <Stage width={size.w} height={size.h} onClick={handleStageClick} onTap={handleStageClick}>
         <Layer>
           {img && <KonvaImage image={img} x={offsetX} y={offsetY} width={dw} height={dh} />}

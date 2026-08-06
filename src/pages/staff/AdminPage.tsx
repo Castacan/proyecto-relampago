@@ -161,31 +161,31 @@ export default function AdminPage() {
   }
 
   if (profile === null) return (
-    <div className="flex justify-center items-center h-full bg-zinc-950">
-      <div className="w-6 h-6 rounded-full border-2 border-yellow-400 border-t-transparent animate-spin" />
+    <div className="flex justify-center items-center h-full bg-fondo">
+      <div className="w-6 h-6 rounded-full border-2 border-primario border-t-transparent animate-spin" />
     </div>
   )
   if (profile.role !== 'admin') return <Navigate to="/staff" replace />
 
   return (
-    <div className="h-full overflow-y-auto bg-zinc-950">
+    <div className="h-full overflow-y-auto bg-fondo">
       <div className="px-4 pt-5 pb-6">
-        <h1 className="text-white font-black text-2xl tracking-tight mb-6">Admin</h1>
+        <h1 className="text-texto-principal font-black text-2xl tracking-tight mb-6">Admin</h1>
 
         {/* Cadena Panorámica */}
-        <div className="bg-zinc-900 rounded-2xl p-4 border border-zinc-800/80 mb-4">
-          <h2 className="text-white font-bold text-base mb-1">Cadena Panorámica</h2>
+        <div className="bg-superficie rounded-2xl p-4 border border-zinc-800/80 mb-4">
+          <h2 className="text-texto-principal font-bold text-base mb-1">Cadena Panorámica</h2>
           <p className="text-zinc-500 text-xs font-medium mb-4">Zonas activas en la cadena y su orden</p>
 
           {chainLoading ? (
             <div className="flex justify-center py-4">
-              <div className="w-5 h-5 rounded-full border-2 border-yellow-400 border-t-transparent animate-spin" />
+              <div className="w-5 h-5 rounded-full border-2 border-primario border-t-transparent animate-spin" />
             </div>
           ) : !chainState.chain ? (
             <p className="text-zinc-500 text-xs">No hay cadenas configuradas en la base de datos.</p>
           ) : (
             <>
-              <p className="text-yellow-400/70 text-[11px] font-bold uppercase tracking-wider mb-2">
+              <p className="text-primario/70 text-[11px] font-bold uppercase tracking-wider mb-2">
                 {chainState.chain.name}
               </p>
 
@@ -194,10 +194,10 @@ export default function AdminPage() {
                 {chainState.chainZones.length === 0 ? (
                   <p className="text-zinc-600 text-xs italic py-2">Sin zonas</p>
                 ) : chainState.chainZones.map((z, i) => (
-                  <div key={z.id} className="flex items-center gap-2.5 bg-zinc-800 rounded-xl px-3 py-2.5">
+                  <div key={z.id} className="flex items-center gap-2.5 bg-superficie-alta rounded-xl px-3 py-2.5">
                     <span className="text-zinc-600 text-xs font-mono w-4 shrink-0">{i}</span>
-                    <div className="w-1.5 h-1.5 rounded-full bg-yellow-400 shrink-0" />
-                    <span className="text-white text-sm font-medium flex-1 truncate">{z.name}</span>
+                    <div className="w-1.5 h-1.5 rounded-full bg-primario shrink-0" />
+                    <span className="text-texto-principal text-sm font-medium flex-1 truncate">{z.name}</span>
                     <button
                       onClick={() => removeFromChain(z)}
                       className="text-zinc-600 hover:text-red-400 text-xs font-bold transition-colors px-1.5 py-1 rounded"
@@ -216,12 +216,12 @@ export default function AdminPage() {
                   </p>
                   <div className="space-y-1.5">
                     {chainState.freeZones.map(z => (
-                      <div key={z.id} className="flex items-center gap-2.5 bg-zinc-800/40 border border-zinc-700/50 border-dashed rounded-xl px-3 py-2.5">
+                      <div key={z.id} className="flex items-center gap-2.5 bg-superficie-alta/40 border border-zinc-700/50 border-dashed rounded-xl px-3 py-2.5">
                         <div className="w-1.5 h-1.5 rounded-full bg-zinc-600 shrink-0" />
                         <span className="text-zinc-400 text-sm font-medium flex-1 truncate">{z.name}</span>
                         <button
                           onClick={() => addToChain(z)}
-                          className="text-yellow-400 hover:text-yellow-300 text-xs font-black transition-colors px-1.5 py-1 rounded"
+                          className="text-primario hover:text-primario-hover text-xs font-black transition-colors px-1.5 py-1 rounded"
                         >
                           + Agregar
                         </button>
@@ -239,32 +239,32 @@ export default function AdminPage() {
         </div>
 
         {/* Calibración de cadenas */}
-        <div className="bg-zinc-900 rounded-2xl p-4 border border-zinc-800/80 mb-4">
-          <h2 className="text-white font-bold text-base mb-1">Calibración de Cadenas</h2>
+        <div className="bg-superficie rounded-2xl p-4 border border-zinc-800/80 mb-4">
+          <h2 className="text-texto-principal font-bold text-base mb-1">Calibración de Cadenas</h2>
           <p className="text-zinc-500 text-xs font-medium mb-4">Configura los overlaps entre fotos de cada cadena panorámica</p>
           <button
             onClick={() => navigate('/staff/calibration')}
-            className="w-full bg-zinc-800 text-zinc-200 font-bold text-sm py-2.5 rounded-xl hover:bg-zinc-700 border border-zinc-700 transition-all"
+            className="w-full bg-superficie-alta text-zinc-200 font-bold text-sm py-2.5 rounded-xl hover:bg-superficie-alta-hover border border-zinc-700 transition-all"
           >
             Abrir Calibración
           </button>
         </div>
 
         {/* Catálogo de volúmenes */}
-        <div className="bg-zinc-900 rounded-2xl p-4 border border-zinc-800/80 mb-4">
-          <h2 className="text-white font-bold text-base mb-1">Catálogo de Volúmenes</h2>
+        <div className="bg-superficie rounded-2xl p-4 border border-zinc-800/80 mb-4">
+          <h2 className="text-texto-principal font-bold text-base mb-1">Catálogo de Volúmenes</h2>
           <p className="text-zinc-500 text-xs font-medium mb-4">Dibuja formas de volúmenes para colocarlos desde inventario</p>
           <button
             onClick={() => navigate('/staff/volume-catalog')}
-            className="w-full bg-zinc-800 text-zinc-200 font-bold text-sm py-2.5 rounded-xl hover:bg-zinc-700 border border-zinc-700 transition-all"
+            className="w-full bg-superficie-alta text-zinc-200 font-bold text-sm py-2.5 rounded-xl hover:bg-superficie-alta-hover border border-zinc-700 transition-all"
           >
             Abrir Catálogo
           </button>
         </div>
 
         {/* QR Generation */}
-        <div className="bg-zinc-900 rounded-2xl p-4 border border-zinc-800/80 mb-4">
-          <h2 className="text-white font-bold text-base mb-3">Generar QR Codes</h2>
+        <div className="bg-superficie rounded-2xl p-4 border border-zinc-800/80 mb-4">
+          <h2 className="text-texto-principal font-bold text-base mb-3">Generar QR Codes</h2>
           <div className="flex items-center gap-3 mb-4">
             <label className="text-zinc-400 text-sm font-medium shrink-0">Cantidad</label>
             <input
@@ -273,12 +273,12 @@ export default function AdminPage() {
               max={50}
               value={qrCount}
               onChange={e => setQrCount(Math.max(1, Math.min(50, Number(e.target.value))))}
-              className="w-20 bg-zinc-800 text-white text-sm font-mono px-3 py-2 rounded-xl border border-zinc-700 focus:outline-none focus:border-yellow-400"
+              className="w-20 bg-superficie-alta text-texto-principal text-sm font-mono px-3 py-2 rounded-xl border border-zinc-700 focus:outline-none focus:border-primario"
             />
             <button
               onClick={handleGenerateQrs}
               disabled={generating}
-              className="flex-1 bg-yellow-400 text-zinc-950 font-black text-sm py-2.5 rounded-xl hover:bg-yellow-300 transition-all disabled:opacity-50"
+              className="flex-1 bg-primario text-texto-en-acento font-black text-sm py-2.5 rounded-xl hover:bg-primario-hover transition-all disabled:opacity-50"
             >
               {generating ? 'Creando...' : 'Crear QRs'}
             </button>
@@ -294,7 +294,7 @@ export default function AdminPage() {
                 <p className="text-zinc-400 text-xs font-medium">{generatedQrs.length} QRs creados</p>
                 <button
                   onClick={() => window.print()}
-                  className="text-xs font-bold px-3 py-1.5 rounded-lg bg-zinc-800 text-zinc-300 hover:bg-zinc-700 border border-zinc-700 transition-all"
+                  className="text-xs font-bold px-3 py-1.5 rounded-lg bg-superficie-alta text-zinc-300 hover:bg-superficie-alta-hover border border-zinc-700 transition-all"
                 >
                   Imprimir
                 </button>
@@ -314,16 +314,16 @@ export default function AdminPage() {
         </div>
 
         {/* Rutas retiradas — restaurar */}
-        <div className="bg-zinc-900 rounded-2xl p-4 border border-zinc-800/80 mb-4">
+        <div className="bg-superficie rounded-2xl p-4 border border-zinc-800/80 mb-4">
           <div className="flex items-center justify-between mb-1">
-            <h2 className="text-white font-bold text-base">Rutas retiradas</h2>
+            <h2 className="text-texto-principal font-bold text-base">Rutas retiradas</h2>
             <button
               onClick={() => {
                 const next = !showRetired
                 setShowRetired(next)
                 if (next && retiredRoutes.length === 0) loadRetiredRoutes()
               }}
-              className="text-zinc-400 hover:text-white text-xs font-bold transition-colors"
+              className="text-zinc-400 hover:text-texto-principal text-xs font-bold transition-colors"
             >
               {showRetired ? 'Ocultar' : 'Ver'}
             </button>
@@ -333,17 +333,17 @@ export default function AdminPage() {
           {showRetired && (
             loadingRetired ? (
               <div className="flex justify-center py-4">
-                <div className="w-5 h-5 rounded-full border-2 border-yellow-400 border-t-transparent animate-spin" />
+                <div className="w-5 h-5 rounded-full border-2 border-primario border-t-transparent animate-spin" />
               </div>
             ) : retiredRoutes.length === 0 ? (
               <p className="text-zinc-600 text-xs text-center py-3">Sin rutas retiradas</p>
             ) : (
               <div className="space-y-2">
                 {retiredRoutes.map(r => (
-                  <div key={r.id} className="flex items-center gap-3 bg-zinc-800 rounded-xl px-3 py-2.5">
+                  <div key={r.id} className="flex items-center gap-3 bg-superficie-alta rounded-xl px-3 py-2.5">
                     <div className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: getColorHex(r.color) }} />
                     <div className="flex-1 min-w-0">
-                      <p className="text-white text-sm font-bold">{r.grade} — {r.color}</p>
+                      <p className="text-texto-principal text-sm font-bold">{r.grade} — {r.color}</p>
                       <p className="text-zinc-500 text-xs">
                         {r.zones?.name ?? '—'} · retirada {r.retired_at ? new Date(r.retired_at).toLocaleDateString('es-MX') : '—'}
                       </p>
@@ -351,7 +351,7 @@ export default function AdminPage() {
                     <button
                       onClick={() => restoreRoute(r.id)}
                       disabled={restoringId === r.id}
-                      className="text-yellow-400 hover:text-yellow-300 text-xs font-black transition-colors px-2 py-1 rounded disabled:opacity-40"
+                      className="text-primario hover:text-primario-hover text-xs font-black transition-colors px-2 py-1 rounded disabled:opacity-40"
                     >
                       {restoringId === r.id ? '…' : 'Restaurar'}
                     </button>
@@ -363,13 +363,13 @@ export default function AdminPage() {
         </div>
 
         {/* CSV Export */}
-        <div className="bg-zinc-900 rounded-2xl p-4 border border-zinc-800/80">
-          <h2 className="text-white font-bold text-base mb-1">Exportar Rutas</h2>
+        <div className="bg-superficie rounded-2xl p-4 border border-zinc-800/80">
+          <h2 className="text-texto-principal font-bold text-base mb-1">Exportar Rutas</h2>
           <p className="text-zinc-500 text-xs font-medium mb-4">Descarga todas las rutas en formato CSV</p>
           <button
             onClick={handleExportCsv}
             disabled={exportingCsv}
-            className="w-full bg-zinc-800 text-zinc-200 font-bold text-sm py-2.5 rounded-xl hover:bg-zinc-700 border border-zinc-700 transition-all disabled:opacity-50"
+            className="w-full bg-superficie-alta text-zinc-200 font-bold text-sm py-2.5 rounded-xl hover:bg-superficie-alta-hover border border-zinc-700 transition-all disabled:opacity-50"
           >
             {exportingCsv ? 'Exportando...' : 'Descargar CSV'}
           </button>

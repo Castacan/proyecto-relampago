@@ -29,9 +29,9 @@ const HISTORICAL_CUTOFF = '2026-07-11'
 // ── Stat card ────────────────────────────────────────────────────────────────
 function StatCard({ value, label, sub }: { value: string | number; label: string; sub?: string }) {
   return (
-    <div className="bg-zinc-900 rounded-2xl p-4 border border-zinc-800/80 flex-1 min-w-0">
-      <div className="text-yellow-400 font-black text-3xl tabular-nums leading-none mb-1">{value}</div>
-      <div className="text-white text-xs font-bold">{label}</div>
+    <div className="bg-superficie rounded-2xl p-4 border border-zinc-800/80 flex-1 min-w-0">
+      <div className="text-primario font-black text-3xl tabular-nums leading-none mb-1">{value}</div>
+      <div className="text-texto-principal text-xs font-bold">{label}</div>
       {sub && <div className="text-zinc-500 text-[10px] mt-0.5">{sub}</div>}
     </div>
   )
@@ -47,7 +47,7 @@ function BarChart({ items }: { items: { label: string; count: number; barColor: 
           <span className="text-zinc-400 text-xs font-medium w-28 shrink-0 truncate text-right leading-none">
             {item.label}
           </span>
-          <div className="flex-1 h-6 rounded-full overflow-hidden bg-zinc-800">
+          <div className="flex-1 h-6 rounded-full overflow-hidden bg-superficie-alta">
             {item.count > 0 && (
               <div
                 className="h-full rounded-full transition-all duration-500"
@@ -55,7 +55,7 @@ function BarChart({ items }: { items: { label: string; count: number; barColor: 
               />
             )}
           </div>
-          <span className={`text-sm font-black w-6 shrink-0 text-right tabular-nums ${item.count === 0 ? 'text-zinc-700' : 'text-white'}`}>
+          <span className={`text-sm font-black w-6 shrink-0 text-right tabular-nums ${item.count === 0 ? 'text-zinc-700' : 'text-texto-principal'}`}>
             {item.count}
           </span>
         </div>
@@ -77,7 +77,7 @@ function ColumnChart({ items }: { items: ColItem[] }) {
         const barH = hasCount ? Math.max(6, Math.round((item.count / max) * BAR_H)) : 2
         return (
           <div key={item.label} className="flex-1 flex flex-col items-center">
-            <span className={`text-sm font-black tabular-nums leading-none mb-1.5 ${hasCount ? 'text-white' : 'text-zinc-700'}`}>
+            <span className={`text-sm font-black tabular-nums leading-none mb-1.5 ${hasCount ? 'text-texto-principal' : 'text-zinc-700'}`}>
               {item.count}
             </span>
             <div className="w-full flex items-end justify-center" style={{ height: BAR_H }}>
@@ -148,8 +148,8 @@ export default function StatsPage() {
   }, [view, fetchedAll, loadingAll, fetchedAllVols])
 
   if (profile === null) return (
-    <div className="flex justify-center items-center h-full bg-zinc-950">
-      <div className="w-6 h-6 rounded-full border-2 border-yellow-400 border-t-transparent animate-spin" />
+    <div className="flex justify-center items-center h-full bg-fondo">
+      <div className="w-6 h-6 rounded-full border-2 border-primario border-t-transparent animate-spin" />
     </div>
   )
   if (profile.role !== 'admin') return <Navigate to="/staff" replace />
@@ -220,20 +220,20 @@ export default function StatsPage() {
   const volAvgLifespan = avgLifespan(view === 'historical' ? historicalVolumes : volumes)
 
   return (
-    <div className="h-full overflow-y-auto bg-zinc-950">
+    <div className="h-full overflow-y-auto bg-fondo">
       <div className="px-4 pt-5 pb-10">
-        <h1 className="text-white font-black text-2xl tracking-tight mb-4">Dashboard</h1>
+        <h1 className="text-texto-principal font-black text-2xl tracking-tight mb-4">Dashboard</h1>
 
         {/* Toggle Actuales / Históricas */}
-        <div className="flex gap-1 mb-5 bg-zinc-900 p-1 rounded-2xl border border-zinc-800/80">
+        <div className="flex gap-1 mb-5 bg-superficie p-1 rounded-2xl border border-zinc-800/80">
           {(['current', 'historical'] as const).map(v => (
             <button
               key={v}
               onClick={() => setView(v)}
               className={`flex-1 py-2.5 rounded-xl text-sm font-bold transition-all ${
                 view === v
-                  ? 'bg-yellow-400 text-zinc-950 shadow-md'
-                  : 'text-zinc-400 hover:text-white'
+                  ? 'bg-primario text-texto-en-acento shadow-md'
+                  : 'text-zinc-400 hover:text-texto-principal'
               }`}
             >
               {v === 'current' ? 'Actuales' : 'Históricas'}
@@ -243,7 +243,7 @@ export default function StatsPage() {
 
         {isLoading ? (
           <div className="flex justify-center pt-16">
-            <div className="w-6 h-6 rounded-full border-2 border-yellow-400 border-t-transparent animate-spin" />
+            <div className="w-6 h-6 rounded-full border-2 border-primario border-t-transparent animate-spin" />
           </div>
         ) : (
           <div className="space-y-4">
@@ -264,27 +264,27 @@ export default function StatsPage() {
             )}
 
             {/* Por zona */}
-            <div className="bg-zinc-900 rounded-2xl p-4 border border-zinc-800/80">
-              <h2 className="text-white font-bold text-base mb-4">Por zona</h2>
+            <div className="bg-superficie rounded-2xl p-4 border border-zinc-800/80">
+              <h2 className="text-texto-principal font-bold text-base mb-4">Por zona</h2>
               <BarChart items={zoneItems} />
             </div>
 
             {/* Por color */}
-            <div className="bg-zinc-900 rounded-2xl p-4 border border-zinc-800/80">
-              <h2 className="text-white font-bold text-base mb-4">Por color</h2>
+            <div className="bg-superficie rounded-2xl p-4 border border-zinc-800/80">
+              <h2 className="text-texto-principal font-bold text-base mb-4">Por color</h2>
               <ColumnChart items={colorItems} />
             </div>
 
             {/* Por grado */}
-            <div className="bg-zinc-900 rounded-2xl p-4 border border-zinc-800/80">
-              <h2 className="text-white font-bold text-base mb-4">Por grado</h2>
+            <div className="bg-superficie rounded-2xl p-4 border border-zinc-800/80">
+              <h2 className="text-texto-principal font-bold text-base mb-4">Por grado</h2>
               <ColumnChart items={gradeItems} />
             </div>
 
             {/* Color × Grado */}
             {colorsWithRoutes.length > 0 && (
-              <div className="bg-zinc-900 rounded-2xl p-4 border border-zinc-800/80">
-                <h2 className="text-white font-bold text-base mb-4">Color × Grado</h2>
+              <div className="bg-superficie rounded-2xl p-4 border border-zinc-800/80">
+                <h2 className="text-texto-principal font-bold text-base mb-4">Color × Grado</h2>
                 <div className="space-y-3">
                   {colorsWithRoutes.map(c => {
                     const grades = colorGradeMatrix[c.key] ?? {}
@@ -295,7 +295,7 @@ export default function StatsPage() {
                         <span className="text-zinc-400 text-xs w-16 shrink-0 truncate">{c.label}</span>
                         <div className="flex flex-wrap gap-1">
                           {gradesPresent.map(g => (
-                            <span key={g} className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-200">
+                            <span key={g} className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-superficie-alta text-zinc-200">
                               {g}{grades[g] > 1 && <span className="text-zinc-500 font-normal">×{grades[g]}</span>}
                             </span>
                           ))}
@@ -308,8 +308,8 @@ export default function StatsPage() {
             )}
 
             {/* Volúmenes */}
-            <div className="bg-zinc-900 rounded-2xl p-4 border border-zinc-800/80">
-              <h2 className="text-white font-bold text-base mb-3">Volúmenes</h2>
+            <div className="bg-superficie rounded-2xl p-4 border border-zinc-800/80">
+              <h2 className="text-texto-principal font-bold text-base mb-3">Volúmenes</h2>
               {view === 'current' ? (
                 <div className="flex gap-3">
                   <StatCard value={volumes.length} label="Activos" sub="en el muro ahora" />
@@ -333,8 +333,8 @@ export default function StatsPage() {
 
             {/* Frescura — solo en vista actual, al fondo */}
             {view === 'current' && (
-              <div className="bg-zinc-900 rounded-2xl p-4 border border-zinc-800/80">
-                <h2 className="text-white font-bold text-base mb-4">Frescura</h2>
+              <div className="bg-superficie rounded-2xl p-4 border border-zinc-800/80">
+                <h2 className="text-texto-principal font-bold text-base mb-4">Frescura</h2>
                 <div className="flex h-5 rounded-full overflow-hidden mb-4 gap-px">
                   {(['green', 'yellow', 'red'] as const).map(level => {
                     const count = freshnessGroups[level]
@@ -353,7 +353,7 @@ export default function StatsPage() {
                     <div key={level} className="flex items-center gap-2">
                       <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: getFreshnessColor(level) }} />
                       <span className="text-zinc-400 text-xs">{getPublicLabel(level)}</span>
-                      <span className="text-white text-base font-black tabular-nums">{freshnessGroups[level]}</span>
+                      <span className="text-texto-principal text-base font-black tabular-nums">{freshnessGroups[level]}</span>
                     </div>
                   ))}
                 </div>

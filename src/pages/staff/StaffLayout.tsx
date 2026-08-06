@@ -7,19 +7,19 @@ export default function StaffLayout() {
   const isAdmin = profile?.role === 'admin'
 
   return (
-    <div className="h-screen bg-zinc-950 flex flex-col overflow-hidden">
+    <div className="h-screen bg-fondo flex flex-col overflow-hidden">
       {/* Top header */}
-      <header className="shrink-0 flex items-center justify-between px-4 h-12 border-b border-zinc-800/60 bg-zinc-950/95 backdrop-blur-sm">
+      <header className="shrink-0 flex items-center justify-between px-4 h-12 border-b border-zinc-800/60 bg-fondo/95 backdrop-blur-sm">
         <div className="flex items-center gap-2">
-          <div className="w-7 h-7 bg-yellow-400 rounded-lg flex items-center justify-center shrink-0">
+          <div className="w-7 h-7 bg-primario rounded-lg flex items-center justify-center shrink-0">
             <span className="text-sm leading-none">⚡</span>
           </div>
-          <span className="text-white font-bold text-sm tracking-tight">Jaibamuro</span>
-          <span className="text-zinc-600 text-[11px] font-medium bg-zinc-800 px-1.5 py-0.5 rounded-md ml-0.5">staff</span>
+          <span className="text-texto-principal font-bold text-sm tracking-tight">Jaibamuro</span>
+          <span className="text-zinc-600 text-[11px] font-medium bg-superficie-alta px-1.5 py-0.5 rounded-md ml-0.5">staff</span>
         </div>
         <button
           onClick={signOut}
-          className="text-zinc-400 hover:text-white text-xs font-semibold px-3 py-1.5 rounded-lg bg-zinc-800/80 hover:bg-zinc-700 border border-zinc-700/50 transition-all"
+          className="text-zinc-400 hover:text-texto-principal text-xs font-semibold px-3 py-1.5 rounded-lg bg-superficie-alta/80 hover:bg-superficie-alta-hover border border-zinc-700/50 transition-all"
         >
           Salir
         </button>
@@ -31,13 +31,13 @@ export default function StaffLayout() {
       </main>
 
       {/* Bottom tab bar */}
-      <nav className="fixed bottom-0 left-0 right-0 h-16 bg-zinc-950 border-t border-zinc-800 flex items-center gap-2 px-4 overflow-x-auto overscroll-x-contain z-40">
+      <nav className="fixed bottom-0 left-0 right-0 h-16 bg-fondo border-t border-zinc-800 flex items-center gap-2 px-4 overflow-x-auto overscroll-x-contain z-40">
         <NavLink to="/staff" end className="shrink-0 flex justify-center">
           {({ isActive }) => (
             <div className={`flex items-center gap-2 px-6 py-2.5 rounded-2xl transition-all text-sm font-bold whitespace-nowrap ${
               isActive
-                ? 'bg-yellow-400 text-zinc-950 shadow-lg shadow-yellow-400/25'
-                : 'bg-zinc-800 text-zinc-300 hover:bg-zinc-700 hover:text-white border border-zinc-700'
+                ? 'bg-primario text-texto-en-acento shadow-lg shadow-primario/25'
+                : 'bg-superficie-alta text-zinc-300 hover:bg-superficie-alta-hover hover:text-texto-principal border border-zinc-700'
             }`}>
               <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={isActive ? 2.5 : 2} strokeLinecap="round" strokeLinejoin="round">
                 <rect x="3" y="3" width="7" height="7" rx="1.5" />
@@ -54,8 +54,8 @@ export default function StaffLayout() {
           {({ isActive }) => (
             <div className={`flex items-center gap-2 px-6 py-2.5 rounded-2xl transition-all text-sm font-bold whitespace-nowrap ${
               isActive
-                ? 'bg-yellow-400 text-zinc-950 shadow-lg shadow-yellow-400/25'
-                : 'bg-zinc-800 text-zinc-300 hover:bg-zinc-700 hover:text-white border border-zinc-700'
+                ? 'bg-primario text-texto-en-acento shadow-lg shadow-primario/25'
+                : 'bg-superficie-alta text-zinc-300 hover:bg-superficie-alta-hover hover:text-texto-principal border border-zinc-700'
             }`}>
               <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={isActive ? 2.5 : 2} strokeLinecap="round" strokeLinejoin="round">
                 <path d="M3 7V5a2 2 0 0 1 2-2h2" />
@@ -76,8 +76,8 @@ export default function StaffLayout() {
           {({ isActive }) => (
             <div className={`flex items-center gap-2 px-6 py-2.5 rounded-2xl transition-all text-sm font-bold whitespace-nowrap ${
               isActive
-                ? 'bg-yellow-400 text-zinc-950 shadow-lg shadow-yellow-400/25'
-                : 'bg-zinc-800 text-zinc-300 hover:bg-zinc-700 hover:text-white border border-zinc-700'
+                ? 'bg-primario text-texto-en-acento shadow-lg shadow-primario/25'
+                : 'bg-superficie-alta text-zinc-300 hover:bg-superficie-alta-hover hover:text-texto-principal border border-zinc-700'
             }`}>
               <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={isActive ? 2.5 : 2} strokeLinecap="round" strokeLinejoin="round">
                 <circle cx="12" cy="12" r="9" />
@@ -94,8 +94,8 @@ export default function StaffLayout() {
           {({ isActive }) => (
             <div className={`flex items-center gap-2 px-6 py-2.5 rounded-2xl transition-all text-sm font-bold whitespace-nowrap ${
               isActive
-                ? 'bg-yellow-400 text-zinc-950 shadow-lg shadow-yellow-400/25'
-                : 'bg-zinc-800 text-zinc-300 hover:bg-zinc-700 hover:text-white border border-zinc-700'
+                ? 'bg-primario text-texto-en-acento shadow-lg shadow-primario/25'
+                : 'bg-superficie-alta text-zinc-300 hover:bg-superficie-alta-hover hover:text-texto-principal border border-zinc-700'
             }`}>
               <svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor">
                 <rect x="3" y="12" width="4" height="10" rx="1" />
@@ -112,8 +112,8 @@ export default function StaffLayout() {
             {({ isActive }) => (
               <div className={`flex items-center gap-2 px-6 py-2.5 rounded-2xl transition-all text-sm font-bold whitespace-nowrap ${
                 isActive
-                  ? 'bg-yellow-400 text-zinc-950 shadow-lg shadow-yellow-400/25'
-                  : 'bg-zinc-800 text-zinc-300 hover:bg-zinc-700 hover:text-white border border-zinc-700'
+                  ? 'bg-primario text-texto-en-acento shadow-lg shadow-primario/25'
+                  : 'bg-superficie-alta text-zinc-300 hover:bg-superficie-alta-hover hover:text-texto-principal border border-zinc-700'
               }`}>
                 <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={isActive ? 2.5 : 2} strokeLinecap="round" strokeLinejoin="round">
                   <path d="M12 2a5 5 0 1 1 0 10A5 5 0 0 1 12 2z" />
