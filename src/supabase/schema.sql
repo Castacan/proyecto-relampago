@@ -275,17 +275,48 @@ CREATE POLICY "betas_write_staff" ON public.betas
   FOR ALL USING (EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid()));
 
 -- ============================================================
--- Pendiente (NO fabricado, no documentado a propósito): las RPCs
--- get_daily_leaderboard, get_monthly_leaderboard y get_recent_events
--- existen en producción (usadas por /leaderboard/display, confirmado
--- vía curl directo a /rest/v1/rpc/... en sesiones previas) pero su
--- definición SQL exacta nunca se extrajo del dashboard. A diferencia
--- de submit_send/get_my_stats/get_my_sends, que sí se documentaron
--- retroactivamente, estas tres siguen pendientes — requieren que el
--- usuario haga el mismo export CSV de "Show definition" en el SQL
--- Editor (el copy-paste normal se corta a la mitad en funciones
--- largas). No inventar su cuerpo aquí.
+-- RPCs: leaderboard (/leaderboard/display)
+-- Ya viven en producción (creadas desde el SQL Editor del dashboard,
+-- sin pasar por este archivo). Documentadas aquí a partir de
+-- `select proname, pg_get_functiondef(oid) from pg_proc where
+-- proname in (...)` exportado como CSV el 2026-08-06 (el copy-paste
+-- normal del panel "Show definition" se corta a la mitad en funciones
+-- largas, mismo problema que con submit_send). Texto verbatim de la
+-- definición real, sin reformatear.
 -- ============================================================
+
+CREATE OR REPLACE FUNCTION public.get_daily_leaderboard()
+ RETURNS TABLE(display_name text, total_points bigint)
+ LANGUAGE sql
+ SECURITY DEFINER
+AS $function$
+    SELECT c.display_name, SUM(s.points_daily)
+    FROM sends s JOIN climbers c ON c.id = s.user_id    WHERE s.sent_at >= date_trunc('day', now() AT TIME ZONE 'America/Mexico_City')
+                        AT TIME ZONE 'America/Mexico_City'      AND c.visible_in_leaderboard = true
+    GROUP BY c.id, c.display_name ORDER BY 2 DESC LIMIT 10;
+  $function$;
+
+CREATE OR REPLACE FUNCTION public.get_monthly_leaderboard()
+ RETURNS TABLE(display_name text, total_points bigint)
+ LANGUAGE sql
+ SECURITY DEFINER
+AS $function$
+    SELECT c.display_name, SUM(s.points_monthly)
+    FROM sends s JOIN climbers c ON c.id = s.user_id    WHERE s.sent_at >= date_trunc('month', now() AT TIME ZONE 'America/Mexico_City')
+                        AT TIME ZONE 'America/Mexico_City'      AND c.visible_in_leaderboard = true
+      AND s.points_monthly > 0
+    GROUP BY c.id, c.display_name ORDER BY 2 DESC LIMIT 5;
+  $function$;
+
+CREATE OR REPLACE FUNCTION public.get_recent_events(lim integer DEFAULT 8)
+ RETURNS TABLE(display_name text, grade text, color text, sent_at timestamp with time zone)
+ LANGUAGE sql
+ SECURITY DEFINER
+AS $function$
+    SELECT c.display_name, r.grade, r.color, s.sent_at
+    FROM sends s JOIN climbers c ON c.id = s.user_id JOIN routes r ON r.id = s.route_id    WHERE s.sent_at > now() - interval '3 hours'
+      AND c.visible_in_leaderboard = true    ORDER BY s.sent_at DESC LIMIT lim;
+  $function$;
 
 -- ============================================================
 -- Migración: route_number (2026-07-31)
