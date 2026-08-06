@@ -7,6 +7,7 @@ import { useRoutes } from '../../hooks/useRoutes'
 import { useVolumes } from '../../hooks/useVolumes'
 import { useQrByRoute } from '../../hooks/useQrByRoute'
 import { useChain } from '../../hooks/useChain'
+import logoHorizontal from '../../assets/logo-horizontal.png'
 import type { Route } from '../../types'
 
 export default function PublicWallPage() {
@@ -32,10 +33,7 @@ export default function PublicWallPage() {
     <div className="relative w-full h-screen bg-fondo flex flex-col">
       <header className="shrink-0 flex items-center justify-between px-4 h-12 bg-fondo/95 backdrop-blur-sm border-b border-zinc-800/40 z-10">
         <div className="flex items-center gap-2">
-          <div className="w-7 h-7 bg-primario rounded-lg flex items-center justify-center">
-            <span className="text-sm leading-none">⚡</span>
-          </div>
-          <span className="text-texto-principal font-bold text-sm tracking-tight">Jaibamuro</span>
+          <img src={logoHorizontal} alt="Jaibamuro" className="h-5 w-auto" />
         </div>
         <div className="flex items-center gap-2">
           <div className="flex items-center gap-2 bg-superficie rounded-full px-3.5 py-1.5 border border-zinc-800/60">

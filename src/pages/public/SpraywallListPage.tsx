@@ -4,6 +4,7 @@ import { useSpraywallRoutes } from '../../hooks/useSpraywallRoutes'
 import { useSpraywallSends } from '../../hooks/useSpraywallSends'
 import { useClimber } from '../../hooks/useClimber'
 import { GRADES } from '../../lib/colors'
+import logoVertical from '../../assets/logo-vertical.png'
 
 type SendFilter = 'todas' | 'enviadas' | 'pendientes'
 
@@ -27,9 +28,7 @@ export default function SpraywallListPage() {
     <div className="min-h-screen bg-fondo">
       <header className="shrink-0 flex items-center justify-between px-4 h-12 bg-fondo/95 backdrop-blur-sm border-b border-zinc-800/40 sticky top-0 z-10">
         <div className="flex items-center gap-2">
-          <div className="w-7 h-7 bg-primario rounded-lg flex items-center justify-center">
-            <span className="text-sm leading-none">⚡</span>
-          </div>
+          <img src={logoVertical} alt="Jaibamuro" className="h-7 w-auto" />
           <span className="text-texto-principal font-bold text-sm tracking-tight">Spraywall</span>
         </div>
         <Link

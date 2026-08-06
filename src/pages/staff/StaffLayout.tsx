@@ -1,6 +1,7 @@
 import { Outlet, NavLink } from 'react-router-dom'
 import { signOut } from '../../lib/auth'
 import { useProfile } from '../../hooks/useProfile'
+import logoHorizontal from '../../assets/logo-horizontal.png'
 
 export default function StaffLayout() {
   const { profile } = useProfile()
@@ -11,10 +12,7 @@ export default function StaffLayout() {
       {/* Top header */}
       <header className="shrink-0 flex items-center justify-between px-4 h-12 border-b border-zinc-800/60 bg-fondo/95 backdrop-blur-sm">
         <div className="flex items-center gap-2">
-          <div className="w-7 h-7 bg-primario rounded-lg flex items-center justify-center shrink-0">
-            <span className="text-sm leading-none">⚡</span>
-          </div>
-          <span className="text-texto-principal font-bold text-sm tracking-tight">Jaibamuro</span>
+          <img src={logoHorizontal} alt="Jaibamuro" className="h-5 w-auto" />
           <span className="text-zinc-600 text-[11px] font-medium bg-superficie-alta px-1.5 py-0.5 rounded-md ml-0.5">staff</span>
         </div>
         <button

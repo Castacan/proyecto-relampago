@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { signIn } from '../../lib/auth'
+import logoVertical from '../../assets/logo-vertical.png'
 
 export default function LoginPage() {
   const [email, setEmail] = useState('')
@@ -26,10 +27,7 @@ export default function LoginPage() {
     <div className="min-h-screen bg-fondo flex flex-col items-center justify-center p-6">
       {/* Branding */}
       <div className="mb-10 text-center">
-        <div className="w-18 h-18 bg-primario rounded-3xl flex items-center justify-center mx-auto mb-5 shadow-2xl shadow-primario/30">
-          <span className="text-4xl">⚡</span>
-        </div>
-        <h1 className="text-texto-principal text-3xl font-black tracking-tight">Jaibamuro</h1>
+        <img src={logoVertical} alt="Jaibamuro" className="h-28 w-auto mx-auto mb-5" />
         <p className="text-zinc-500 text-sm font-medium mt-1.5">Acceso para setters del gym</p>
       </div>
 
