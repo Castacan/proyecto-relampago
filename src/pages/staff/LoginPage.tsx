@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, Link } from 'react-router-dom'
 import { signIn } from '../../lib/auth'
 import logoVertical from '../../assets/logo-vertical.png'
 
@@ -24,7 +24,14 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen bg-fondo flex flex-col items-center justify-center p-6">
+    <div className="min-h-screen bg-fondo flex flex-col items-center justify-center p-6 relative">
+      <Link
+        to="/muro"
+        className="absolute top-5 left-5 flex items-center gap-1.5 text-zinc-500 hover:text-zinc-300 text-sm font-medium transition-colors"
+      >
+        ← Muro
+      </Link>
+
       {/* Branding */}
       <div className="mb-10 text-center">
         <img src={logoVertical} alt="Jaibamuro" className="h-28 w-auto mx-auto mb-5" />
