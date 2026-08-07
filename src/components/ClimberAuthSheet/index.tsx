@@ -34,11 +34,27 @@ export default function ClimberAuthSheet({ isOpen, onClose, onDone, startAtSetup
   const [codeError, setCodeError] = useState<string | null>(null)
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
-  // Cuando la sesión se activa (magic link clickeado), avanzar a setup
+  // Cuando la sesión se activa (magic link/código), avanzar a setup —
+  // pero solo si de verdad no tiene perfil todavía. Antes esto pasaba a
+  // 'setup' sin checar nada, así que alguien que ya tenía alias guardado
+  // (ej. abriendo el sheet a mano con "Entrar" en vez de por un link
+  // frío) volvía a ver el paso de "elige tu alias" en cada login. Se
+  // consulta directo a la DB en vez de depender de un prop `climber` del
+  // padre, que puede no estar listo todavía en este mismo instante.
   useEffect(() => {
-    if (session?.user && step === 'sent') {
-      setStep('setup')
-    }
+    if (!(session?.user && step === 'sent')) return
+    let cancelled = false
+    ;(async () => {
+      const { data } = await db.from('climbers').select('id').eq('id', session.user.id).single()
+      if (cancelled) return
+      if (data) {
+        clearPendingOnboarding()
+        onDone()
+      } else {
+        setStep('setup')
+      }
+    })()
+    return () => { cancelled = true }
   }, [session?.user?.id, step])
 
   // Countdown timer para reenvío
