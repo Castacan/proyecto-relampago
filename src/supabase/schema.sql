@@ -488,6 +488,122 @@ AS $function$
   END; $function$;
 
 -- ============================================================
+-- RPC: get_admin_insights (2026-08-07)
+-- Dashboard de datos de clientes/desempeño (/staff/insights).
+-- SOLO accesible por el dueño (esz1996mx@gmail.com) — el guard real
+-- vive AQUÍ, no en el frontend: la función es SECURITY DEFINER y
+-- verifica auth.jwt()->>'email' antes de tocar cualquier tabla, así
+-- que aunque el frontend se manipulara, nadie más puede sacar datos
+-- de climbers/scans/sends/votes vía este RPC. Cambiar el email acá
+-- Y en src/lib/owner.ts si algún día cambia el dueño o se agrega otro.
+-- ============================================================
+CREATE OR REPLACE FUNCTION public.get_admin_insights()
+ RETURNS JSONB
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+AS $function$
+  DECLARE
+    v_result JSONB;
+  BEGIN
+    IF lower(auth.jwt() ->> 'email') IS DISTINCT FROM 'esz1996mx@gmail.com' THEN
+      RETURN '{"error":"not_authorized"}'::JSONB;
+    END IF;
+
+    SELECT jsonb_build_object(
+      'climbers_total', (SELECT COUNT(*) FROM climbers),
+      'climbers_new_7d', (SELECT COUNT(*) FROM climbers WHERE created_at >= now() - interval '7 days'),
+      'climbers_new_30d', (SELECT COUNT(*) FROM climbers WHERE created_at >= now() - interval '30 days'),
+      'active_climbers', (SELECT COUNT(DISTINCT user_id) FROM sends),
+
+      'climbers_by_week', (
+        SELECT COALESCE(jsonb_agg(jsonb_build_object('week_start', week_start, 'count', cnt) ORDER BY week_start), '[]'::jsonb)
+        FROM (
+          SELECT date_trunc('week', created_at AT TIME ZONE 'America/Mexico_City')::date AS week_start, COUNT(*) AS cnt
+          FROM climbers
+          WHERE created_at >= now() - interval '56 days'
+          GROUP BY 1
+        ) w
+      ),
+
+      'sends_total', (SELECT COUNT(*) FROM sends),
+      'sends_7d', (SELECT COUNT(*) FROM sends WHERE sent_at >= now() - interval '7 days'),
+      'sends_30d', (SELECT COUNT(*) FROM sends WHERE sent_at >= now() - interval '30 days'),
+
+      'sends_by_day', (
+        SELECT COALESCE(jsonb_agg(jsonb_build_object('day', day, 'count', cnt) ORDER BY day), '[]'::jsonb)
+        FROM (
+          SELECT (sent_at AT TIME ZONE 'America/Mexico_City')::date AS day, COUNT(*) AS cnt
+          FROM sends
+          WHERE sent_at >= now() - interval '30 days'
+          GROUP BY 1
+        ) d
+      ),
+
+      'scans_30d', (SELECT COUNT(*) FROM scans WHERE scanned_at >= now() - interval '30 days'),
+
+      'top_routes_by_sends', (
+        SELECT COALESCE(jsonb_agg(t), '[]'::jsonb) FROM (
+          SELECT r.id AS route_id, r.color, r.grade, z.name AS zone_name, COUNT(s.id) AS send_count
+          FROM sends s
+          JOIN routes r ON r.id = s.route_id
+          LEFT JOIN zones z ON z.id = r.zone_id
+          GROUP BY r.id, r.color, r.grade, z.name
+          ORDER BY send_count DESC
+          LIMIT 10
+        ) t
+      ),
+
+      'top_routes_by_scans', (
+        SELECT COALESCE(jsonb_agg(t), '[]'::jsonb) FROM (
+          SELECT r.id AS route_id, r.color, r.grade, z.name AS zone_name, COUNT(sc.id) AS scan_count
+          FROM scans sc
+          JOIN routes r ON r.id = sc.route_id
+          LEFT JOIN zones z ON z.id = r.zone_id
+          GROUP BY r.id, r.color, r.grade, z.name
+          ORDER BY scan_count DESC
+          LIMIT 10
+        ) t
+      ),
+
+      'votes_up', (SELECT COUNT(*) FROM votes WHERE value = 'up'),
+      'votes_down', (SELECT COUNT(*) FROM votes WHERE value = 'down'),
+
+      'peak_hours', (
+        SELECT COALESCE(jsonb_agg(jsonb_build_object('hour', hour, 'count', cnt) ORDER BY hour), '[]'::jsonb)
+        FROM (
+          SELECT EXTRACT(HOUR FROM scanned_at AT TIME ZONE 'America/Mexico_City')::int AS hour, COUNT(*) AS cnt
+          FROM scans
+          WHERE scanned_at >= now() - interval '30 days'
+          GROUP BY 1
+        ) h
+      ),
+
+      'peak_weekdays', (
+        SELECT COALESCE(jsonb_agg(jsonb_build_object('dow', dow, 'count', cnt) ORDER BY dow), '[]'::jsonb)
+        FROM (
+          SELECT EXTRACT(DOW FROM scanned_at AT TIME ZONE 'America/Mexico_City')::int AS dow, COUNT(*) AS cnt
+          FROM scans
+          WHERE scanned_at >= now() - interval '30 days'
+          GROUP BY 1
+        ) wd
+      ),
+
+      'retained_climbers', (
+        SELECT COUNT(*) FROM (
+          SELECT user_id
+          FROM sends
+          GROUP BY user_id
+          HAVING COUNT(DISTINCT date_trunc('week', sent_at AT TIME ZONE 'America/Mexico_City')) >= 2
+        ) r
+      )
+    ) INTO v_result;
+
+    RETURN v_result;
+  END; $function$;
+
+GRANT EXECUTE ON FUNCTION public.get_admin_insights() TO authenticated;
+
+-- ============================================================
 -- Spraywall (2026-08-01)
 -- Pared fija de agarres (nunca cambian), una sola foto base
 -- compartida por todas las rutas. Sin puntos/leaderboard/QR-scan —

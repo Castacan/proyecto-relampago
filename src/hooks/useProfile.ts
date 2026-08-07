@@ -4,10 +4,12 @@ import type { Profile } from '../types'
 
 export function useProfile() {
   const [profile, setProfile] = useState<Profile | null>(null)
+  const [email, setEmail] = useState<string | null>(null)
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data: { user } }) => {
       if (!user) return
+      setEmail(user.email ?? null)
       supabase
         .from('profiles')
         .select('*')
@@ -17,5 +19,5 @@ export function useProfile() {
     })
   }, [])
 
-  return { profile }
+  return { profile, email }
 }

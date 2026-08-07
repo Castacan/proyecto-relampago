@@ -1,11 +1,13 @@
 import { Outlet, NavLink } from 'react-router-dom'
 import { signOut } from '../../lib/auth'
 import { useProfile } from '../../hooks/useProfile'
+import { isOwner } from '../../lib/owner'
 import logoHorizontal from '../../assets/logo-horizontal.png'
 
 export default function StaffLayout() {
-  const { profile } = useProfile()
+  const { profile, email } = useProfile()
   const isAdmin = profile?.role === 'admin'
+  const showInsights = isAdmin && isOwner(email)
 
   return (
     <div className="h-screen bg-fondo flex flex-col overflow-hidden">
@@ -101,6 +103,22 @@ export default function StaffLayout() {
                 <rect x="17" y="2" width="4" height="20" rx="1" />
               </svg>
               <span>Stats</span>
+            </div>
+          )}
+        </NavLink>}
+
+        {showInsights && <NavLink to="/staff/insights" className="shrink-0 flex justify-center">
+          {({ isActive }) => (
+            <div className={`flex items-center gap-2 px-6 py-2.5 rounded-2xl transition-all text-sm font-bold whitespace-nowrap ${
+              isActive
+                ? 'bg-primario text-texto-en-acento shadow-lg shadow-primario/25'
+                : 'bg-superficie-alta text-zinc-300 hover:bg-superficie-alta-hover hover:text-texto-principal border border-zinc-700'
+            }`}>
+              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={isActive ? 2.5 : 2} strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="10" />
+                <path d="M12 8v4l3 2" />
+              </svg>
+              <span>Insights</span>
             </div>
           )}
         </NavLink>}
