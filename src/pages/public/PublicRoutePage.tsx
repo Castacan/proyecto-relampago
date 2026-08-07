@@ -6,6 +6,7 @@ import { useClimber } from '../../hooks/useClimber'
 import { getColorHex } from '../../lib/colors'
 import { getFreshnessLevel, getFreshnessColor, getPublicLabel } from '../../lib/freshness'
 import { getDeviceId } from '../../lib/device'
+import { isPendingOnboarding, clearPendingOnboarding } from '../../lib/pendingOnboarding'
 import VoteButtons from '../../components/VoteButtons'
 import SendButton from '../../components/SendButton'
 import LoginBanner from '../../components/LoginBanner'
@@ -45,15 +46,19 @@ export default function PublicRoutePage() {
   const [authSheetOpen, setAuthSheetOpen] = useState(false)
   const [startAtSetup, setStartAtSetup] = useState(false)
 
-  // Detectar llegada vía magic link para lanzar onboarding automático
-  const isFromMagicLink = useRef(
-    typeof window !== 'undefined' && window.location.hash.includes('access_token')
-  )
+  // Auto-abrir onboarding si hay sesión pero el climber todavía no
+  // completó su perfil (marcado explícitamente al mandar el magic
+  // link/código — ver pendingOnboarding.ts). Solo se checa una vez por
+  // montaje, cuando ya sabemos con certeza si hay sesión y si el
+  // climber existe (climberLoading en false).
+  const onboardingChecked = useRef(false)
   useEffect(() => {
-    if (!isFromMagicLink.current) return
+    if (onboardingChecked.current) return
     if (!session?.user || climberLoading) return
-    isFromMagicLink.current = false
-    if (!climber) {
+    onboardingChecked.current = true
+    if (climber) {
+      clearPendingOnboarding()
+    } else if (isPendingOnboarding()) {
       setStartAtSetup(true)
       setAuthSheetOpen(true)
     }

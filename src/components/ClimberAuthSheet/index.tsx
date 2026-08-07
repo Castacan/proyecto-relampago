@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../lib/auth'
 import { signInWithMagicLink, verifyEmailOtp } from '../../lib/auth'
+import { markPendingOnboarding, clearPendingOnboarding } from '../../lib/pendingOnboarding'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const db = supabase as unknown as any
@@ -81,6 +82,7 @@ export default function ClimberAuthSheet({ isOpen, onClose, onDone, startAtSetup
     if (error) {
       setSendError('No se pudo enviar el link. Verifica tu correo.')
     } else {
+      markPendingOnboarding()
       setStep('sent')
     }
   }
@@ -129,6 +131,7 @@ export default function ClimberAuthSheet({ isOpen, onClose, onDone, startAtSetup
       setStep('setup')
       return
     }
+    clearPendingOnboarding()
     onDone()
   }
 
