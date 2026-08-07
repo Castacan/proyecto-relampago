@@ -2,16 +2,21 @@ import { useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import ZoneMap from '../../components/ZoneMap'
 import ChainCanvas from '../../components/ChainCanvas'
+import ClimberAuthSheet from '../../components/ClimberAuthSheet'
 import { useZones } from '../../hooks/useZones'
 import { useRoutes } from '../../hooks/useRoutes'
 import { useVolumes } from '../../hooks/useVolumes'
 import { useQrByRoute } from '../../hooks/useQrByRoute'
 import { useChain } from '../../hooks/useChain'
+import { useAuth } from '../../lib/auth'
+import { useClimber } from '../../hooks/useClimber'
 import logoHorizontal from '../../assets/logo-horizontal.png'
 import type { Route } from '../../types'
 
 export default function PublicWallPage() {
   const navigate = useNavigate()
+  const { session } = useAuth()
+  const { climber, refetch: refetchClimber } = useClimber()
   const { zones: allZones } = useZones()
   const { routes } = useRoutes()
   const { volumes } = useVolumes()
@@ -23,6 +28,7 @@ export default function PublicWallPage() {
   const [activeZoneId, setActiveZoneId] = useState<string | null>(null)
   const [showMap, setShowMap] = useState(false)
   const [jumpZoneId, setJumpZoneId] = useState<string | null>(null)
+  const [authSheetOpen, setAuthSheetOpen] = useState(false)
 
   function handleRouteClick(route: Route) {
     const qrId = qrByRoute[route.id]
@@ -45,6 +51,29 @@ export default function PublicWallPage() {
             className="bg-superficie rounded-full px-3.5 py-1.5 border border-zinc-800/60 text-zinc-300 text-xs font-semibold hover:text-texto-principal hover:border-zinc-700 transition-colors"
           >
             Spraywall
+          </Link>
+          {session?.user ? (
+            <Link
+              to="/mi-cuenta"
+              className="w-7 h-7 rounded-full bg-superficie-alta border border-zinc-700/60 flex items-center justify-center text-zinc-300 text-xs font-black hover:border-zinc-500 transition-colors"
+            >
+              {climber?.display_name?.[0]?.toUpperCase() ?? '⚡'}
+            </Link>
+          ) : (
+            <button
+              onClick={() => setAuthSheetOpen(true)}
+              className="bg-primario hover:bg-primario-hover text-texto-en-acento rounded-full px-3.5 py-1.5 text-xs font-bold transition-colors"
+            >
+              Entrar
+            </button>
+          )}
+          <Link
+            to="/login"
+            title="Acceso staff"
+            aria-label="Acceso staff"
+            className="text-zinc-700 hover:text-zinc-500 text-xs transition-colors px-1"
+          >
+            ⚙
           </Link>
         </div>
       </header>
@@ -108,6 +137,12 @@ export default function PublicWallPage() {
           </>
         )}
       </div>
+
+      <ClimberAuthSheet
+        isOpen={authSheetOpen}
+        onClose={() => setAuthSheetOpen(false)}
+        onDone={() => { setAuthSheetOpen(false); refetchClimber() }}
+      />
     </div>
   )
 }
