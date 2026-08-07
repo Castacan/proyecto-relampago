@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import ZoneMap from '../../components/ZoneMap'
 import ChainCanvas from '../../components/ChainCanvas'
@@ -16,7 +16,7 @@ import type { Route } from '../../types'
 export default function PublicWallPage() {
   const navigate = useNavigate()
   const { session } = useAuth()
-  const { climber, refetch: refetchClimber } = useClimber()
+  const { climber, loading: climberLoading, refetch: refetchClimber } = useClimber()
   const { zones: allZones } = useZones()
   const { routes } = useRoutes()
   const { volumes } = useVolumes()
@@ -29,6 +29,21 @@ export default function PublicWallPage() {
   const [showMap, setShowMap] = useState(false)
   const [jumpZoneId, setJumpZoneId] = useState<string | null>(null)
   const [authSheetOpen, setAuthSheetOpen] = useState(false)
+  const [startAtSetup, setStartAtSetup] = useState(false)
+
+  // Detectar llegada vía magic link para lanzar onboarding automático
+  const isFromMagicLink = useRef(
+    typeof window !== 'undefined' && window.location.hash.includes('access_token')
+  )
+  useEffect(() => {
+    if (!isFromMagicLink.current) return
+    if (!session?.user || climberLoading) return
+    isFromMagicLink.current = false
+    if (!climber) {
+      setStartAtSetup(true)
+      setAuthSheetOpen(true)
+    }
+  }, [session?.user?.id, climberLoading, climber])
 
   function handleRouteClick(route: Route) {
     const qrId = qrByRoute[route.id]
@@ -142,6 +157,7 @@ export default function PublicWallPage() {
         isOpen={authSheetOpen}
         onClose={() => setAuthSheetOpen(false)}
         onDone={() => { setAuthSheetOpen(false); refetchClimber() }}
+        startAtSetup={startAtSetup}
       />
     </div>
   )
