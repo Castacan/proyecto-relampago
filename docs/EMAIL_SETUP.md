@@ -4,68 +4,72 @@ Guía para conectar un dominio propio con Resend y Supabase para que los magic l
 
 ---
 
-## Paso 1 — Comprar el dominio
+## Paso 1 — Comprar el dominio ✅
 
-Recomendado: `relampago.mx` o `jaibamuro.mx`. Registradores confiables: GoDaddy, Namecheap, Cloudflare Registrar.
+Dominio: `jaibamuro.com` (comprado en Namecheap).
 
 ---
 
-## Paso 2 — Crear cuenta en Resend
+## Paso 2 — Crear cuenta en Resend ✅
 
 1. Ir a [resend.com](https://resend.com) y crear cuenta gratuita.
 2. Plan gratuito: 3,000 emails/mes, 100/día. Suficiente para producción inicial.
 
 ---
 
-## Paso 3 — Verificar el dominio en Resend
+## Paso 3 — Verificar el dominio en Resend ✅
 
 1. En Resend → **Domains** → **Add Domain**.
-2. Ingresar el dominio (ej. `relampago.mx`).
-3. Resend mostrará registros DNS que debes agregar en tu proveedor del dominio:
+2. Ingresar el dominio `jaibamuro.com`.
+3. Resend mostró los registros DNS (DKIM, SPF, DMARC, MX) que se agregaron en Namecheap:
 
 | Tipo  | Nombre                          | Valor                              |
 |-------|---------------------------------|------------------------------------|
-| TXT   | `resend._domainkey.relampago.mx` | (clave DKIM que te da Resend)      |
-| TXT   | `relampago.mx`                  | `v=spf1 include:amazonses.com ~all` |
-| TXT   | `_dmarc.relampago.mx`           | `v=DMARC1; p=none; rua=mailto:...` |
+| TXT   | `resend._domainkey.jaibamuro.com` | (clave DKIM de Resend)           |
+| TXT   | `jaibamuro.com`                 | `v=spf1 include:amazonses.com ~all` |
+| TXT   | `_dmarc.jaibamuro.com`          | `v=DMARC1; p=none; rua=mailto:...` |
+| MX    | `send.jaibamuro.com`            | `feedback-smtp.us-east-1.amazonses.com` |
 
-4. Después de agregar los registros, hacer clic en **Verify** en Resend. La verificación puede tomar 5-60 minutos.
+El registro MX requirió cambiar el modo "Mail Settings" de Namecheap a **Custom MX** (no aparece en la tabla normal de Host Records). Confirmado sin forwarding de correo activo antes de hacer el cambio.
+
+4. DNS verificado como propagado externamente (8.8.8.8, 1.1.1.1); el estado "Verified" en el dashboard de Resend puede tardar unas horas más en confirmarse.
 
 ---
 
-## Paso 4 — Crear API Key en Resend
+## Paso 4 — Crear API Key en Resend ✅
 
 1. En Resend → **API Keys** → **Create API Key**.
-2. Permisos: **Sending access**.
-3. Guardar la clave (solo se muestra una vez): `re_xxxxxxxxxxxx`
+2. Nombre: `jaibamuro-app-smtp`. Permisos: **Sending access**, restringido al dominio `jaibamuro.com` (no Full access).
+3. Clave copiada directo al SMTP de Supabase (no se guardó en texto plano en ningún archivo).
 
 ---
 
-## Paso 5 — Configurar Supabase para usar Resend como SMTP
+## Paso 5 — Configurar Supabase para usar Resend como SMTP ✅
 
-1. Ir a Supabase Dashboard → **Authentication** → **Providers** → **Email**.
-2. Activar **Custom SMTP**.
-3. Llenar los campos:
+1. Supabase Dashboard → **Authentication** → **Emails** → pestaña **SMTP Settings** (no está bajo Providers).
+2. Activar **Enable custom SMTP**.
+3. Campos configurados:
 
 | Campo             | Valor                         |
 |-------------------|-------------------------------|
 | Host              | `smtp.resend.com`             |
 | Port              | `465`                         |
 | Username          | `resend`                      |
-| Password          | `re_xxxxxxxxxxxx` (tu API key)|
+| Password          | la API key `jaibamuro-app-smtp` |
 | Sender name       | `Jaibamuro`                   |
-| Sender email      | `hola@relampago.mx`           |
+| Sender email      | `hola@jaibamuro.com`          |
 
-4. Guardar.
+4. Guardado y verificado tras recargar la página (los valores persisten, salvo el password que Supabase nunca vuelve a mostrar).
 
 ---
 
-## Paso 6 — Configurar Site URL y Redirect URLs en Supabase
+## Paso 6 — Configurar Site URL y Redirect URLs en Supabase ✅
 
 1. Supabase Dashboard → **Authentication** → **URL Configuration**.
-2. **Site URL**: `https://proyecto-relampago.vercel.app` (o tu dominio personalizado cuando lo tengas).
-3. **Redirect URLs** (agregar todas):
-   - `https://proyecto-relampago.vercel.app/**`
+2. **Site URL**: `https://app.jaibamuro.com`.
+3. **Redirect URLs** (las 3 activas):
+   - `https://app.jaibamuro.com/**`
+   - `https://proyecto-relampago.vercel.app/**` (se dejó como fallback, no estorba)
    - `http://localhost:5173/**` (para desarrollo local)
 
 Sin esto, los magic links no redirigen correctamente.
@@ -91,8 +95,8 @@ problema común en Android/iOS). Si ya tenías este template pegado desde antes 
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Entra a Jaibamuro</title>
 </head>
-<body style="margin:0;padding:0;background:#09090b;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">
-  <table width="100%" cellpadding="0" cellspacing="0" style="background:#09090b;min-height:100vh;">
+<body style="margin:0;padding:0;background:#013a4b;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#013a4b;min-height:100vh;">
     <tr>
       <td align="center" style="padding:40px 20px;">
         <table width="100%" cellpadding="0" cellspacing="0" style="max-width:420px;">
@@ -100,37 +104,34 @@ problema común en Android/iOS). Si ya tenías este template pegado desde antes 
           <!-- Logo -->
           <tr>
             <td align="center" style="padding-bottom:32px;">
-              <div style="display:inline-flex;align-items:center;gap:10px;">
-                <div style="width:36px;height:36px;background:#facc15;border-radius:10px;display:inline-flex;align-items:center;justify-content:center;font-size:20px;line-height:1;">⚡</div>
-                <span style="color:#ffffff;font-size:20px;font-weight:900;letter-spacing:-0.5px;">Jaibamuro</span>
-              </div>
+              <img src="https://jaibamuro.com/logo-email.png" width="160" height="41" alt="Jaibamuro" style="display:block;" />
             </td>
           </tr>
 
           <!-- Card -->
           <tr>
-            <td style="background:#18181b;border-radius:20px;border:1px solid #27272a;padding:36px 32px;">
-              <h1 style="color:#ffffff;font-size:22px;font-weight:900;margin:0 0 8px;letter-spacing:-0.5px;">
+            <td style="background:#015169;border-radius:20px;border:1px solid #026987;padding:36px 32px;">
+              <h1 style="color:#f4f4f3;font-size:22px;font-weight:900;margin:0 0 8px;letter-spacing:-0.5px;">
                 Tu link para entrar
               </h1>
-              <p style="color:#71717a;font-size:14px;margin:0 0 28px;line-height:1.6;">
+              <p style="color:#a9c2c9;font-size:14px;margin:0 0 28px;line-height:1.6;">
                 Haz clic en el botón para acceder a tu cuenta y ver tus puntos en el leaderboard.
               </p>
 
               <!-- CTA Button -->
               <a href="{{ .ConfirmationURL }}"
-                 style="display:block;background:#facc15;color:#09090b;text-decoration:none;font-weight:900;font-size:16px;text-align:center;padding:16px 24px;border-radius:14px;letter-spacing:-0.3px;">
-                ENTRAR A JAIBAMURO ⚡
+                 style="display:block;background:#ff4d15;color:#f4f4f3;text-decoration:none;font-weight:900;font-size:16px;text-align:center;padding:16px 24px;border-radius:14px;letter-spacing:-0.3px;">
+                ENTRAR A JAIBAMURO
               </a>
 
-              <p style="color:#52525b;font-size:12px;text-align:center;margin:24px 0 8px;line-height:1.6;">
+              <p style="color:#71717a;font-size:12px;text-align:center;margin:24px 0 8px;line-height:1.6;">
                 ¿El botón no abre bien desde tu app de correo? Usa este código en la pantalla donde pediste el acceso:
               </p>
-              <p style="color:#facc15;font-size:28px;font-weight:900;text-align:center;letter-spacing:0.3em;margin:0 0 20px;font-family:monospace;">
+              <p style="color:#ff4d15;font-size:28px;font-weight:900;text-align:center;letter-spacing:0.3em;margin:0 0 20px;font-family:monospace;">
                 {{ .Token }}
               </p>
 
-              <p style="color:#52525b;font-size:12px;text-align:center;margin:0;line-height:1.6;">
+              <p style="color:#71717a;font-size:12px;text-align:center;margin:0;line-height:1.6;">
                 El link y el código expiran en 1 hora y solo pueden usarse una vez.<br/>
                 Si no pediste este correo, puedes ignorarlo.
               </p>
@@ -140,8 +141,8 @@ problema común en Android/iOS). Si ya tenías este template pegado desde antes 
           <!-- Footer -->
           <tr>
             <td align="center" style="padding-top:24px;">
-              <p style="color:#3f3f46;font-size:11px;margin:0;">
-                Jaibamuro · El Muro
+              <p style="color:#52717a;font-size:11px;margin:0;">
+                Jaibamuro · Escalada hecha en Veracruz
               </p>
             </td>
           </tr>
@@ -154,7 +155,7 @@ problema común en Android/iOS). Si ya tenías este template pegado desde antes 
 </html>
 ```
 
-3. En **Subject**: `Tu link para entrar a Jaibamuro ⚡`
+3. En **Subject**: `Tu link para entrar a Jaibamuro`
 
 ---
 
@@ -163,7 +164,7 @@ problema común en Android/iOS). Si ya tenías este template pegado desde antes 
 1. Abrir la app en producción.
 2. Escanear un QR y tocar "Entrar".
 3. Ingresar un correo real.
-4. Verificar que el correo llegue desde `hola@relampago.mx` con el diseño correcto.
+4. Verificar que el correo llegue desde `hola@jaibamuro.com` con el diseño correcto.
 5. Hacer clic en el botón → debe regresar a la ruta que estabas viendo.
 6. Por separado, probar el código: pedir el link de nuevo, copiar el código de 6 dígitos del correo y pegarlo en el campo "o ingresa el código" sin tocar el botón — debe iniciar sesión igual, sin salir de la pestaña.
 
@@ -175,7 +176,7 @@ Si en el futuro se prefiere llamar a Resend directamente desde un Edge Function 
 
 ```
 RESEND_API_KEY=re_xxxxxxxxxxxx
-EMAIL_FROM=hola@relampago.mx
+EMAIL_FROM=hola@jaibamuro.com
 ```
 
 Por ahora la integración vía SMTP de Supabase es suficiente y más simple.
