@@ -71,6 +71,23 @@ export default function ClimberAuthSheet({ isOpen, onClose, onDone, startAtSetup
     }
   }, [isOpen, startAtSetup])
 
+  // Bloquear scroll del body mientras el sheet está abierto. En mobile,
+  // enfocar un input dentro de un overlay "fixed" (ej. el de alias en el
+  // paso 'setup') puede hacer que el navegador desplace el body detrás
+  // para mantener el input visible sobre el teclado — y ese scroll no se
+  // deshace solo al cerrar el sheet, dejando el header (arriba del todo)
+  // fuera de vista hasta refrescar. Se restaura y se fuerza scroll a 0
+  // al cerrar, por si ya hubo drift.
+  useEffect(() => {
+    if (!isOpen) return
+    const original = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => {
+      document.body.style.overflow = original
+      window.scrollTo(0, 0)
+    }
+  }, [isOpen])
+
   if (!isOpen) return null
 
   async function handleSendLink() {
