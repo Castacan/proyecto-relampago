@@ -19,6 +19,7 @@ import SpraywallListPage from './pages/public/SpraywallListPage'
 import SpraywallRoutePage from './pages/public/SpraywallRoutePage'
 import SpraywallProposePage from './pages/public/SpraywallProposePage'
 import SpraywallPage from './pages/staff/SpraywallPage'
+import NotFoundPage from './pages/public/NotFoundPage'
 import { useAuth } from './lib/auth'
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -59,6 +60,7 @@ export default function App() {
           <Route path="spraywall" element={<ErrorBoundary label="Spraywall"><SpraywallPage /></ErrorBoundary>} />
         </Route>
         <Route path="/" element={<HubPage />} />
+        <Route path="*" element={<NotFoundPage />} />
       </Routes>
     </BrowserRouter>
   )
