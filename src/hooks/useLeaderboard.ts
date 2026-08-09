@@ -31,7 +31,7 @@ export function useLeaderboard() {
       .channel('leaderboard-sends')
       .on(
         'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'sends' },
+        { event: '*', schema: 'public', table: 'sends' },
         () => { fetchAll() }
       )
       .subscribe((status) => {

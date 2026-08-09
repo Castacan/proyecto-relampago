@@ -699,3 +699,95 @@ create policy "spraywall_photos_write_staff" on storage.objects
     bucket_id = 'spraywall-photos'
     and exists (select 1 from public.profiles where id = auth.uid())
   );
+
+-- ============================================
+-- Moderación de sends (admin) — get_recent_sends + delete_send
+-- Ejecutado en Supabase 2026-08-09.
+-- ============================================
+
+CREATE OR REPLACE FUNCTION public.get_recent_sends(
+  p_search TEXT DEFAULT NULL,
+  p_limit INT DEFAULT 50
+)
+RETURNS TABLE (
+  id UUID,
+  sent_at TIMESTAMPTZ,
+  points_daily INT,
+  points_monthly INT,
+  climber_id UUID,
+  display_name TEXT,
+  email TEXT,
+  route_id UUID,
+  grade TEXT,
+  color TEXT,
+  zone_name TEXT,
+  route_number BIGINT
+)
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $function$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'admin'
+  ) THEN
+    RETURN; -- tabla vacía si no es admin
+  END IF;
+
+  RETURN QUERY
+  SELECT
+    s.id,
+    s.sent_at,
+    s.points_daily,
+    s.points_monthly,
+    c.id AS climber_id,
+    c.display_name,
+    c.email,
+    r.id AS route_id,
+    r.grade,
+    r.color,
+    z.name AS zone_name,
+    r.route_number
+  FROM sends s
+  JOIN climbers c ON c.id = s.user_id
+  JOIN routes r ON r.id = s.route_id
+  LEFT JOIN zones z ON z.id = r.zone_id
+  WHERE
+    p_search IS NULL
+    OR c.display_name ILIKE '%' || p_search || '%'
+    OR c.email ILIKE '%' || p_search || '%'
+    OR r.grade ILIKE '%' || p_search || '%'
+    OR z.name ILIKE '%' || p_search || '%'
+  ORDER BY s.sent_at DESC
+  LIMIT LEAST(GREATEST(p_limit, 1), 200);
+END;
+$function$;
+
+GRANT EXECUTE ON FUNCTION public.get_recent_sends(TEXT, INT) TO authenticated;
+
+
+CREATE OR REPLACE FUNCTION public.delete_send(p_send_id UUID)
+RETURNS JSONB
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $function$
+DECLARE
+  v_deleted INT;
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'admin'
+  ) THEN
+    RETURN '{"error":"not_authorized"}'::JSONB;
+  END IF;
+
+  DELETE FROM sends WHERE id = p_send_id;
+  GET DIAGNOSTICS v_deleted = ROW_COUNT;
+
+  IF v_deleted = 0 THEN
+    RETURN '{"error":"not_found"}'::JSONB;
+  END IF;
+
+  RETURN '{"success":true}'::JSONB;
+END;
+$function$;
+
+GRANT EXECUTE ON FUNCTION public.delete_send(UUID) TO authenticated;

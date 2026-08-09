@@ -6,6 +6,7 @@ import QrInventoryPage from './pages/staff/QrInventoryPage'
 import AdminPage from './pages/staff/AdminPage'
 import StatsPage from './pages/staff/StatsPage'
 import InsightsPage from './pages/staff/InsightsPage'
+import SendsPage from './pages/staff/SendsPage'
 import CalibrationPage from './pages/staff/CalibrationPage'
 import VolumeCatalogPage from './pages/staff/VolumeCatalogPage'
 import { ErrorBoundary } from './components/ErrorBoundary'
@@ -54,6 +55,7 @@ export default function App() {
           <Route path="qr" element={<QrInventoryPage />} />
           <Route path="stats" element={<StatsPage />} />
           <Route path="insights" element={<ErrorBoundary label="Insights"><InsightsPage /></ErrorBoundary>} />
+          <Route path="sends" element={<ErrorBoundary label="Envíos"><SendsPage /></ErrorBoundary>} />
           <Route path="calibration" element={<ErrorBoundary label="Calibración"><CalibrationPage /></ErrorBoundary>} />
           <Route path="admin" element={<ErrorBoundary label="Admin"><AdminPage /></ErrorBoundary>} />
           <Route path="volume-catalog" element={<ErrorBoundary label="Catálogo de Volúmenes"><VolumeCatalogPage /></ErrorBoundary>} />

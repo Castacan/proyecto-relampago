@@ -107,6 +107,22 @@ export default function StaffLayout() {
           )}
         </NavLink>}
 
+        {isAdmin && <NavLink to="/staff/sends" className="shrink-0 flex justify-center">
+          {({ isActive }) => (
+            <div className={`flex items-center gap-2 px-6 py-2.5 rounded-2xl transition-all text-sm font-bold whitespace-nowrap ${
+              isActive
+                ? 'bg-primario text-texto-en-acento shadow-lg shadow-primario/25'
+                : 'bg-superficie-alta text-zinc-300 hover:bg-superficie-alta-hover hover:text-texto-principal border border-zinc-700'
+            }`}>
+              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={isActive ? 2.5 : 2} strokeLinecap="round" strokeLinejoin="round">
+                <path d="M9 11l3 3L22 4" />
+                <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" />
+              </svg>
+              <span>Envíos</span>
+            </div>
+          )}
+        </NavLink>}
+
         {showInsights && <NavLink to="/staff/insights" className="shrink-0 flex justify-center">
           {({ isActive }) => (
             <div className={`flex items-center gap-2 px-6 py-2.5 rounded-2xl transition-all text-sm font-bold whitespace-nowrap ${
