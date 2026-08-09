@@ -728,7 +728,7 @@ SECURITY DEFINER
 AS $function$
 BEGIN
   IF NOT EXISTS (
-    SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'admin'
+    SELECT 1 FROM profiles p WHERE p.id = auth.uid() AND p.role = 'admin'
   ) THEN
     RETURN; -- tabla vacía si no es admin
   END IF;
