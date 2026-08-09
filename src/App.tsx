@@ -16,6 +16,7 @@ import LeaderboardDisplay from './pages/public/LeaderboardDisplay'
 import LeaderboardPage from './pages/public/LeaderboardPage'
 import HubPage from './pages/public/HubPage'
 import MyAccountPage from './pages/public/MyAccountPage'
+import SendsHistoryPage from './pages/public/SendsHistoryPage'
 import SpraywallListPage from './pages/public/SpraywallListPage'
 import SpraywallRoutePage from './pages/public/SpraywallRoutePage'
 import SpraywallProposePage from './pages/public/SpraywallProposePage'
@@ -40,6 +41,7 @@ export default function App() {
         <Route path="/leaderboard/display" element={<LeaderboardDisplay />} />
         <Route path="/leaderboard" element={<LeaderboardPage />} />
         <Route path="/mi-cuenta" element={<MyAccountPage />} />
+        <Route path="/mi-cuenta/historial" element={<SendsHistoryPage />} />
         <Route path="/spraywall" element={<SpraywallListPage />} />
         <Route path="/spraywall/proponer" element={<SpraywallProposePage />} />
         <Route path="/spraywall/:routeId" element={<SpraywallRoutePage />} />

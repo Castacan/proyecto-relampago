@@ -215,7 +215,12 @@ export default function MyAccountPage() {
 
         {/* Sends history */}
         <div>
-          <p className="text-zinc-500 text-[11px] font-bold uppercase tracking-widest mb-3">Últimas rutas</p>
+          <div className="flex items-center justify-between mb-3">
+            <p className="text-zinc-500 text-[11px] font-bold uppercase tracking-widest">Últimas rutas</p>
+            <Link to="/mi-cuenta/historial" className="text-primario text-xs font-semibold hover:text-primario-hover transition-colors">
+              Ver historial →
+            </Link>
+          </div>
           {loadingData ? (
             <div className="h-20 bg-superficie rounded-2xl border border-zinc-800/60 flex items-center justify-center">
               <div className="w-5 h-5 rounded-full border-2 border-primario border-t-transparent animate-spin" />
