@@ -29,13 +29,18 @@ const MONTHS_ES = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio
 
 function cdmxParts(dateStr: string) {
   const d = new Date(dateStr)
-  const fmt = new Intl.DateTimeFormat('en-CA', {
+  // en-CA da orden ISO (YYYY-MM-DD) para las partes numéricas; el weekday
+  // se pide aparte en es-MX porque en-CA lo devuelve en inglés.
+  const isoFmt = new Intl.DateTimeFormat('en-CA', {
     timeZone: 'America/Mexico_City',
-    year: 'numeric', month: '2-digit', day: '2-digit', weekday: 'long',
+    year: 'numeric', month: '2-digit', day: '2-digit',
   })
-  const parts = fmt.formatToParts(d)
+  const weekdayFmt = new Intl.DateTimeFormat('es-MX', {
+    timeZone: 'America/Mexico_City', weekday: 'long',
+  })
+  const parts = isoFmt.formatToParts(d)
   const get = (t: string) => parts.find(p => p.type === t)?.value ?? ''
-  return { year: get('year'), month: get('month'), day: get('day'), weekday: get('weekday') }
+  return { year: get('year'), month: get('month'), day: get('day'), weekday: weekdayFmt.format(d) }
 }
 
 function capitalize(s: string) {
