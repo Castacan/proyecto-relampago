@@ -145,7 +145,8 @@
     display: flex;
     flex-wrap: wrap;
     align-content: flex-start;
-    gap: 0.5cm;
+    column-gap: 0.5cm;
+    row-gap: 1cm;
     padding: 0;
   }
 
