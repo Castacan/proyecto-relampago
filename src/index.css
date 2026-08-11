@@ -114,12 +114,26 @@
  * #qr-print-sheet vive como portal hijo directo de <body>, sibling de
  * #root. En pantalla queda oculto; al imprimir se oculta #root entero
  * (así el resto de la SPA no deja páginas en blanco de más) y solo se
- * ve la hoja: una cuadrícula de QRs de exactamente 4x4cm (content-box,
- * el borde punteado y el padding de zona blanca de quietud no restan
- * de esos 4cm) con guía de corte punteada.
+ * ve la hoja: una cuadrícula de QRs. Cada TILE (guía de corte punteada
+ * incluida) mide exactamente 4x4cm (box-sizing: border-box); el padding
+ * interno de 0.25cm es zona de silencio blanca para que escanee bien
+ * ya laminado, así que el patrón del QR en sí queda un poco más chico
+ * que 4cm — es lo esperado, no un bug.
+ *
+ * `@page { margin }` le pide al navegador usar un margen delgado en
+ * "Márgenes: Predeterminados" (Chrome lo respeta) — el padding propio
+ * de #qr-print-sheet se dejó en 0 para no duplicar ese margen. Con
+ * esto entran 4 columnas en carta/A4 en vez de 3. Si aun así el
+ * usuario deja "Encabezados y pies de página" activados en el diálogo
+ * de impresión, el navegador agrega su franja de fecha/título/URL
+ * arriba y abajo — sugerirle desactivarlo ahí (no controlable por CSS).
  * ============================================================ */
 #qr-print-sheet {
   display: none;
+}
+
+@page {
+  margin: 0.6cm;
 }
 
 @media print {
@@ -131,8 +145,8 @@
     display: flex;
     flex-wrap: wrap;
     align-content: flex-start;
-    gap: 0.6cm;
-    padding: 1cm;
+    gap: 0.5cm;
+    padding: 0;
   }
 
   #qr-print-sheet .qr-print-cell {
