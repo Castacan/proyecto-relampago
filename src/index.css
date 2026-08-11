@@ -108,3 +108,53 @@
     border-radius: 4px;
   }
 }
+
+/* ============================================================
+ * Hoja de impresión de QR codes (/staff/qr) — ver [[proyecto-relampago]].
+ * #qr-print-sheet vive como portal hijo directo de <body>, sibling de
+ * #root. En pantalla queda oculto; al imprimir se oculta #root entero
+ * (así el resto de la SPA no deja páginas en blanco de más) y solo se
+ * ve la hoja: una cuadrícula de QRs de exactamente 4x4cm (content-box,
+ * el borde punteado y el padding de zona blanca de quietud no restan
+ * de esos 4cm) con guía de corte punteada.
+ * ============================================================ */
+#qr-print-sheet {
+  display: none;
+}
+
+@media print {
+  #root {
+    display: none;
+  }
+
+  #qr-print-sheet {
+    display: flex;
+    flex-wrap: wrap;
+    align-content: flex-start;
+    gap: 0.6cm;
+    padding: 1cm;
+  }
+
+  #qr-print-sheet .qr-print-cell {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.15cm;
+    break-inside: avoid;
+  }
+
+  #qr-print-sheet .qr-print-box {
+    width: 4cm;
+    height: 4cm;
+    box-sizing: border-box;
+    background: #fff;
+    padding: 0.25cm;
+    border: 1px dashed #999;
+  }
+
+  #qr-print-sheet .qr-print-label {
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-size: 8pt;
+    color: #000;
+  }
+}

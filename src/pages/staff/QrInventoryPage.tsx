@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { createPortal } from 'react-dom'
 import QRCode from 'react-qr-code'
 import { supabase } from '../../lib/supabase'
 import { getColorHex } from '../../lib/colors'
@@ -18,6 +19,7 @@ export default function QrInventoryPage() {
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState<'all' | 'available' | 'in_use'>('all')
   const [selectedQr, setSelectedQr] = useState<QrRow | null>(null)
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
 
   useEffect(() => {
     supabase
@@ -34,6 +36,33 @@ export default function QrInventoryPage() {
   const available = qrs.filter(q => q.status === 'available').length
   const inUse = qrs.filter(q => q.status === 'in_use').length
   const qrUrl = selectedQr ? `${window.location.origin}/q/${selectedQr.id}` : ''
+
+  // El botón "Imprimir" del detalle de un solo QR manda a imprimir SOLO
+  // ese, sin depender ni tocar la selección múltiple de abajo.
+  const printList = selectedQr ? [selectedQr] : qrs.filter(q => selectedIds.has(q.id))
+  const allFilteredSelected = filtered.length > 0 && filtered.every(q => selectedIds.has(q.id))
+
+  const toggleSelect = (id: string, e: React.MouseEvent) => {
+    e.stopPropagation()
+    setSelectedIds(prev => {
+      const next = new Set(prev)
+      next.has(id) ? next.delete(id) : next.add(id)
+      return next
+    })
+  }
+
+  const toggleSelectAllFiltered = () => {
+    setSelectedIds(prev => {
+      if (allFilteredSelected) {
+        const next = new Set(prev)
+        filtered.forEach(q => next.delete(q.id))
+        return next
+      }
+      const next = new Set(prev)
+      filtered.forEach(q => next.add(q.id))
+      return next
+    })
+  }
 
   return (
     <div className="h-full overflow-y-auto bg-fondo">
@@ -57,7 +86,7 @@ export default function QrInventoryPage() {
       </div>
 
       {/* Filter tabs */}
-      <div className="flex gap-2 px-4 mb-4">
+      <div className="flex items-center gap-2 px-4 mb-4">
         {([
           { key: 'all', label: 'Todos' },
           { key: 'available', label: 'Disponibles' },
@@ -75,6 +104,14 @@ export default function QrInventoryPage() {
             {f.label}
           </button>
         ))}
+        {!loading && filtered.length > 0 && (
+          <button
+            onClick={toggleSelectAllFiltered}
+            className="ml-auto text-zinc-500 hover:text-zinc-300 text-[11px] font-bold underline underline-offset-2 shrink-0"
+          >
+            {allFilteredSelected ? 'Deseleccionar todo' : 'Seleccionar todo'}
+          </button>
+        )}
       </div>
 
       {loading ? (
@@ -82,18 +119,33 @@ export default function QrInventoryPage() {
           <div className="w-6 h-6 rounded-full border-2 border-primario border-t-transparent animate-spin" />
         </div>
       ) : (
-        <div className="grid grid-cols-2 gap-2.5 px-4 pb-6">
+        <div className={`grid grid-cols-2 gap-2.5 px-4 ${selectedIds.size > 0 ? 'pb-24' : 'pb-6'}`}>
           {filtered.map(qr => (
             <button
               key={qr.id}
               onClick={() => setSelectedQr(qr)}
-              className={`p-4 rounded-2xl border text-left transition-all active:scale-95 ${
+              className={`relative p-4 rounded-2xl border text-left transition-all active:scale-95 ${
                 qr.status === 'available'
                   ? 'bg-superficie border-zinc-800/80 hover:border-zinc-700'
                   : 'bg-superficie border-zinc-700/60 hover:border-zinc-600'
-              }`}
+              } ${selectedIds.has(qr.id) ? '!border-primario' : ''}`}
             >
-              <div className="flex items-center gap-2 mb-2.5">
+              <div
+                onClick={e => toggleSelect(qr.id, e)}
+                className={`absolute top-2.5 right-2.5 w-5 h-5 rounded-md border-2 flex items-center justify-center transition-all ${
+                  selectedIds.has(qr.id)
+                    ? 'bg-primario border-primario'
+                    : 'border-zinc-600 hover:border-zinc-400'
+                }`}
+              >
+                {selectedIds.has(qr.id) && (
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#1a1a1a" strokeWidth={3} strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M20 6 9 17l-5-5" />
+                  </svg>
+                )}
+              </div>
+
+              <div className="flex items-center gap-2 mb-2.5 pr-6">
                 <div className={`w-2 h-2 rounded-full shrink-0 ${
                   qr.status === 'available' ? 'bg-green-400' : 'bg-primario'
                 }`} />
@@ -170,6 +222,49 @@ export default function QrInventoryPage() {
             </button>
           </div>
         </div>
+      )}
+
+      {/* Barra flotante de selección múltiple */}
+      {selectedIds.size > 0 && !selectedQr && (
+        <div className="fixed bottom-20 left-4 right-4 z-40 bg-superficie border border-zinc-700 rounded-2xl shadow-xl shadow-black/40 p-3 flex items-center gap-3">
+          <span className="text-texto-principal text-sm font-bold flex-1">
+            {selectedIds.size} seleccionado{selectedIds.size > 1 ? 's' : ''}
+          </span>
+          <button
+            onClick={() => setSelectedIds(new Set())}
+            className="text-zinc-400 hover:text-zinc-200 text-xs font-bold px-3 py-2"
+          >
+            Cancelar
+          </button>
+          <button
+            onClick={() => window.print()}
+            className="bg-primario text-texto-en-acento font-black text-sm px-5 py-2.5 rounded-xl hover:bg-primario-hover transition-all"
+          >
+            Imprimir
+          </button>
+        </div>
+      )}
+
+      {/* Hoja de impresión — portal a document.body, oculta en pantalla,
+          visible solo dentro de @media print (ver src/index.css). Cada QR
+          sale a 4x4cm exactos con guía de corte punteada, listo para
+          cortar y laminar. */}
+      {printList.length > 0 && createPortal(
+        <div id="qr-print-sheet">
+          {printList.map(qr => (
+            <div className="qr-print-cell" key={qr.id}>
+              <div className="qr-print-box">
+                <QRCode
+                  value={`${window.location.origin}/q/${qr.id}`}
+                  level="M"
+                  style={{ width: '100%', height: '100%' }}
+                />
+              </div>
+              <span className="qr-print-label">{qr.id.slice(0, 8)}</span>
+            </div>
+          ))}
+        </div>,
+        document.body
       )}
     </div>
   )
