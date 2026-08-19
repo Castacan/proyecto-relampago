@@ -9,6 +9,7 @@ const db = supabase as unknown as any
 
 interface Props {
   initial?: Sponsorship
+  existingSponsorships: Sponsorship[]
   onSave: () => void
   onCancel: () => void
 }
@@ -21,7 +22,7 @@ function toDatetimeLocal(iso: string | undefined): string {
   return iso.slice(0, 16)
 }
 
-export default function SponsorForm({ initial, onSave, onCancel }: Props) {
+export default function SponsorForm({ initial, existingSponsorships, onSave, onCancel }: Props) {
   const [name, setName] = useState(initial?.sponsor_name ?? '')
   const [logo, setLogo] = useState(initial?.sponsor_logo ?? '')
   const [prize, setPrize] = useState(initial?.prize_text ?? '')
@@ -53,6 +54,26 @@ export default function SponsorForm({ initial, onSave, onCancel }: Props) {
       setError('La fecha de fin debe ser después del inicio.')
       return
     }
+
+    const newStartsIso = new Date(startsAt).toISOString()
+    const newEndsIso = new Date(endsAt).toISOString()
+
+    // Solo 1 patrocinador activo a la vez (decisión explícita del doc,
+    // sección 9) — si esto queda activo, no debe traslaparse en fechas con
+    // otro patrocinador que también vaya a quedar activo.
+    if (active) {
+      const conflict = existingSponsorships.find(s =>
+        s.id !== initial?.id &&
+        s.is_active &&
+        s.starts_at < newEndsIso &&
+        s.ends_at > newStartsIso
+      )
+      if (conflict) {
+        setError(`Se traslapa con "${conflict.sponsor_name}" (${new Date(conflict.starts_at).toLocaleDateString('es-MX')}–${new Date(conflict.ends_at).toLocaleDateString('es-MX')}). Solo puede haber un patrocinador activo a la vez — desactívalo o ajusta las fechas.`)
+        return
+      }
+    }
+
     setSaving(true)
     setError(null)
 
@@ -60,8 +81,8 @@ export default function SponsorForm({ initial, onSave, onCancel }: Props) {
       sponsor_name: name.trim(),
       sponsor_logo: logo,
       prize_text: prize.trim(),
-      starts_at: new Date(startsAt).toISOString(),
-      ends_at: new Date(endsAt).toISOString(),
+      starts_at: newStartsIso,
+      ends_at: newEndsIso,
       is_active: active,
     }
 

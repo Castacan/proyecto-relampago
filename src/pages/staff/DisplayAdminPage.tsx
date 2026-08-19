@@ -267,6 +267,7 @@ export default function DisplayAdminPage() {
       {sponsorForm.open && (
         <SponsorForm
           initial={sponsorForm.initial}
+          existingSponsorships={sponsorships}
           onSave={() => { setSponsorForm({ open: false }); refetchSponsors() }}
           onCancel={() => setSponsorForm({ open: false })}
         />
