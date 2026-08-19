@@ -158,6 +158,24 @@ export default function StaffLayout() {
             )}
           </NavLink>
         )}
+
+        {isAdmin && (
+          <NavLink to="/staff/display" className="shrink-0 flex justify-center">
+            {({ isActive }) => (
+              <div className={`flex items-center gap-2 px-6 py-2.5 rounded-2xl transition-all text-sm font-bold whitespace-nowrap ${
+                isActive
+                  ? 'bg-primario text-texto-en-acento shadow-lg shadow-primario/25'
+                  : 'bg-superficie-alta text-zinc-300 hover:bg-superficie-alta-hover hover:text-texto-principal border border-zinc-700'
+              }`}>
+                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={isActive ? 2.5 : 2} strokeLinecap="round" strokeLinejoin="round">
+                  <rect x="2" y="4" width="20" height="13" rx="1.5" />
+                  <path d="M8 21h8M12 17v4" />
+                </svg>
+                <span>Display</span>
+              </div>
+            )}
+          </NavLink>
+        )}
       </nav>
     </div>
   )

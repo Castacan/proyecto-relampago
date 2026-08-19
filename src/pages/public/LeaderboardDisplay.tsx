@@ -1,18 +1,33 @@
 import { useState, useEffect } from 'react'
 import { useLeaderboard } from '../../hooks/useLeaderboard'
+import { useSponsorships } from '../../hooks/useSponsorships'
+import { useDisplaySlides } from '../../hooks/useDisplaySlides'
+import { useDisplaySettings } from '../../hooks/useDisplaySettings'
+import { useSlideCarousel } from '../../hooks/useSlideCarousel'
 import { getColorHex } from '../../lib/colors'
+import { nowMX } from '../../lib/timezone'
+import { getBannerSponsorship } from '../../lib/sponsorship'
+import SponsorBanner from '../../components/SponsorBanner'
+import DisplaySlide from '../../components/DisplaySlide'
 
 const MONTHS_ES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre']
 const DAYS_ES = ['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado']
 
-function nowMX() {
-  return new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Mexico_City' }))
-}
-
 export default function LeaderboardDisplay() {
   const { daily, monthly, events, loading, connected } = useLeaderboard()
+  const { sponsorships } = useSponsorships()
+  const { slides } = useDisplaySlides()
+  const { settings } = useDisplaySettings()
+  const { phase, currentSlide } = useSlideCarousel(slides, settings.slide_interval_seconds, settings.fade_duration_ms)
   const [tickerIdx, setTickerIdx] = useState(0)
   const [now, setNow] = useState(nowMX)
+
+  // Precarga todas las imágenes de slides activos al montar/cambiar la
+  // lista — son pocas y máx. 2MB cada una, más simple y seguro que
+  // precargar solo la siguiente.
+  useEffect(() => {
+    slides.forEach(s => { new Image().src = s.image_url })
+  }, [slides])
 
   // Rotar ticker cada 4 segundos
   useEffect(() => {
@@ -32,6 +47,7 @@ export default function LeaderboardDisplay() {
   const monthRange = `1–${new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate()} de ${MONTHS_ES[now.getMonth()]}`
 
   const currentEvent = events[tickerIdx]
+  const hasBanner = getBannerSponsorship(sponsorships, now) !== null
 
   if (loading) {
     return (
@@ -41,8 +57,15 @@ export default function LeaderboardDisplay() {
     )
   }
 
+  const leaderboardVisible = phase === 'leaderboard'
+  const slideVisible = phase === 'slide'
+
   return (
-    <div className="w-screen h-screen bg-fondo flex flex-col overflow-hidden font-sans select-none">
+    <div className="relative w-screen h-screen bg-fondo overflow-hidden font-sans select-none">
+    <div
+      className="absolute inset-0 flex flex-col transition-opacity"
+      style={{ opacity: leaderboardVisible ? 1 : 0, transitionDuration: `${settings.fade_duration_ms}ms` }}
+    >
 
       {/* Ticker superior */}
       <div className="shrink-0 h-14 bg-superficie border-b border-zinc-800 flex items-center px-8 gap-4">
@@ -122,10 +145,22 @@ export default function LeaderboardDisplay() {
         </div>
       </div>
 
-      {/* Footer */}
-      <div className="shrink-0 h-10 bg-superficie border-t border-zinc-800 flex items-center justify-center gap-2">
-        <span className="text-primario text-sm">⚡</span>
-        <span className="text-zinc-600 text-sm font-medium">El Muro · Jaibamuro</span>
+      {/* Footer: banner de patrocinador si hay uno activo/ganador, si no el de siempre */}
+      {hasBanner ? (
+        <SponsorBanner sponsorships={sponsorships} variant="tv" />
+      ) : (
+        <div className="shrink-0 h-10 bg-superficie border-t border-zinc-800 flex items-center justify-center gap-2">
+          <span className="text-primario text-sm">⚡</span>
+          <span className="text-zinc-600 text-sm font-medium">El Muro · Jaibamuro</span>
+        </div>
+      )}
+    </div>
+
+      <div
+        className="absolute inset-0 transition-opacity"
+        style={{ opacity: slideVisible ? 1 : 0, transitionDuration: `${settings.fade_duration_ms}ms` }}
+      >
+        <DisplaySlide slide={currentSlide} />
       </div>
     </div>
   )

@@ -2,6 +2,8 @@ import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useLeaderboard } from '../../hooks/useLeaderboard'
 import { useClimber } from '../../hooks/useClimber'
+import { useSponsorships } from '../../hooks/useSponsorships'
+import SponsorBanner from '../../components/SponsorBanner'
 import logoHorizontal from '../../assets/logo-horizontal.png'
 
 type Tab = 'diario' | 'mensual'
@@ -9,6 +11,7 @@ type Tab = 'diario' | 'mensual'
 export default function LeaderboardPage() {
   const { daily, monthly, loading } = useLeaderboard()
   const { climber } = useClimber()
+  const { sponsorships } = useSponsorships()
   const [tab, setTab] = useState<Tab>('diario')
 
   const entries = tab === 'diario' ? daily : monthly
@@ -25,6 +28,8 @@ export default function LeaderboardPage() {
 
       <div className="flex-1 max-w-md mx-auto w-full px-5 py-6">
         <h1 className="text-texto-principal font-black text-2xl tracking-tight mb-5">Leaderboard</h1>
+
+        <SponsorBanner sponsorships={sponsorships} variant="mobile" />
 
         {/* Tabs */}
         <div className="flex gap-2 mb-5 bg-superficie rounded-2xl p-1 border border-zinc-800/60">

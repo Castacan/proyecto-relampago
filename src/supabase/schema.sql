@@ -791,3 +791,137 @@ END;
 $function$;
 
 GRANT EXECUTE ON FUNCTION public.delete_send(UUID) TO authenticated;
+
+
+-- ============================================================
+-- Patrocinadores y Slides en Pantalla (2026-08-19)
+-- Dos features nuevas para /leaderboard/display + /leaderboard:
+-- banner de patrocinador del mes (ligado al leaderboard mensual
+-- existente) y carrusel de slides rotatorios en la TV.
+-- ============================================================
+
+CREATE TABLE IF NOT EXISTS public.sponsorships (
+  id                UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  sponsor_name      TEXT NOT NULL,
+  sponsor_logo      TEXT NOT NULL,
+  prize_text        TEXT NOT NULL,
+  winner_rule       TEXT NOT NULL DEFAULT 'top_1_monthly' CHECK (winner_rule IN ('top_1_monthly')),
+  starts_at         TIMESTAMPTZ NOT NULL,
+  ends_at           TIMESTAMPTZ NOT NULL,
+  is_active         BOOLEAN NOT NULL DEFAULT true,
+  winner_user_id    UUID REFERENCES public.climbers(id),
+  prize_delivered   BOOLEAN NOT NULL DEFAULT false,
+  created_at        TIMESTAMPTZ DEFAULT NOW(),
+  CHECK (ends_at > starts_at)
+);
+
+CREATE TABLE IF NOT EXISTS public.display_slides (
+  id                UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  title             TEXT NOT NULL,
+  image_url         TEXT NOT NULL,
+  overlay_text      TEXT,
+  display_seconds   INT NOT NULL DEFAULT 8 CHECK (display_seconds > 0),
+  sort_order        INT NOT NULL DEFAULT 0,
+  is_active         BOOLEAN NOT NULL DEFAULT true,
+  starts_at         TIMESTAMPTZ,
+  ends_at           TIMESTAMPTZ,
+  created_at        TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS public.display_settings (
+  id    UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  key   TEXT UNIQUE NOT NULL,
+  value TEXT NOT NULL
+);
+INSERT INTO public.display_settings (key, value) VALUES
+  ('slide_interval_seconds', '60'),
+  ('fade_duration_ms', '500')
+ON CONFLICT (key) DO NOTHING;
+
+ALTER TABLE public.sponsorships     ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.display_slides   ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.display_settings ENABLE ROW LEVEL SECURITY;
+
+-- Lectura pública (TV sin auth + móvil), escritura solo admin (hay dinero/
+-- premios de por medio → mismo nivel que Stats/Admin/Sends/Insights, no el
+-- patrón laxo "cualquier staff" que usa Spraywall).
+CREATE POLICY "sponsorships_read_public" ON public.sponsorships FOR SELECT USING (true);
+CREATE POLICY "sponsorships_write_admin" ON public.sponsorships FOR ALL
+  USING       (EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role = 'admin'))
+  WITH CHECK  (EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role = 'admin'));
+
+CREATE POLICY "display_slides_read_public" ON public.display_slides FOR SELECT USING (true);
+CREATE POLICY "display_slides_write_admin" ON public.display_slides FOR ALL
+  USING       (EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role = 'admin'))
+  WITH CHECK  (EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role = 'admin'));
+
+CREATE POLICY "display_settings_read_public" ON public.display_settings FOR SELECT USING (true);
+CREATE POLICY "display_settings_write_admin" ON public.display_settings FOR ALL
+  USING       (EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role = 'admin'))
+  WITH CHECK  (EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role = 'admin'));
+
+-- Storage: bucket público para logos e imágenes de slides. A diferencia de
+-- spraywall-photos (singleton, upsert:true sobre 'base.jpg'), aquí cada fila
+-- es su propia imagen → nombre único por archivo bajo sponsors/ o slides/.
+insert into storage.buckets (id, name, public)
+values ('display-assets', 'display-assets', true)
+on conflict (id) do nothing;
+
+create policy "display_assets_write_admin" on storage.objects
+  for all using (
+    bucket_id = 'display-assets'
+    and exists (select 1 from public.profiles where id = auth.uid() and role = 'admin')
+  );
+
+-- ============================================================
+-- RPC: determine_sponsorship_winner
+-- Llamable por anon (la TV no tiene auth, igual que get_daily_leaderboard/
+-- get_monthly_leaderboard/get_recent_events) pero calcula el ganador de
+-- forma independiente — un caller anónimo no puede forjarlo.
+-- Solo climbers con visible_in_leaderboard=true son elegibles (decisión
+-- confirmada por el usuario 2026-08-19): si el líder mensual tiene el
+-- ranking oculto, no gana hasta que lo active. Sus puntos se siguen
+-- acumulando igual mientras tanto (visible_in_leaderboard solo filtra qué
+-- se muestra, nunca lo que se guarda).
+-- Empate: gana quien llegó primero a esa cantidad de puntos (MAX(sent_at)
+-- más temprano entre los empatados en el máximo de puntos).
+-- ============================================================
+CREATE OR REPLACE FUNCTION public.determine_sponsorship_winner()
+RETURNS JSONB
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $function$
+DECLARE
+  v_sp RECORD;
+  v_winner UUID;
+  v_results JSONB := '[]'::jsonb;
+BEGIN
+  FOR v_sp IN
+    SELECT * FROM public.sponsorships
+    WHERE winner_user_id IS NULL
+      AND is_active = true
+      AND ends_at < now()
+      AND winner_rule = 'top_1_monthly'
+  LOOP
+    SELECT s.user_id INTO v_winner
+    FROM public.sends s
+    JOIN public.climbers c ON c.id = s.user_id
+    WHERE s.sent_at >= v_sp.starts_at
+      AND s.sent_at <= v_sp.ends_at
+      AND c.visible_in_leaderboard = true
+      AND s.points_monthly > 0
+    GROUP BY s.user_id
+    ORDER BY SUM(s.points_monthly) DESC, MAX(s.sent_at) ASC
+    LIMIT 1;
+
+    IF v_winner IS NOT NULL THEN
+      UPDATE public.sponsorships SET winner_user_id = v_winner WHERE id = v_sp.id;
+      v_results := v_results || jsonb_build_object('sponsorship_id', v_sp.id, 'winner_user_id', v_winner);
+    END IF;
+  END LOOP;
+
+  RETURN jsonb_build_object('processed', v_results);
+END;
+$function$;
+
+GRANT EXECUTE ON FUNCTION public.determine_sponsorship_winner() TO anon, authenticated;

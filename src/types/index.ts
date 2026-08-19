@@ -149,3 +149,36 @@ export interface SpraywallSend {
   climber_id: string
   sent_at: string
 }
+
+export interface Sponsorship {
+  id: string
+  sponsor_name: string
+  sponsor_logo: string
+  prize_text: string
+  winner_rule: 'top_1_monthly'
+  starts_at: string
+  ends_at: string
+  is_active: boolean
+  winner_user_id: string | null
+  prize_delivered: boolean
+  created_at: string
+  winner?: { display_name: string } | null
+}
+
+export interface DisplaySlide {
+  id: string
+  title: string
+  image_url: string
+  overlay_text: string | null
+  display_seconds: number
+  sort_order: number
+  is_active: boolean
+  starts_at: string | null
+  ends_at: string | null
+  created_at: string
+}
+
+export interface DisplaySettingsMap {
+  slide_interval_seconds: number
+  fade_duration_ms: number
+}
