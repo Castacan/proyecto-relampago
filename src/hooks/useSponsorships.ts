@@ -19,7 +19,11 @@ export function useSponsorships({ all = false }: Options = {}) {
     q = all
       ? q.order('created_at', { ascending: false })
       : q.eq('is_active', true).order('ends_at', { ascending: false }).limit(5)
-    const { data } = await q
+    const { data, error } = await q
+    if (error) {
+      // eslint-disable-next-line no-console
+      console.error('useSponsorships:', error)
+    }
     setSponsorships(data ?? [])
     setLoading(false)
   }, [all])

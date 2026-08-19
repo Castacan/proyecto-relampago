@@ -9,24 +9,28 @@ interface Options {
   all?: boolean // true = admin (todos, ordenados por sort_order), false = público (solo activos y dentro de ventana de fechas)
 }
 
+function withinWindow(s: DisplaySlide, nowIso: string): boolean {
+  if (s.starts_at && s.starts_at > nowIso) return false
+  if (s.ends_at && s.ends_at < nowIso) return false
+  return true
+}
+
 export function useDisplaySlides({ all = false }: Options = {}) {
   const [slides, setSlides] = useState<DisplaySlide[]>([])
   const [loading, setLoading] = useState(true)
 
   const fetchAll = useCallback(async () => {
-    let q = db.from('display_slides').select('*')
-    if (all) {
-      q = q.order('sort_order', { ascending: true })
-    } else {
-      const nowIso = new Date().toISOString()
-      q = q
-        .eq('is_active', true)
-        .or(`starts_at.is.null,starts_at.lte.${nowIso}`)
-        .or(`ends_at.is.null,ends_at.gte.${nowIso}`)
-        .order('sort_order', { ascending: true })
+    let q = db.from('display_slides').select('*').order('sort_order', { ascending: true })
+    if (!all) q = q.eq('is_active', true)
+    const { data, error } = await q
+    if (error) {
+      // eslint-disable-next-line no-console
+      console.error('useDisplaySlides:', error)
     }
-    const { data } = await q
-    setSlides(data ?? [])
+    // Ventana de fechas filtrada en JS, no en la query — más simple y sin
+    // depender de cómo PostgREST combina múltiples .or() encadenados.
+    const rows: DisplaySlide[] = data ?? []
+    setSlides(all ? rows : rows.filter(s => withinWindow(s, new Date().toISOString())))
     setLoading(false)
   }, [all])
 

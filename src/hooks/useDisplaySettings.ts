@@ -15,7 +15,11 @@ export function useDisplaySettings() {
   const [loading, setLoading] = useState(true)
 
   const fetchAll = useCallback(async () => {
-    const { data } = await db.from('display_settings').select('key, value')
+    const { data, error } = await db.from('display_settings').select('key, value')
+    if (error) {
+      // eslint-disable-next-line no-console
+      console.error('useDisplaySettings:', error)
+    }
     const map = { ...DEFAULTS }
     for (const row of data ?? []) {
       if (row.key === 'slide_interval_seconds' || row.key === 'fade_duration_ms') {
