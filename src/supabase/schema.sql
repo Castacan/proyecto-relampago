@@ -312,9 +312,9 @@ AS $function$
 -- columnas (Hoy/Semana/Mes). Semana calendario lunes-domingo hora CDMX
 -- (date_trunc('week', ...) trunca a lunes en Postgres), mismo patrón que
 -- día/mes. Usa points_daily (no existe points_weekly ni falta agregarlo:
--- points_daily ya es el valor real de cada send individual, sin el bonus de
--- +1 que solo aplica a points_monthly) — sin filtro > 0 porque un send
--- válido siempre tiene points_daily >= 1 (V0 = 1 punto).
+-- points_daily ya es el valor real de cada send individual, grado + bonus
+-- de ruta nueva desde el ajuste de submit_send del mismo día) — sin filtro
+-- > 0 porque un send válido siempre tiene points_daily >= 1 (V0 = 1 punto).
 CREATE OR REPLACE FUNCTION public.get_weekly_leaderboard()
  RETURNS TABLE(display_name text, total_points bigint)
  LANGUAGE sql
@@ -432,17 +432,27 @@ $$;
 
 -- ============================================================
 -- RPC: submit_send (obtenida vía pg_get_functiondef + export CSV,
--- 2026-07-31; actualizada 2026-08-01 con bonus +1 mensual)
+-- 2026-07-31; actualizada 2026-08-01 con bonus +1 mensual; actualizada
+-- 2026-08-23 para que el bonus también cuente en daily/weekly, no solo
+-- monthly — ver razón abajo.
 -- Firma sin cambios: submit_send(p_route_id uuid, p_device_id text).
 -- Reglas de puntos:
---   - points_daily: puntos por grado (V0=1 ... V9=10), una vez al día
---     por ruta (dedup vía `already_sent_today`).
---   - points_monthly: igual, deduplicado por mes; +1 bonus si la ruta
---     enviada fue puesta el mismo día calendario (hora CDMX) que la
---     ruta ACTIVA con route_number más alto (la más reciente de verdad,
---     inmune a placed_at editado). El bonus vive dentro del mismo CASE
---     de dedup mensual, así que si la ruta ya se envió este mes no se
---     otorga de nuevo (evita farmear reenviando la "más nueva" a diario).
+--   - points_daily: puntos por grado (V0=1 ... V9=10) + bonus (ver abajo),
+--     una vez al día por ruta (dedup vía `already_sent_today` — no hace
+--     falta dedup adicional aquí, ya es imposible mandar 2 veces la misma
+--     ruta el mismo día).
+--   - points_monthly: igual (grado + bonus), pero deduplicado por mes: si
+--     la ruta ya se envió este mes, 0.
+--   - Bonus (+1): si la ruta enviada fue puesta el mismo día calendario
+--     (hora CDMX) que la ruta ACTIVA con route_number más alto (la más
+--     reciente de verdad, inmune a placed_at editado). Antes (2026-08-01)
+--     solo se sumaba a points_monthly, lo que hacía que Mes se viera más
+--     alto que Hoy/Semana en el leaderboard TV de 3 columnas (commit
+--     2026-08-23) sin razón visible para el usuario — el usuario pidió
+--     que las 3 columnas sumen consistente, así que ahora el bonus cuenta
+--     en las 3. Sigue sin poder farmearse: el dedup mensual de arriba ya
+--     evita repetir el bonus reenviando la "más nueva" día tras día dentro
+--     del mismo mes (el dedup DIARIO ya lo impedía de por sí, por ruta).
 -- Requiere scan reciente (<30 min) en `scans` por user_id o device_id.
 -- ============================================================
 
@@ -456,6 +466,7 @@ AS $function$
     v_grade TEXT;
     v_route_placed_at TIMESTAMPTZ;
     v_pts INT;
+    v_pts_daily INT;
     v_pts_monthly INT;
     v_day_start TIMESTAMPTZ;
     v_month_start TIMESTAMPTZ;
@@ -495,16 +506,18 @@ AS $function$
     v_route_day := (v_route_placed_at AT TIME ZONE 'America/Mexico_City')::date;
     v_bonus := CASE WHEN v_route_day = v_newest_day THEN 1 ELSE 0 END;
 
+    v_pts_daily := v_pts + v_bonus;
+
     v_pts_monthly := CASE WHEN EXISTS (
       SELECT 1 FROM sends
       WHERE user_id = v_uid AND route_id = p_route_id AND sent_at >= v_month_start
-    ) THEN 0 ELSE v_pts + v_bonus END;
+    ) THEN 0 ELSE v_pts_daily END;
 
     INSERT INTO sends(user_id, route_id, points_daily, points_monthly)
-    VALUES (v_uid, p_route_id, v_pts, v_pts_monthly);
+    VALUES (v_uid, p_route_id, v_pts_daily, v_pts_monthly);
 
     RETURN jsonb_build_object('success', true,
-      'points_daily', v_pts, 'points_monthly', v_pts_monthly, 'bonus', v_bonus);
+      'points_daily', v_pts_daily, 'points_monthly', v_pts_monthly, 'bonus', v_bonus);
   END; $function$;
 
 -- ============================================================
@@ -907,8 +920,8 @@ create policy "display_assets_write_admin" on storage.objects
 -- más temprano entre los empatados en el máximo de puntos).
 -- Ampliado (2026-08-23) para leaderboard TV de 3 columnas: winner_rule ahora
 -- también puede ser 'top_1_daily'/'top_1_weekly', que suman points_daily
--- (el valor real de cada send, sin el bonus que solo aplica al mensual) en
--- vez de points_monthly. 'top_1_monthly' conserva exactamente la lógica
+-- (el valor real de cada send, grado + bonus de ruta nueva del mismo día)
+-- en vez de points_monthly. 'top_1_monthly' conserva exactamente la lógica
 -- original (SUM(points_monthly), filtro > 0).
 -- ============================================================
 CREATE OR REPLACE FUNCTION public.determine_sponsorship_winner()
