@@ -6,12 +6,10 @@ import { useDisplaySettings } from '../../hooks/useDisplaySettings'
 import { useSlideCarousel } from '../../hooks/useSlideCarousel'
 import { getColorHex } from '../../lib/colors'
 import { nowMX } from '../../lib/timezone'
+import { MONTHS_ES, DAYS_ES } from '../../lib/dates'
 import SponsorBanner from '../../components/SponsorBanner'
 import DisplaySlide from '../../components/DisplaySlide'
 import type { LeaderboardEntry, Sponsorship, SponsorPeriod } from '../../types'
-
-const MONTHS_ES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre']
-const DAYS_ES = ['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado']
 
 export default function LeaderboardDisplay() {
   const { daily, weekly, monthly, events, loading, connected } = useLeaderboard()

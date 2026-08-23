@@ -328,6 +328,31 @@ AS $function$
 
 GRANT EXECUTE ON FUNCTION public.get_weekly_leaderboard() TO anon, authenticated;
 
+-- get_leaderboard_for_range (2026-08-23): utilidad para el generador de
+-- imagen de ganador en /staff/display → Ganadores → "📸 Crear imagen". A
+-- diferencia de get_daily/weekly/monthly_leaderboard (que siempre calculan
+-- sobre la ventana relativa a "ahora"), esta recibe un rango arbitrario —
+-- necesario porque Ganadores muestra patrocinios YA TERMINADOS, cuya
+-- ventana starts_at/ends_at ya no coincide con "esta semana"/"este mes"
+-- para cuando el staff genera la imagen días o semanas después.
+-- p_monthly=true replica el criterio de determine_sponsorship_winner para
+-- 'top_1_monthly' (SUM(points_monthly), filtro > 0); false replica
+-- 'top_1_daily'/'top_1_weekly' (SUM(points_daily), sin filtro).
+CREATE OR REPLACE FUNCTION public.get_leaderboard_for_range(p_start TIMESTAMPTZ, p_end TIMESTAMPTZ, p_monthly BOOLEAN DEFAULT false, p_limit INT DEFAULT 10)
+ RETURNS TABLE(display_name text, total_points bigint)
+ LANGUAGE sql
+ SECURITY DEFINER
+AS $function$
+    SELECT c.display_name, SUM(CASE WHEN p_monthly THEN s.points_monthly ELSE s.points_daily END)
+    FROM sends s JOIN climbers c ON c.id = s.user_id
+    WHERE s.sent_at >= p_start AND s.sent_at <= p_end
+      AND c.visible_in_leaderboard = true
+      AND (NOT p_monthly OR s.points_monthly > 0)
+    GROUP BY c.id, c.display_name ORDER BY 2 DESC LIMIT p_limit;
+  $function$;
+
+GRANT EXECUTE ON FUNCTION public.get_leaderboard_for_range(TIMESTAMPTZ, TIMESTAMPTZ, BOOLEAN, INT) TO anon, authenticated;
+
 CREATE OR REPLACE FUNCTION public.get_recent_events(lim integer DEFAULT 8)
  RETURNS TABLE(display_name text, grade text, color text, sent_at timestamp with time zone)
  LANGUAGE sql

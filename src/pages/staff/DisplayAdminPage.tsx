@@ -8,6 +8,7 @@ import { useDisplaySettings } from '../../hooks/useDisplaySettings'
 import SponsorForm from '../../components/SponsorForm'
 import SlideForm from '../../components/SlideForm'
 import SlidePreviewModal from '../../components/SlidePreviewModal'
+import WinnerImageModal from '../../components/WinnerImageModal'
 import Toggle from '../../components/Toggle'
 import type { Sponsorship, DisplaySlide, SponsorPeriod } from '../../types'
 
@@ -61,6 +62,7 @@ export default function DisplayAdminPage() {
   const [slideForm, setSlideForm] = useState<{ open: boolean; initial?: DisplaySlide }>({ open: false })
   const [previewSlide, setPreviewSlide] = useState<DisplaySlide | null>(null)
   const [winnerFilter, setWinnerFilter] = useState<'todos' | SponsorPeriod>('todos')
+  const [winnerImageSponsorship, setWinnerImageSponsorship] = useState<Sponsorship | null>(null)
 
   const [intervalSeconds, setIntervalSeconds] = useState<number | null>(null)
   const [fadeMs, setFadeMs] = useState<number | null>(null)
@@ -243,7 +245,18 @@ export default function DisplayAdminPage() {
                             <Toggle checked={s.prize_delivered} onChange={() => togglePrizeDelivered(s)} label="Premio entregado" />
                           </>
                         ) : (
-                          <p className="text-zinc-600 text-xs">Sin ganador (nadie calificó dentro del periodo, o se calcula dentro de 60s de haber terminado).</p>
+                          <p className="text-zinc-600 text-xs mb-2">Sin ganador (nadie calificó dentro del periodo, o se calcula dentro de 60s de haber terminado).</p>
+                        )}
+                        {/* Solo semanal/mensual (2026-08-23) — el usuario pidió
+                            esto específicamente para anunciar esos dos, diario
+                            queda fuera para no llenar la pantalla de botones */}
+                        {s.winner_rule !== 'top_1_daily' && (
+                          <button
+                            onClick={() => setWinnerImageSponsorship(s)}
+                            className="w-full mt-1 py-2.5 rounded-xl bg-superficie-alta hover:bg-superficie-alta-hover text-texto-principal font-semibold text-xs transition-all"
+                          >
+                            📸 Crear imagen
+                          </button>
                         )}
                       </div>
                     </div>
@@ -380,6 +393,10 @@ export default function DisplayAdminPage() {
 
       {previewSlide && (
         <SlidePreviewModal slide={previewSlide} onClose={() => setPreviewSlide(null)} />
+      )}
+
+      {winnerImageSponsorship && (
+        <WinnerImageModal sponsorship={winnerImageSponsorship} onClose={() => setWinnerImageSponsorship(null)} />
       )}
     </div>
   )
