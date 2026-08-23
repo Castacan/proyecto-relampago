@@ -44,18 +44,26 @@ export default function LeaderboardDisplay() {
 
   const dayLabel = `${DAYS_ES[now.getDay()]} ${now.getDate()} de ${MONTHS_ES[now.getMonth()]}`
   const monthLabel = `${MONTHS_ES[now.getMonth()]} ${now.getFullYear()}`
-  const monthRange = `1–${new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate()} de ${MONTHS_ES[now.getMonth()]}`
+
+  // Rango del mes con nombre de día al inicio y fin (ej. "Sábado 1 a
+  // Lunes 31 de Agosto"), no solo los números — mismo criterio que semana.
+  const firstOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
+  const lastOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0)
+  const monthRange = `${DAYS_ES[firstOfMonth.getDay()]} 1 a ${DAYS_ES[lastOfMonth.getDay()]} ${lastOfMonth.getDate()} de ${MONTHS_ES[now.getMonth()]}`
 
   // Semana calendario lunes-domingo (date_trunc('week', ...) de Postgres
-  // trunca a lunes, mismo criterio que usa get_weekly_leaderboard).
+  // trunca a lunes, mismo criterio que usa get_weekly_leaderboard). Rango
+  // con nombre de día (ej. "Lunes 24 a Domingo 30") — monday.getDay() es
+  // siempre 1 y sunday.getDay() siempre 0 por construcción, pero se leen
+  // de DAYS_ES igual para no hardcodear los nombres dos veces.
   const dow = now.getDay() // 0=domingo..6=sábado
   const monday = new Date(now)
   monday.setDate(now.getDate() + (dow === 0 ? -6 : 1 - dow))
   const sunday = new Date(monday)
   sunday.setDate(monday.getDate() + 6)
   const weekRange = monday.getMonth() === sunday.getMonth()
-    ? `${monday.getDate()}–${sunday.getDate()} de ${MONTHS_ES[monday.getMonth()]}`
-    : `${monday.getDate()} de ${MONTHS_ES[monday.getMonth()]} – ${sunday.getDate()} de ${MONTHS_ES[sunday.getMonth()]}`
+    ? `${DAYS_ES[monday.getDay()]} ${monday.getDate()} a ${DAYS_ES[sunday.getDay()]} ${sunday.getDate()} de ${MONTHS_ES[monday.getMonth()]}`
+    : `${DAYS_ES[monday.getDay()]} ${monday.getDate()} de ${MONTHS_ES[monday.getMonth()]} a ${DAYS_ES[sunday.getDay()]} ${sunday.getDate()} de ${MONTHS_ES[sunday.getMonth()]}`
 
   const currentEvent = events[tickerIdx]
 
@@ -120,7 +128,7 @@ export default function LeaderboardDisplay() {
         <LeaderboardColumn
           title="SEMANA" subtitle={weekRange}
           entries={weekly} emptyTitle="Sin actividad esta semana"
-          period="top_1_weekly" sponsorships={sponsorships} borderRight
+          period="top_1_weekly" sponsorships={sponsorships} borderRight tinted
         />
         <LeaderboardColumn
           title={monthLabel.toUpperCase()} subtitle={monthRange}
@@ -150,11 +158,15 @@ interface ColumnProps {
   period: SponsorPeriod
   sponsorships: Sponsorship[]
   borderRight?: boolean
+  tinted?: boolean
 }
 
-function LeaderboardColumn({ title, titleAccent, subtitle, entries, emptyTitle, emptySubtitle, period, sponsorships, borderRight }: ColumnProps) {
+function LeaderboardColumn({ title, titleAccent, subtitle, entries, emptyTitle, emptySubtitle, period, sponsorships, borderRight, tinted }: ColumnProps) {
   return (
-    <div className={`flex-1 flex flex-col overflow-hidden ${borderRight ? 'border-r border-zinc-800' : ''}`}>
+    // Tinte muy sutil (5% blanco) solo en la columna Semana — deja claro
+    // a simple vista que son 3 secciones distintas sin competir con el
+    // fondo de las filas (bg-superficie/50), que se queda igual.
+    <div className={`flex-1 flex flex-col overflow-hidden ${borderRight ? 'border-r border-zinc-800' : ''} ${tinted ? 'bg-white/5' : ''}`}>
       <div className="flex-1 flex flex-col px-6 py-6 overflow-hidden">
         <div className="mb-6 shrink-0">
           <h1

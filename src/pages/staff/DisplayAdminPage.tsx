@@ -9,17 +9,28 @@ import SponsorForm from '../../components/SponsorForm'
 import SlideForm from '../../components/SlideForm'
 import SlidePreviewModal from '../../components/SlidePreviewModal'
 import Toggle from '../../components/Toggle'
-import type { Sponsorship, DisplaySlide } from '../../types'
+import type { Sponsorship, DisplaySlide, SponsorPeriod } from '../../types'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const db = supabase as unknown as any
 
-type Tab = 'patrocinadores' | 'slides' | 'configuracion'
+type Tab = 'patrocinadores' | 'ganadores' | 'slides' | 'configuracion'
 
-const PERIOD_LABEL: Record<Sponsorship['winner_rule'], string> = {
+const PERIOD_LABEL: Record<SponsorPeriod, string> = {
   top_1_daily: 'Diario',
   top_1_weekly: 'Semanal',
   top_1_monthly: 'Mensual',
+}
+
+const WINNER_FILTERS: { value: 'todos' | SponsorPeriod; label: string }[] = [
+  { value: 'todos', label: 'Todos' },
+  { value: 'top_1_daily', label: 'Diario' },
+  { value: 'top_1_weekly', label: 'Semanal' },
+  { value: 'top_1_monthly', label: 'Mensual' },
+]
+
+function fmtDate(iso: string): string {
+  return new Date(iso).toLocaleDateString('es-MX', { day: 'numeric', month: 'short', year: 'numeric' })
 }
 
 function sponsorshipEstado(s: Sponsorship): { label: string; color: string } {
@@ -49,6 +60,7 @@ export default function DisplayAdminPage() {
   const [sponsorForm, setSponsorForm] = useState<{ open: boolean; initial?: Sponsorship }>({ open: false })
   const [slideForm, setSlideForm] = useState<{ open: boolean; initial?: DisplaySlide }>({ open: false })
   const [previewSlide, setPreviewSlide] = useState<DisplaySlide | null>(null)
+  const [winnerFilter, setWinnerFilter] = useState<'todos' | SponsorPeriod>('todos')
 
   const [intervalSeconds, setIntervalSeconds] = useState<number | null>(null)
   const [fadeMs, setFadeMs] = useState<number | null>(null)
@@ -96,16 +108,20 @@ export default function DisplayAdminPage() {
       <div className="px-4 pt-5 pb-6">
         <h1 className="text-texto-principal font-black text-2xl tracking-tight mb-4">Display</h1>
 
-        <div className="flex gap-2 mb-5 bg-superficie rounded-2xl p-1 border border-zinc-800/60">
+        {/* overflow-x-auto + shrink-0 (no flex-1): con 4 tabs "Patrocinadores"
+            ya no cabe repartido en pantallas chicas — mismo fix que
+            StaffLayout aplicó para su tab bar de 5 (commit f41cc11). */}
+        <div className="flex gap-2 mb-5 bg-superficie rounded-2xl p-1 border border-zinc-800/60 overflow-x-auto">
           {([
             { key: 'patrocinadores', label: 'Patrocinadores' },
+            { key: 'ganadores', label: 'Ganadores' },
             { key: 'slides', label: 'Slides' },
             { key: 'configuracion', label: 'Configuración' },
           ] as { key: Tab; label: string }[]).map(t => (
             <button
               key={t.key}
               onClick={() => setTab(t.key)}
-              className={`flex-1 py-2.5 rounded-xl text-xs font-bold transition-all ${
+              className={`shrink-0 whitespace-nowrap px-4 py-2.5 rounded-xl text-xs font-bold transition-all ${
                 tab === t.key ? 'bg-primario text-texto-en-acento' : 'text-zinc-400 hover:text-texto-principal'
               }`}
             >
@@ -164,6 +180,77 @@ export default function DisplayAdminPage() {
                 )
               })}
             </div>
+          </>
+        )}
+
+        {tab === 'ganadores' && (
+          <>
+            <div className="flex gap-2 mb-4 overflow-x-auto">
+              {WINNER_FILTERS.map(f => (
+                <button
+                  key={f.value}
+                  onClick={() => setWinnerFilter(f.value)}
+                  className={`shrink-0 whitespace-nowrap px-4 py-2 rounded-xl text-xs font-bold transition-all border ${
+                    winnerFilter === f.value
+                      ? 'bg-primario text-texto-en-acento border-primario'
+                      : 'bg-superficie text-zinc-400 border-zinc-800/60 hover:text-texto-principal'
+                  }`}
+                >
+                  {f.label}
+                </button>
+              ))}
+            </div>
+
+            {sponsorsLoading && (
+              <div className="flex justify-center py-10">
+                <div className="w-6 h-6 rounded-full border-2 border-primario border-t-transparent animate-spin" />
+              </div>
+            )}
+
+            {!sponsorsLoading && (() => {
+              const nowIso = new Date().toISOString()
+              const past = sponsorships
+                .filter(s => s.ends_at < nowIso && (winnerFilter === 'todos' || s.winner_rule === winnerFilter))
+                .sort((a, b) => b.ends_at.localeCompare(a.ends_at))
+
+              if (past.length === 0) {
+                return <p className="text-zinc-600 text-sm text-center py-10">Todavía no hay patrocinios terminados{winnerFilter !== 'todos' ? ` de tipo ${PERIOD_LABEL[winnerFilter]}` : ''}.</p>
+              }
+
+              return (
+                <div className="flex flex-col gap-2.5">
+                  {past.map(s => (
+                    <div key={s.id} className="p-4 bg-superficie border border-zinc-800/60 rounded-2xl">
+                      <div className="flex items-center gap-3">
+                        <div className="w-11 h-11 rounded-xl bg-zinc-950 flex items-center justify-center shrink-0 overflow-hidden">
+                          <img src={s.sponsor_logo} alt={s.sponsor_name} className="max-w-full max-h-full object-contain" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-1.5">
+                            <p className="text-texto-principal font-semibold text-sm truncate">{s.sponsor_name}</p>
+                            <span className="text-[9px] font-bold uppercase text-zinc-500 bg-superficie-alta px-1.5 py-0.5 rounded shrink-0">{PERIOD_LABEL[s.winner_rule]}</span>
+                          </div>
+                          <p className="text-zinc-500 text-xs mt-0.5 truncate">{s.prize_text}</p>
+                          <p className="text-zinc-600 text-[11px] mt-0.5">{fmtDate(s.starts_at)} – {fmtDate(s.ends_at)}</p>
+                        </div>
+                      </div>
+                      <div className="mt-3 pt-3 border-t border-zinc-800/60">
+                        {s.winner_user_id ? (
+                          <>
+                            <p className="text-zinc-400 text-xs mb-2">
+                              🏆 Ganó: <span className="text-texto-principal font-semibold">{s.winner?.display_name ?? '—'}</span>
+                            </p>
+                            <Toggle checked={s.prize_delivered} onChange={() => togglePrizeDelivered(s)} label="Premio entregado" />
+                          </>
+                        ) : (
+                          <p className="text-zinc-600 text-xs">Sin ganador (nadie calificó dentro del periodo, o se calcula dentro de 60s de haber terminado).</p>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )
+            })()}
           </>
         )}
 
