@@ -2,7 +2,13 @@ import { useRef, useState } from 'react'
 import { supabase } from '../../lib/supabase'
 import { uploadDisplayAsset } from '../../lib/uploadDisplayAsset'
 import Toggle from '../Toggle'
-import type { Sponsorship } from '../../types'
+import type { Sponsorship, SponsorPeriod } from '../../types'
+
+const PERIOD_OPTIONS: { value: SponsorPeriod; label: string }[] = [
+  { value: 'top_1_daily', label: 'Diario' },
+  { value: 'top_1_weekly', label: 'Semanal' },
+  { value: 'top_1_monthly', label: 'Mensual' },
+]
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const db = supabase as unknown as any
@@ -26,6 +32,7 @@ export default function SponsorForm({ initial, existingSponsorships, onSave, onC
   const [name, setName] = useState(initial?.sponsor_name ?? '')
   const [logo, setLogo] = useState(initial?.sponsor_logo ?? '')
   const [prize, setPrize] = useState(initial?.prize_text ?? '')
+  const [period, setPeriod] = useState<SponsorPeriod>(initial?.winner_rule ?? 'top_1_monthly')
   const [startsAt, setStartsAt] = useState(toDatetimeLocal(initial?.starts_at))
   const [endsAt, setEndsAt] = useState(toDatetimeLocal(initial?.ends_at))
   const [active, setActive] = useState(initial?.is_active ?? true)
@@ -58,18 +65,21 @@ export default function SponsorForm({ initial, existingSponsorships, onSave, onC
     const newStartsIso = new Date(startsAt).toISOString()
     const newEndsIso = new Date(endsAt).toISOString()
 
-    // Solo 1 patrocinador activo a la vez (decisión explícita del doc,
-    // sección 9) — si esto queda activo, no debe traslaparse en fechas con
-    // otro patrocinador que también vaya a quedar activo.
+    // Solo 1 patrocinador activo a la vez POR PERIODO (2026-08-23: antes era
+    // global, pero ahora Diario/Semanal/Mensual conviven en sus propias
+    // columnas del leaderboard TV, así que cada uno tiene su propio cupo de
+    // "solo 1 a la vez" — dos patrocinadores mensuales no pueden traslaparse,
+    // pero un mensual y un semanal sí pueden estar activos el mismo día).
     if (active) {
       const conflict = existingSponsorships.find(s =>
         s.id !== initial?.id &&
         s.is_active &&
+        s.winner_rule === period &&
         s.starts_at < newEndsIso &&
         s.ends_at > newStartsIso
       )
       if (conflict) {
-        setError(`Se traslapa con "${conflict.sponsor_name}" (${new Date(conflict.starts_at).toLocaleDateString('es-MX')}–${new Date(conflict.ends_at).toLocaleDateString('es-MX')}). Solo puede haber un patrocinador activo a la vez — desactívalo o ajusta las fechas.`)
+        setError(`Se traslapa con "${conflict.sponsor_name}" (${new Date(conflict.starts_at).toLocaleDateString('es-MX')}–${new Date(conflict.ends_at).toLocaleDateString('es-MX')}), que también es ${PERIOD_OPTIONS.find(p => p.value === period)?.label.toLowerCase()}. Solo puede haber un patrocinador activo por periodo a la vez — desactívalo o ajusta las fechas.`)
         return
       }
     }
@@ -81,6 +91,7 @@ export default function SponsorForm({ initial, existingSponsorships, onSave, onC
       sponsor_name: name.trim(),
       sponsor_logo: logo,
       prize_text: prize.trim(),
+      winner_rule: period,
       starts_at: newStartsIso,
       ends_at: newEndsIso,
       is_active: active,
@@ -151,6 +162,25 @@ export default function SponsorForm({ initial, existingSponsorships, onSave, onC
               placeholder="Vale de $500 en hamburguesas"
               className="w-full bg-superficie-alta text-texto-principal rounded-xl px-4 py-3 text-sm outline-none border border-zinc-700/50 hover:border-zinc-600 focus:border-primario/60 transition-all"
             />
+          </div>
+
+          <div>
+            <label className="text-zinc-400 text-xs font-semibold mb-1.5 block">Periodo</label>
+            <p className="text-zinc-600 text-xs mb-2">En qué sección de la pantalla aparece y qué leaderboard decide al ganador.</p>
+            <div className="flex gap-2 bg-superficie-alta rounded-xl p-1 border border-zinc-700/50">
+              {PERIOD_OPTIONS.map(opt => (
+                <button
+                  key={opt.value}
+                  type="button"
+                  onClick={() => setPeriod(opt.value)}
+                  className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all ${
+                    period === opt.value ? 'bg-primario text-texto-en-acento' : 'text-zinc-400 hover:text-texto-principal'
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
           </div>
 
           <div className="grid grid-cols-2 gap-3">

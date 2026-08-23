@@ -18,7 +18,12 @@ export function useSponsorships({ all = false }: Options = {}) {
     let q = db.from('sponsorships').select('*, winner:climbers!winner_user_id(display_name)')
     q = all
       ? q.order('created_at', { ascending: false })
-      : q.eq('is_active', true).order('ends_at', { ascending: false }).limit(5)
+      // Límite subido de 5 a 12 (2026-08-23): antes solo podía haber 1
+      // patrocinador activo A LA VEZ en todo el sistema; ahora hay 3
+      // periodos independientes (diario/semanal/mensual) que pueden estar
+      // activos simultáneamente, cada uno con su propia ventana de 48h de
+      // "ganador reciente" — hasta 6 filas relevantes de golpe, 12 da margen.
+      : q.eq('is_active', true).order('ends_at', { ascending: false }).limit(12)
     const { data, error } = await q
     if (error) {
       // eslint-disable-next-line no-console

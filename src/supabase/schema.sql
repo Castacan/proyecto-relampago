@@ -308,6 +308,26 @@ AS $function$
     GROUP BY c.id, c.display_name ORDER BY 2 DESC LIMIT 5;
   $function$;
 
+-- get_weekly_leaderboard (2026-08-23): agregado para el leaderboard TV de 3
+-- columnas (Hoy/Semana/Mes). Semana calendario lunes-domingo hora CDMX
+-- (date_trunc('week', ...) trunca a lunes en Postgres), mismo patrón que
+-- día/mes. Usa points_daily (no existe points_weekly ni falta agregarlo:
+-- points_daily ya es el valor real de cada send individual, sin el bonus de
+-- +1 que solo aplica a points_monthly) — sin filtro > 0 porque un send
+-- válido siempre tiene points_daily >= 1 (V0 = 1 punto).
+CREATE OR REPLACE FUNCTION public.get_weekly_leaderboard()
+ RETURNS TABLE(display_name text, total_points bigint)
+ LANGUAGE sql
+ SECURITY DEFINER
+AS $function$
+    SELECT c.display_name, SUM(s.points_daily)
+    FROM sends s JOIN climbers c ON c.id = s.user_id    WHERE s.sent_at >= date_trunc('week', now() AT TIME ZONE 'America/Mexico_City')
+                        AT TIME ZONE 'America/Mexico_City'      AND c.visible_in_leaderboard = true
+    GROUP BY c.id, c.display_name ORDER BY 2 DESC LIMIT 10;
+  $function$;
+
+GRANT EXECUTE ON FUNCTION public.get_weekly_leaderboard() TO anon, authenticated;
+
 CREATE OR REPLACE FUNCTION public.get_recent_events(lim integer DEFAULT 8)
  RETURNS TABLE(display_name text, grade text, color text, sent_at timestamp with time zone)
  LANGUAGE sql
@@ -805,7 +825,7 @@ CREATE TABLE IF NOT EXISTS public.sponsorships (
   sponsor_name      TEXT NOT NULL,
   sponsor_logo      TEXT NOT NULL,
   prize_text        TEXT NOT NULL,
-  winner_rule       TEXT NOT NULL DEFAULT 'top_1_monthly' CHECK (winner_rule IN ('top_1_monthly')),
+  winner_rule       TEXT NOT NULL DEFAULT 'top_1_monthly' CHECK (winner_rule IN ('top_1_daily', 'top_1_weekly', 'top_1_monthly')),
   starts_at         TIMESTAMPTZ NOT NULL,
   ends_at           TIMESTAMPTZ NOT NULL,
   is_active         BOOLEAN NOT NULL DEFAULT true,
@@ -885,6 +905,11 @@ create policy "display_assets_write_admin" on storage.objects
 -- se muestra, nunca lo que se guarda).
 -- Empate: gana quien llegó primero a esa cantidad de puntos (MAX(sent_at)
 -- más temprano entre los empatados en el máximo de puntos).
+-- Ampliado (2026-08-23) para leaderboard TV de 3 columnas: winner_rule ahora
+-- también puede ser 'top_1_daily'/'top_1_weekly', que suman points_daily
+-- (el valor real de cada send, sin el bonus que solo aplica al mensual) en
+-- vez de points_monthly. 'top_1_monthly' conserva exactamente la lógica
+-- original (SUM(points_monthly), filtro > 0).
 -- ============================================================
 CREATE OR REPLACE FUNCTION public.determine_sponsorship_winner()
 RETURNS JSONB
@@ -901,18 +926,29 @@ BEGIN
     WHERE winner_user_id IS NULL
       AND is_active = true
       AND ends_at < now()
-      AND winner_rule = 'top_1_monthly'
   LOOP
-    SELECT s.user_id INTO v_winner
-    FROM public.sends s
-    JOIN public.climbers c ON c.id = s.user_id
-    WHERE s.sent_at >= v_sp.starts_at
-      AND s.sent_at <= v_sp.ends_at
-      AND c.visible_in_leaderboard = true
-      AND s.points_monthly > 0
-    GROUP BY s.user_id
-    ORDER BY SUM(s.points_monthly) DESC, MAX(s.sent_at) ASC
-    LIMIT 1;
+    IF v_sp.winner_rule = 'top_1_monthly' THEN
+      SELECT s.user_id INTO v_winner
+      FROM public.sends s
+      JOIN public.climbers c ON c.id = s.user_id
+      WHERE s.sent_at >= v_sp.starts_at
+        AND s.sent_at <= v_sp.ends_at
+        AND c.visible_in_leaderboard = true
+        AND s.points_monthly > 0
+      GROUP BY s.user_id
+      ORDER BY SUM(s.points_monthly) DESC, MAX(s.sent_at) ASC
+      LIMIT 1;
+    ELSE -- top_1_daily / top_1_weekly
+      SELECT s.user_id INTO v_winner
+      FROM public.sends s
+      JOIN public.climbers c ON c.id = s.user_id
+      WHERE s.sent_at >= v_sp.starts_at
+        AND s.sent_at <= v_sp.ends_at
+        AND c.visible_in_leaderboard = true
+      GROUP BY s.user_id
+      ORDER BY SUM(s.points_daily) DESC, MAX(s.sent_at) ASC
+      LIMIT 1;
+    END IF;
 
     IF v_winner IS NOT NULL THEN
       UPDATE public.sponsorships SET winner_user_id = v_winner WHERE id = v_sp.id;
@@ -925,3 +961,12 @@ END;
 $function$;
 
 GRANT EXECUTE ON FUNCTION public.determine_sponsorship_winner() TO anon, authenticated;
+
+-- ============================================================
+-- Migración: sponsorships.winner_rule admite daily/weekly (2026-08-23)
+-- Solo necesaria en la DB de producción existente — CREATE TABLE de arriba
+-- ya trae el CHECK correcto para instalaciones nuevas.
+-- ============================================================
+ALTER TABLE public.sponsorships DROP CONSTRAINT IF EXISTS sponsorships_winner_rule_check;
+ALTER TABLE public.sponsorships ADD CONSTRAINT sponsorships_winner_rule_check
+  CHECK (winner_rule IN ('top_1_daily', 'top_1_weekly', 'top_1_monthly'));

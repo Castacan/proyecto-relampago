@@ -16,6 +16,12 @@ const db = supabase as unknown as any
 
 type Tab = 'patrocinadores' | 'slides' | 'configuracion'
 
+const PERIOD_LABEL: Record<Sponsorship['winner_rule'], string> = {
+  top_1_daily: 'Diario',
+  top_1_weekly: 'Semanal',
+  top_1_monthly: 'Mensual',
+}
+
 function sponsorshipEstado(s: Sponsorship): { label: string; color: string } {
   const now = new Date().toISOString()
   if (!s.is_active) return { label: 'Inactivo', color: 'text-zinc-500' }
@@ -135,7 +141,10 @@ export default function DisplayAdminPage() {
                         <img src={s.sponsor_logo} alt={s.sponsor_name} className="max-w-full max-h-full object-contain" />
                       </div>
                       <div className="flex-1 min-w-0">
-                        <p className="text-texto-principal font-semibold text-sm truncate">{s.sponsor_name}</p>
+                        <div className="flex items-center gap-1.5">
+                          <p className="text-texto-principal font-semibold text-sm truncate">{s.sponsor_name}</p>
+                          <span className="text-[9px] font-bold uppercase text-zinc-500 bg-superficie-alta px-1.5 py-0.5 rounded shrink-0">{PERIOD_LABEL[s.winner_rule]}</span>
+                        </div>
                         <p className="text-zinc-500 text-xs mt-0.5 truncate">{s.prize_text}</p>
                       </div>
                       <span className={`text-[10px] font-bold uppercase shrink-0 ${estado.color}`}>{estado.label}</span>

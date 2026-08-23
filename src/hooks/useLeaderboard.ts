@@ -7,18 +7,21 @@ const db = supabase as unknown as any
 
 export function useLeaderboard() {
   const [daily, setDaily] = useState<LeaderboardEntry[]>([])
+  const [weekly, setWeekly] = useState<LeaderboardEntry[]>([])
   const [monthly, setMonthly] = useState<LeaderboardEntry[]>([])
   const [events, setEvents] = useState<RecentEvent[]>([])
   const [loading, setLoading] = useState(true)
   const [connected, setConnected] = useState(true)
 
   const fetchAll = useCallback(async () => {
-    const [d, m, e] = await Promise.all([
+    const [d, w, m, e] = await Promise.all([
       db.rpc('get_daily_leaderboard'),
+      db.rpc('get_weekly_leaderboard'),
       db.rpc('get_monthly_leaderboard'),
       db.rpc('get_recent_events', { lim: 8 }),
     ])
     setDaily(d.data ?? [])
+    setWeekly(w.data ?? [])
     setMonthly(m.data ?? [])
     setEvents(e.data ?? [])
     setLoading(false)
@@ -41,5 +44,5 @@ export function useLeaderboard() {
     return () => { supabase.removeChannel(channel) }
   }, [fetchAll])
 
-  return { daily, monthly, events, loading, connected }
+  return { daily, weekly, monthly, events, loading, connected }
 }

@@ -5,16 +5,23 @@ import { useClimber } from '../../hooks/useClimber'
 import { useSponsorships } from '../../hooks/useSponsorships'
 import SponsorBanner from '../../components/SponsorBanner'
 import logoHorizontal from '../../assets/logo-horizontal.png'
+import type { SponsorPeriod } from '../../types'
 
-type Tab = 'diario' | 'mensual'
+type Tab = 'diario' | 'semanal' | 'mensual'
+
+const TAB_PERIOD: Record<Tab, SponsorPeriod> = {
+  diario: 'top_1_daily',
+  semanal: 'top_1_weekly',
+  mensual: 'top_1_monthly',
+}
 
 export default function LeaderboardPage() {
-  const { daily, monthly, loading } = useLeaderboard()
+  const { daily, weekly, monthly, loading } = useLeaderboard()
   const { climber } = useClimber()
   const { sponsorships } = useSponsorships()
   const [tab, setTab] = useState<Tab>('diario')
 
-  const entries = tab === 'diario' ? daily : monthly
+  const entries = tab === 'diario' ? daily : tab === 'semanal' ? weekly : monthly
 
   return (
     <div className="min-h-screen bg-fondo flex flex-col">
@@ -29,7 +36,7 @@ export default function LeaderboardPage() {
       <div className="flex-1 max-w-md mx-auto w-full px-5 py-6">
         <h1 className="text-texto-principal font-black text-2xl tracking-tight mb-5">Leaderboard</h1>
 
-        <SponsorBanner sponsorships={sponsorships} variant="mobile" />
+        <SponsorBanner sponsorships={sponsorships} period={TAB_PERIOD[tab]} variant="mobile" />
 
         {/* Tabs */}
         <div className="flex gap-2 mb-5 bg-superficie rounded-2xl p-1 border border-zinc-800/60">
@@ -40,6 +47,14 @@ export default function LeaderboardPage() {
             }`}
           >
             Diario
+          </button>
+          <button
+            onClick={() => setTab('semanal')}
+            className={`flex-1 py-2.5 rounded-xl text-sm font-bold transition-all ${
+              tab === 'semanal' ? 'bg-primario text-texto-en-acento' : 'text-zinc-400 hover:text-zinc-200'
+            }`}
+          >
+            Semanal
           </button>
           <button
             onClick={() => setTab('mensual')}
@@ -59,7 +74,7 @@ export default function LeaderboardPage() {
         ) : entries.length === 0 ? (
           <div className="py-10 bg-superficie rounded-2xl border border-zinc-800/60 text-center">
             <p className="text-zinc-600 text-sm">
-              {tab === 'diario' ? 'Nadie ha marcado un send hoy.' : 'Sin actividad este mes.'}
+              {tab === 'diario' ? 'Nadie ha marcado un send hoy.' : tab === 'semanal' ? 'Sin actividad esta semana.' : 'Sin actividad este mes.'}
             </p>
           </div>
         ) : (

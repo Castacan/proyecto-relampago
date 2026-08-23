@@ -150,12 +150,14 @@ export interface SpraywallSend {
   sent_at: string
 }
 
+export type SponsorPeriod = 'top_1_daily' | 'top_1_weekly' | 'top_1_monthly'
+
 export interface Sponsorship {
   id: string
   sponsor_name: string
   sponsor_logo: string
   prize_text: string
-  winner_rule: 'top_1_monthly'
+  winner_rule: SponsorPeriod
   starts_at: string
   ends_at: string
   is_active: boolean

@@ -6,15 +6,15 @@ import { useDisplaySettings } from '../../hooks/useDisplaySettings'
 import { useSlideCarousel } from '../../hooks/useSlideCarousel'
 import { getColorHex } from '../../lib/colors'
 import { nowMX } from '../../lib/timezone'
-import { getBannerSponsorship } from '../../lib/sponsorship'
 import SponsorBanner from '../../components/SponsorBanner'
 import DisplaySlide from '../../components/DisplaySlide'
+import type { LeaderboardEntry, Sponsorship, SponsorPeriod } from '../../types'
 
 const MONTHS_ES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre']
 const DAYS_ES = ['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado']
 
 export default function LeaderboardDisplay() {
-  const { daily, monthly, events, loading, connected } = useLeaderboard()
+  const { daily, weekly, monthly, events, loading, connected } = useLeaderboard()
   const { sponsorships } = useSponsorships()
   const { slides } = useDisplaySlides()
   const { settings } = useDisplaySettings()
@@ -46,8 +46,18 @@ export default function LeaderboardDisplay() {
   const monthLabel = `${MONTHS_ES[now.getMonth()]} ${now.getFullYear()}`
   const monthRange = `1–${new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate()} de ${MONTHS_ES[now.getMonth()]}`
 
+  // Semana calendario lunes-domingo (date_trunc('week', ...) de Postgres
+  // trunca a lunes, mismo criterio que usa get_weekly_leaderboard).
+  const dow = now.getDay() // 0=domingo..6=sábado
+  const monday = new Date(now)
+  monday.setDate(now.getDate() + (dow === 0 ? -6 : 1 - dow))
+  const sunday = new Date(monday)
+  sunday.setDate(monday.getDate() + 6)
+  const weekRange = monday.getMonth() === sunday.getMonth()
+    ? `${monday.getDate()}–${sunday.getDate()} de ${MONTHS_ES[monday.getMonth()]}`
+    : `${monday.getDate()} de ${MONTHS_ES[monday.getMonth()]} – ${sunday.getDate()} de ${MONTHS_ES[sunday.getMonth()]}`
+
   const currentEvent = events[tickerIdx]
-  const hasBanner = getBannerSponsorship(sponsorships, now) !== null
 
   if (loading) {
     return (
@@ -98,62 +108,26 @@ export default function LeaderboardDisplay() {
         )}
       </div>
 
-      {/* Cuerpo: Daily (65%) + Monthly (35%) */}
+      {/* Cuerpo: 3 columnas iguales, cada una con su propio patrocinador
+          abajo (commit 2026-08-23, antes era Diario 65% + Mensual 35% con
+          un solo banner global de pie de página) */}
       <div className="flex-1 flex overflow-hidden">
-
-        {/* Leaderboard Diario */}
-        <div className="flex-[65] flex flex-col px-10 py-8 border-r border-zinc-800">
-          <div className="mb-8">
-            <h1 className="text-primario font-black tracking-tight" style={{ fontSize: '4rem', lineHeight: 1 }}>HOY</h1>
-            <p className="text-zinc-400 text-2xl font-semibold mt-1">{dayLabel}</p>
-          </div>
-
-          {daily.length === 0 ? (
-            <div className="flex-1 flex items-center justify-center">
-              <div className="text-center">
-                <p className="text-zinc-600 text-3xl font-bold mb-2">Nadie ha marcado un send hoy</p>
-                <p className="text-zinc-700 text-xl">¡Sé el primero!</p>
-              </div>
-            </div>
-          ) : (
-            <div className="flex flex-col gap-2">
-              {daily.map((entry, i) => (
-                <DailyRow key={entry.display_name} rank={i + 1} name={entry.display_name} points={Number(entry.total_points)} />
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* Leaderboard Mensual */}
-        <div className="flex-[35] flex flex-col px-8 py-8">
-          <div className="mb-8">
-            <h2 className="text-zinc-300 font-black tracking-tight" style={{ fontSize: '2.5rem', lineHeight: 1 }}>{monthLabel.toUpperCase()}</h2>
-            <p className="text-zinc-600 text-lg font-semibold mt-1">{monthRange}</p>
-          </div>
-
-          {monthly.length === 0 ? (
-            <div className="flex-1 flex items-center justify-center">
-              <p className="text-zinc-700 text-xl font-bold text-center">Sin actividad este mes</p>
-            </div>
-          ) : (
-            <div className="flex flex-col gap-3">
-              {monthly.map((entry, i) => (
-                <MonthlyRow key={entry.display_name} rank={i + 1} name={entry.display_name} points={Number(entry.total_points)} />
-              ))}
-            </div>
-          )}
-        </div>
+        <LeaderboardColumn
+          title="HOY" titleAccent subtitle={dayLabel}
+          entries={daily} emptyTitle="Nadie ha marcado un send hoy" emptySubtitle="¡Sé el primero!"
+          period="top_1_daily" sponsorships={sponsorships} borderRight
+        />
+        <LeaderboardColumn
+          title="SEMANA" subtitle={weekRange}
+          entries={weekly} emptyTitle="Sin actividad esta semana"
+          period="top_1_weekly" sponsorships={sponsorships} borderRight
+        />
+        <LeaderboardColumn
+          title={monthLabel.toUpperCase()} subtitle={monthRange}
+          entries={monthly} emptyTitle="Sin actividad este mes"
+          period="top_1_monthly" sponsorships={sponsorships}
+        />
       </div>
-
-      {/* Footer: banner de patrocinador si hay uno activo/ganador, si no el de siempre */}
-      {hasBanner ? (
-        <SponsorBanner sponsorships={sponsorships} variant="tv" />
-      ) : (
-        <div className="shrink-0 h-10 bg-superficie border-t border-zinc-800 flex items-center justify-center gap-2">
-          <span className="text-primario text-sm">⚡</span>
-          <span className="text-zinc-600 text-sm font-medium">El Muro · Jaibamuro</span>
-        </div>
-      )}
     </div>
 
       <div
@@ -166,44 +140,73 @@ export default function LeaderboardDisplay() {
   )
 }
 
-function DailyRow({ rank, name, points }: { rank: number; name: string; points: number }) {
+interface ColumnProps {
+  title: string
+  titleAccent?: boolean
+  subtitle: string
+  entries: LeaderboardEntry[]
+  emptyTitle: string
+  emptySubtitle?: string
+  period: SponsorPeriod
+  sponsorships: Sponsorship[]
+  borderRight?: boolean
+}
+
+function LeaderboardColumn({ title, titleAccent, subtitle, entries, emptyTitle, emptySubtitle, period, sponsorships, borderRight }: ColumnProps) {
+  return (
+    <div className={`flex-1 flex flex-col overflow-hidden ${borderRight ? 'border-r border-zinc-800' : ''}`}>
+      <div className="flex-1 flex flex-col px-6 py-6 overflow-hidden">
+        <div className="mb-6 shrink-0">
+          <h1
+            className={`font-black tracking-tight ${titleAccent ? 'text-primario' : 'text-zinc-300'}`}
+            style={{ fontSize: '2.5rem', lineHeight: 1 }}
+          >
+            {title}
+          </h1>
+          <p className="text-zinc-500 text-lg font-semibold mt-1">{subtitle}</p>
+        </div>
+
+        {entries.length === 0 ? (
+          <div className="flex-1 flex items-center justify-center">
+            <div className="text-center">
+              <p className="text-zinc-600 text-xl font-bold mb-1">{emptyTitle}</p>
+              {emptySubtitle && <p className="text-zinc-700 text-base">{emptySubtitle}</p>}
+            </div>
+          </div>
+        ) : (
+          <div className="flex flex-col gap-2 overflow-y-auto">
+            {entries.map((entry, i) => (
+              <LeaderboardRow key={entry.display_name} rank={i + 1} name={entry.display_name} points={Number(entry.total_points)} />
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Patrocinador de este periodo si hay uno activo/ganador; si no,
+          SponsorBanner mismo cae a un branding de respaldo (variant="tv"
+          nunca regresa null, mantiene alineada la altura entre columnas) */}
+      <SponsorBanner sponsorships={sponsorships} period={period} variant="tv" />
+    </div>
+  )
+}
+
+function LeaderboardRow({ rank, name, points }: { rank: number; name: string; points: number }) {
   const isFirst = rank === 1
-  const fontSize = isFirst ? '2.25rem' : rank <= 3 ? '1.75rem' : '1.4rem'
+  const fontSize = isFirst ? '2rem' : rank <= 3 ? '1.5rem' : '1.15rem'
   const nameColor = isFirst ? 'text-texto-principal' : 'text-zinc-200'
   const rankColor = isFirst ? 'text-primario' : rank <= 3 ? 'text-zinc-300' : 'text-zinc-600'
   const ptsColor = isFirst ? 'text-primario' : 'text-zinc-400'
   const bg = isFirst ? 'bg-superficie border border-primario/20' : 'bg-superficie/50'
 
   return (
-    <div className={`flex items-center gap-4 px-5 py-3 rounded-2xl ${bg}`}>
-      <span className={`font-black shrink-0 ${rankColor}`} style={{ fontSize, width: '3.5rem' }}>
+    <div className={`flex items-center gap-3 px-4 py-2.5 rounded-2xl ${bg}`}>
+      <span className={`font-black shrink-0 ${rankColor}`} style={{ fontSize, width: '2.75rem' }}>
         #{rank}
       </span>
       <span className={`flex-1 font-black truncate ${nameColor}`} style={{ fontSize }}>
         {name}
       </span>
       <span className={`font-black shrink-0 ${ptsColor}`} style={{ fontSize }}>
-        {points} pts
-      </span>
-    </div>
-  )
-}
-
-function MonthlyRow({ rank, name, points }: { rank: number; name: string; points: number }) {
-  const isFirst = rank === 1
-  const fontSize = isFirst ? '1.75rem' : '1.35rem'
-  const nameColor = isFirst ? 'text-texto-principal' : 'text-zinc-300'
-  const rankColor = isFirst ? 'text-primario' : 'text-zinc-500'
-
-  return (
-    <div className={`flex items-center gap-3 px-4 py-2.5 rounded-xl ${isFirst ? 'bg-superficie border border-zinc-700/50' : ''}`}>
-      <span className={`font-black shrink-0 ${rankColor}`} style={{ fontSize, width: '2.75rem' }}>
-        #{rank}
-      </span>
-      <span className={`flex-1 font-bold truncate ${nameColor}`} style={{ fontSize }}>
-        {name}
-      </span>
-      <span className="font-bold shrink-0 text-zinc-500" style={{ fontSize }}>
         {points} pts
       </span>
     </div>
