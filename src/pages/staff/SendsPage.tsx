@@ -20,6 +20,7 @@ interface SendRow {
   color: string
   zone_name: string | null
   route_number: number | null
+  visible_in_leaderboard: boolean
 }
 
 export default function SendsPage() {
@@ -33,6 +34,7 @@ export default function SendsPage() {
   const [debouncedSearch, setDebouncedSearch] = useState('')
   const [confirmingId, setConfirmingId] = useState<string | null>(null)
   const [deletingId, setDeletingId] = useState<string | null>(null)
+  const [togglingClimberId, setTogglingClimberId] = useState<string | null>(null)
 
   useEffect(() => {
     const t = setTimeout(() => setDebouncedSearch(search.trim()), 300)
@@ -77,6 +79,22 @@ export default function SendsPage() {
     }
     // success o not_found: en ambos casos ya no existe, quitar de la lista local
     setSends(prev => prev.filter(s => s.id !== id))
+  }
+
+  // Excluir/incluir a un climber de TODOS los leaderboards (staff/TV/imagen
+  // de ganador) — para gente de staff probando la app o que hizo trampa.
+  // Actualiza climbers.visible_in_leaderboard vía RPC (climbers no tiene
+  // policies RLS documentadas, ver comentario en schema.sql), y refleja el
+  // cambio en todas las filas de ese climber en la lista local.
+  const handleToggleVisibility = async (climberId: string, currentlyVisible: boolean) => {
+    setTogglingClimberId(climberId)
+    const { data, error } = await db.rpc('set_climber_visibility', { p_climber_id: climberId, p_visible: !currentlyVisible })
+    setTogglingClimberId(null)
+    if (error || data?.error) {
+      setError('No se pudo cambiar la visibilidad en el leaderboard.')
+      return
+    }
+    setSends(prev => prev.map(s => s.climber_id === climberId ? { ...s, visible_in_leaderboard: !currentlyVisible } : s))
   }
 
   return (
@@ -126,6 +144,9 @@ export default function SendsPage() {
                 <div className="text-zinc-400 text-xs truncate">
                   {s.display_name ?? 'Sin alias'}
                   {s.email && <span className="text-zinc-600"> · {s.email}</span>}
+                  {!s.visible_in_leaderboard && (
+                    <span className="ml-1.5 text-[9px] font-bold uppercase text-alerta bg-alerta/10 px-1.5 py-0.5 rounded">Oculto</span>
+                  )}
                 </div>
                 <div className="text-zinc-600 text-[10px] mt-0.5">
                   {new Date(s.sent_at).toLocaleString('es-MX', { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' })}
@@ -151,12 +172,22 @@ export default function SendsPage() {
                   </button>
                 </div>
               ) : (
-                <button
-                  onClick={() => setConfirmingId(s.id)}
-                  className="shrink-0 text-zinc-400 hover:text-alerta text-xs font-semibold px-3 py-1.5 rounded-lg bg-superficie-alta/80 hover:bg-superficie-alta-hover border border-zinc-700/50 transition-all"
-                >
-                  Eliminar
-                </button>
+                <div className="flex flex-col items-end gap-1.5 shrink-0">
+                  <button
+                    onClick={() => setConfirmingId(s.id)}
+                    className="text-zinc-400 hover:text-alerta text-xs font-semibold px-3 py-1.5 rounded-lg bg-superficie-alta/80 hover:bg-superficie-alta-hover border border-zinc-700/50 transition-all"
+                  >
+                    Eliminar
+                  </button>
+                  <button
+                    onClick={() => handleToggleVisibility(s.climber_id, s.visible_in_leaderboard)}
+                    disabled={togglingClimberId === s.climber_id}
+                    title="Excluir o incluir a esta persona en todos los leaderboards (staff probando, trampa, etc.)"
+                    className="text-zinc-500 hover:text-texto-principal text-[10px] font-semibold px-3 py-1 rounded-lg bg-superficie-alta/50 hover:bg-superficie-alta-hover border border-zinc-800/60 transition-all disabled:opacity-60"
+                  >
+                    {togglingClimberId === s.climber_id ? '...' : s.visible_in_leaderboard ? 'Excluir del leaderboard' : 'Reincluir'}
+                  </button>
+                </div>
               )}
             </div>
           ))}

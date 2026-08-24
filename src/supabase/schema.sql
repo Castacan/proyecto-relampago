@@ -763,6 +763,7 @@ create policy "spraywall_photos_write_staff" on storage.objects
 -- Ejecutado en Supabase 2026-08-09.
 -- ============================================
 
+DROP FUNCTION IF EXISTS public.get_recent_sends(TEXT, INT);
 CREATE OR REPLACE FUNCTION public.get_recent_sends(
   p_search TEXT DEFAULT NULL,
   p_limit INT DEFAULT 50
@@ -779,7 +780,8 @@ RETURNS TABLE (
   grade TEXT,
   color TEXT,
   zone_name TEXT,
-  route_number BIGINT
+  route_number BIGINT,
+  visible_in_leaderboard BOOLEAN
 )
 LANGUAGE plpgsql
 SECURITY DEFINER
@@ -804,7 +806,8 @@ BEGIN
     r.grade,
     r.color,
     z.name AS zone_name,
-    r.route_number
+    r.route_number,
+    c.visible_in_leaderboard
   FROM sends s
   JOIN climbers c ON c.id = s.user_id
   JOIN routes r ON r.id = s.route_id
@@ -821,6 +824,40 @@ END;
 $function$;
 
 GRANT EXECUTE ON FUNCTION public.get_recent_sends(TEXT, INT) TO authenticated;
+
+-- set_climber_visibility (2026-08-24): permite a un admin excluir a un
+-- climber de todos los leaderboards (staff/mensual/semanal/diario/imagen
+-- de ganador) — ej. es staff probando la app, o hizo trampa. Reutiliza
+-- climbers.visible_in_leaderboard, la misma columna que ya filtran
+-- get_daily/weekly/monthly_leaderboard y get_leaderboard_for_range;
+-- antes solo el propio climber podía cambiarla desde /mi-cuenta.
+-- RPC en vez de UPDATE directo porque climbers no tiene policies RLS
+-- documentadas (mismo caso que sends) — SECURITY DEFINER + chequeo
+-- explícito de admin es más seguro que asumir que el UPDATE directo
+-- vaya a fallar cerrado.
+CREATE OR REPLACE FUNCTION public.set_climber_visibility(p_climber_id UUID, p_visible BOOLEAN)
+RETURNS JSONB
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $function$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'admin'
+  ) THEN
+    RETURN '{"error":"not_authorized"}'::JSONB;
+  END IF;
+
+  UPDATE public.climbers SET visible_in_leaderboard = p_visible, updated_at = NOW() WHERE id = p_climber_id;
+
+  IF NOT FOUND THEN
+    RETURN '{"error":"not_found"}'::JSONB;
+  END IF;
+
+  RETURN '{"success":true}'::JSONB;
+END;
+$function$;
+
+GRANT EXECUTE ON FUNCTION public.set_climber_visibility(UUID, BOOLEAN) TO authenticated;
 
 
 CREATE OR REPLACE FUNCTION public.delete_send(p_send_id UUID)
