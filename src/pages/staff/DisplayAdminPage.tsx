@@ -4,6 +4,8 @@ import { supabase } from '../../lib/supabase'
 import { useProfile } from '../../hooks/useProfile'
 import { useSponsorships } from '../../hooks/useSponsorships'
 import { useLeaderboard } from '../../hooks/useLeaderboard'
+import { useWinnersHistory } from '../../hooks/useWinnersHistory'
+import { fmtDateOnly, fmtMonthOnly } from '../../lib/dates'
 import { useDisplaySlides } from '../../hooks/useDisplaySlides'
 import { useDisplaySettings } from '../../hooks/useDisplaySettings'
 import SponsorForm from '../../components/SponsorForm'
@@ -57,6 +59,7 @@ export default function DisplayAdminPage() {
 
   const { sponsorships, loading: sponsorsLoading, refetch: refetchSponsors } = useSponsorships({ all: true })
   const { weekly: weeklyBoard, monthly: monthlyBoard, loading: boardLoading } = useLeaderboard()
+  const { weekly: weeklyHistory, monthly: monthlyHistory, loading: historyLoading } = useWinnersHistory()
   const { slides, loading: slidesLoading, refetch: refetchSlides } = useDisplaySlides({ all: true })
   const { settings, loading: settingsLoading, refetch: refetchSettings } = useDisplaySettings()
 
@@ -214,6 +217,55 @@ export default function DisplayAdminPage() {
                   )}
                 </div>
               ))}
+            </div>
+
+            {/* Historial de ganadores por semana/mes — periodos ya terminados,
+                calculado directo de sends (get_weekly/monthly_winners_history),
+                sin ninguna relación con sponsorships. Se "actualiza solo" cada
+                semana/mes porque no hay nada guardado: se recalcula en cada
+                carga de la página. */}
+            <p className="text-zinc-600 text-[11px] font-semibold uppercase tracking-widest mb-2">Historial de ganadores</p>
+            <div className="grid grid-cols-2 gap-3 mb-5">
+              <div>
+                <p className="text-zinc-500 text-xs font-semibold mb-2">Por semana</p>
+                {historyLoading ? (
+                  <div className="flex justify-center py-6">
+                    <div className="w-5 h-5 rounded-full border-2 border-primario border-t-transparent animate-spin" />
+                  </div>
+                ) : weeklyHistory.length === 0 ? (
+                  <p className="text-zinc-600 text-xs">Sin semanas terminadas todavía.</p>
+                ) : (
+                  <div className="flex flex-col gap-2">
+                    {weeklyHistory.map(w => (
+                      <div key={w.period_start} className="p-3 bg-superficie border border-zinc-800/60 rounded-xl">
+                        <p className="text-zinc-600 text-[10px] mb-1">{fmtDateOnly(w.period_start)} – {fmtDateOnly(w.period_end)}</p>
+                        <p className="text-texto-principal font-bold text-xs truncate">🏆 {w.display_name}</p>
+                        <p className="text-zinc-500 text-[11px]">{w.total_points} pts</p>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+              <div>
+                <p className="text-zinc-500 text-xs font-semibold mb-2">Por mes</p>
+                {historyLoading ? (
+                  <div className="flex justify-center py-6">
+                    <div className="w-5 h-5 rounded-full border-2 border-primario border-t-transparent animate-spin" />
+                  </div>
+                ) : monthlyHistory.length === 0 ? (
+                  <p className="text-zinc-600 text-xs">Sin meses terminados todavía.</p>
+                ) : (
+                  <div className="flex flex-col gap-2">
+                    {monthlyHistory.map(m => (
+                      <div key={m.period_start} className="p-3 bg-superficie border border-zinc-800/60 rounded-xl">
+                        <p className="text-zinc-600 text-[10px] mb-1">{fmtMonthOnly(m.period_start)}</p>
+                        <p className="text-texto-principal font-bold text-xs truncate">👑 {m.display_name}</p>
+                        <p className="text-zinc-500 text-[11px]">{m.total_points} pts</p>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
 
             <p className="text-zinc-600 text-[11px] font-semibold uppercase tracking-widest mb-2">Historial de premios</p>

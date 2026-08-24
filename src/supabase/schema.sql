@@ -885,6 +885,92 @@ GRANT EXECUTE ON FUNCTION public.get_route_send_counts(UUID) TO authenticated;
 
 
 -- ============================================================
+-- Historial de ganadores por semana/mes en /staff/display → Ganadores
+-- (2026-08-24). Independiente de sponsorships por completo — antes
+-- "Ganadores" solo mostraba patrocinios ya terminados (ends_at < now),
+-- así que si el premio activo tenía una ventana larga (ej. 12 días en
+-- vez de semana calendario) nunca se veía nada aunque sí hubiera
+-- participantes. Esto calcula el top 1 real de cada semana/mes
+-- calendario (lunes-domingo / día 1 a fin de mes, hora CDMX) directo
+-- de sends, mismo criterio que get_weekly/monthly_leaderboard
+-- (points_daily sin filtro para semana; points_monthly > 0 para mes).
+-- Solo periodos YA TERMINADOS — el actual en curso ya se muestra aparte
+-- vía get_weekly/monthly_leaderboard. Se "actualiza solo" cada semana/mes
+-- porque no hay nada guardado: se recalcula desde sends en cada llamada.
+-- ============================================================
+
+CREATE OR REPLACE FUNCTION public.get_weekly_winners_history(p_limit INT DEFAULT 8)
+RETURNS TABLE (
+  period_start DATE,
+  period_end DATE,
+  display_name TEXT,
+  total_points BIGINT
+)
+LANGUAGE sql
+SECURITY DEFINER
+AS $function$
+  WITH weekly AS (
+    SELECT
+      date_trunc('week', s.sent_at AT TIME ZONE 'America/Mexico_City')::date AS week_start,
+      c.id AS climber_id,
+      c.display_name,
+      SUM(s.points_daily) AS total_points
+    FROM sends s
+    JOIN climbers c ON c.id = s.user_id
+    WHERE c.visible_in_leaderboard = true
+    GROUP BY 1, c.id, c.display_name
+  ),
+  ranked AS (
+    SELECT weekly.*, ROW_NUMBER() OVER (PARTITION BY week_start ORDER BY total_points DESC) AS rn
+    FROM weekly
+  )
+  SELECT week_start, (week_start + interval '6 days')::date, display_name, total_points
+  FROM ranked
+  WHERE rn = 1
+    AND week_start < date_trunc('week', now() AT TIME ZONE 'America/Mexico_City')::date
+  ORDER BY week_start DESC
+  LIMIT p_limit;
+$function$;
+
+GRANT EXECUTE ON FUNCTION public.get_weekly_winners_history(INT) TO anon, authenticated;
+
+CREATE OR REPLACE FUNCTION public.get_monthly_winners_history(p_limit INT DEFAULT 6)
+RETURNS TABLE (
+  period_start DATE,
+  period_end DATE,
+  display_name TEXT,
+  total_points BIGINT
+)
+LANGUAGE sql
+SECURITY DEFINER
+AS $function$
+  WITH monthly AS (
+    SELECT
+      date_trunc('month', s.sent_at AT TIME ZONE 'America/Mexico_City')::date AS month_start,
+      c.id AS climber_id,
+      c.display_name,
+      SUM(s.points_monthly) AS total_points
+    FROM sends s
+    JOIN climbers c ON c.id = s.user_id
+    WHERE c.visible_in_leaderboard = true AND s.points_monthly > 0
+    GROUP BY 1, c.id, c.display_name
+  ),
+  ranked AS (
+    SELECT monthly.*, ROW_NUMBER() OVER (PARTITION BY month_start ORDER BY total_points DESC) AS rn
+    FROM monthly
+  )
+  SELECT month_start, (month_start + interval '1 month' - interval '1 day')::date, display_name, total_points
+  FROM ranked
+  WHERE rn = 1
+    AND month_start < date_trunc('month', now() AT TIME ZONE 'America/Mexico_City')::date
+  ORDER BY month_start DESC
+  LIMIT p_limit;
+$function$;
+
+GRANT EXECUTE ON FUNCTION public.get_monthly_winners_history(INT) TO anon, authenticated;
+
+
+-- ============================================================
 -- Patrocinadores y Slides en Pantalla (2026-08-19)
 -- Dos features nuevas para /leaderboard/display + /leaderboard:
 -- banner de patrocinador del mes (ligado al leaderboard mensual
