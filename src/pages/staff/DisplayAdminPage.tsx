@@ -3,6 +3,7 @@ import { Navigate } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import { useProfile } from '../../hooks/useProfile'
 import { useSponsorships } from '../../hooks/useSponsorships'
+import { useLeaderboard } from '../../hooks/useLeaderboard'
 import { useDisplaySlides } from '../../hooks/useDisplaySlides'
 import { useDisplaySettings } from '../../hooks/useDisplaySettings'
 import SponsorForm from '../../components/SponsorForm'
@@ -55,6 +56,7 @@ export default function DisplayAdminPage() {
   const [tab, setTab] = useState<Tab>('patrocinadores')
 
   const { sponsorships, loading: sponsorsLoading, refetch: refetchSponsors } = useSponsorships({ all: true })
+  const { weekly: weeklyBoard, monthly: monthlyBoard, loading: boardLoading } = useLeaderboard()
   const { slides, loading: slidesLoading, refetch: refetchSlides } = useDisplaySlides({ all: true })
   const { settings, loading: settingsLoading, refetch: refetchSettings } = useDisplaySettings()
 
@@ -187,6 +189,34 @@ export default function DisplayAdminPage() {
 
         {tab === 'ganadores' && (
           <>
+            {/* Líder actual de semana/mes — en vivo desde get_weekly/monthly_leaderboard
+                (misma fuente que la TV), independiente de si hay un patrocinio
+                activo o de cuándo termina su periodo. Se actualiza solo cada
+                semana/mes porque las RPCs truncan sobre la fecha real, y useLeaderboard
+                ya trae suscripción realtime a la tabla sends. */}
+            <div className="flex flex-col gap-2.5 mb-5">
+              {([
+                { label: 'Líder de la semana', emoji: '🏆', board: weeklyBoard },
+                { label: 'Líder del mes', emoji: '👑', board: monthlyBoard },
+              ] as const).map(({ label, emoji, board }) => (
+                <div key={label} className="p-4 bg-superficie border border-zinc-800/60 rounded-2xl">
+                  <p className="text-zinc-500 text-[11px] font-semibold uppercase tracking-widest mb-2">{label}</p>
+                  {boardLoading ? (
+                    <div className="h-6 flex items-center">
+                      <div className="w-5 h-5 rounded-full border-2 border-primario border-t-transparent animate-spin" />
+                    </div>
+                  ) : board.length === 0 ? (
+                    <p className="text-zinc-600 text-sm">Nadie ha enviado rutas todavía en este periodo.</p>
+                  ) : (
+                    <p className="text-texto-principal font-bold text-sm">
+                      {emoji} {board[0].display_name} <span className="text-zinc-500 font-normal">— {board[0].total_points} pts</span>
+                    </p>
+                  )}
+                </div>
+              ))}
+            </div>
+
+            <p className="text-zinc-600 text-[11px] font-semibold uppercase tracking-widest mb-2">Historial de premios</p>
             <div className="flex gap-2 mb-4 overflow-x-auto">
               {WINNER_FILTERS.map(f => (
                 <button
