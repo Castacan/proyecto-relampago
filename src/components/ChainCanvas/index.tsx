@@ -21,6 +21,7 @@ interface Props {
   anchors: ZoneAnchor[]
   routes: Route[]
   volumes?: Volume[]
+  sendCounts?: Map<string, number>
   paintMode: boolean
   drawColor: string
   previewBlob: { path: { x: number; y: number }[] } | null
@@ -46,7 +47,7 @@ interface Props {
 }
 
 export default function ChainCanvas({
-  zones, anchors, routes, volumes = [], paintMode, drawColor, previewBlob,
+  zones, anchors, routes, volumes = [], sendCounts, paintMode, drawColor, previewBlob,
   volumePaintMode = null, previewVolumePerimeter = null, previewVolumeDetails = [],
   repositionMode = null,
   volPlaceMode = null, onVolumePlaced,
@@ -1007,6 +1008,7 @@ export default function ChainCanvas({
       const level = getFreshnessLevel(route.placed_at)
       const freshnessHex = getFreshnessColor(level)
       const days = getDaysOnWall(route.placed_at)
+      const sendCount = sendCounts?.get(route.id) ?? 0
       const bd = badgeMap.get(route.id + keySuffix)
       return (
         <Group key={route.id + keySuffix}>
@@ -1016,7 +1018,7 @@ export default function ChainCanvas({
             <>
               <Line points={[bd.bx, bd.by + BADGE_H, bd.anchorX, bd.anchorY]} stroke={freshnessHex} strokeWidth={1.5} opacity={0.7} listening={false} />
               <Rect x={bd.bx - BADGE_W / 2} y={bd.by} width={BADGE_W} height={BADGE_H} fill={freshnessHex} cornerRadius={4} listening={false} />
-              <Text x={bd.bx - BADGE_W / 2 + 2} y={bd.by + 3} text={`${days}d`} fontSize={10} fill="#111" fontStyle="bold" fontFamily="sans-serif" width={BADGE_W - 4} align="center" listening={false} />
+              <Text x={bd.bx - BADGE_W / 2 + 2} y={bd.by + 3} text={`${days}d · ${sendCount}✓`} fontSize={9} fill="#111" fontStyle="bold" fontFamily="sans-serif" width={BADGE_W - 4} align="center" listening={false} />
             </>
           )}
           {bd && !isStaff && (
@@ -1095,7 +1097,7 @@ export default function ChainCanvas({
     }
 
     // ── Badge layout: ancla en punto más alto + separación sin colisiones ────
-    const BADGE_W = isStaff ? 38 : 62
+    const BADGE_W = isStaff ? 54 : 62
     const BADGE_H = 16
     const LINE_BASE = 26
     const GAP = 5

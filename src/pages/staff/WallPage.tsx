@@ -8,6 +8,7 @@ import RouteDetail from '../../components/RouteDetail'
 import VolumeDetail from '../../components/VolumeDetail'
 import { useZones } from '../../hooks/useZones'
 import { useRoutes } from '../../hooks/useRoutes'
+import { useRouteSendCounts } from '../../hooks/useRouteSendCounts'
 import { useVolumes } from '../../hooks/useVolumes'
 import { useVolumeCatalog } from '../../hooks/useVolumeCatalog'
 import { useChain } from '../../hooks/useChain'
@@ -29,6 +30,7 @@ export default function WallPage() {
 
   const { zones: allZones } = useZones()
   const { routes, refetch: refetchRoutes } = useRoutes()
+  const { counts: sendCounts } = useRouteSendCounts()
   const { volumes, refetch: refetchVolumes } = useVolumes()
   const { catalog } = useVolumeCatalog()
 
@@ -215,6 +217,7 @@ export default function WallPage() {
         anchors={anchors}
         routes={routes}
         volumes={volumes}
+        sendCounts={sendCounts}
         paintMode={ui === 'drawing'}
         drawColor={paintColor}
         previewBlob={(ui === 'review' || ui === 'form') && newBlobPath ? { path: newBlobPath } : null}

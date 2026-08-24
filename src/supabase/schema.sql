@@ -852,6 +852,39 @@ GRANT EXECUTE ON FUNCTION public.delete_send(UUID) TO authenticated;
 
 
 -- ============================================================
+-- Contador de envíos por ruta en /staff/pared (2026-08-24)
+-- Cuántas personas distintas han marcado cada ruta como enviada.
+-- Abierto a cualquier staff (no solo admin), a diferencia de
+-- get_recent_sends/delete_send que son solo-admin.
+-- ============================================================
+
+CREATE OR REPLACE FUNCTION public.get_route_send_counts(p_route_id UUID DEFAULT NULL)
+RETURNS TABLE (
+  route_id UUID,
+  send_count BIGINT
+)
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $function$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM profiles WHERE id = auth.uid()
+  ) THEN
+    RETURN; -- tabla vacía si no es staff
+  END IF;
+
+  RETURN QUERY
+  SELECT s.route_id, COUNT(*) AS send_count
+  FROM sends s
+  WHERE p_route_id IS NULL OR s.route_id = p_route_id
+  GROUP BY s.route_id;
+END;
+$function$;
+
+GRANT EXECUTE ON FUNCTION public.get_route_send_counts(UUID) TO authenticated;
+
+
+-- ============================================================
 -- Patrocinadores y Slides en Pantalla (2026-08-19)
 -- Dos features nuevas para /leaderboard/display + /leaderboard:
 -- banner de patrocinador del mes (ligado al leaderboard mensual

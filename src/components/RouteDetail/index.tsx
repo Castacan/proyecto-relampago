@@ -5,6 +5,9 @@ import { getDaysOnWall, getFreshnessColor, getFreshnessLevel } from '../../lib/f
 import type { Route, Zone } from '../../types'
 import QrScanner from '../QrScanner'
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const db = supabase as unknown as any
+
 interface Props {
   route: Route
   zones: Zone[]
@@ -28,6 +31,7 @@ export default function RouteDetail({ route, zones, onClose, onUpdate, onRetire 
   const [confirmRetire, setConfirmRetire] = useState(false)
 
   const [votes, setVotes] = useState<VoteCounts>({ up: 0, down: 0 })
+  const [sendCount, setSendCount] = useState(0)
   const [qrId, setQrId] = useState<string | null | undefined>(undefined)
   const [showScanner, setShowScanner] = useState(false)
 
@@ -49,6 +53,12 @@ export default function RouteDetail({ route, zones, onClose, onUpdate, onRetire 
         up: data.filter(v => v.value === 'up').length,
         down: data.filter(v => v.value === 'down').length,
       })
+    })
+  }, [route.id])
+
+  useEffect(() => {
+    db.rpc('get_route_send_counts', { p_route_id: route.id }).then(({ data }: { data: { route_id: string; send_count: number }[] | null }) => {
+      setSendCount(Number(data?.[0]?.send_count ?? 0))
     })
   }, [route.id])
 
@@ -132,6 +142,15 @@ export default function RouteDetail({ route, zones, onClose, onUpdate, onRetire 
               <div className="w-2 h-2 rounded-full shrink-0 animate-pulse" style={{ backgroundColor: freshnessHex }} />
               <span className="font-black text-3xl font-mono leading-none" style={{ color: freshnessHex }}>{days}</span>
               <span className="text-zinc-300 text-sm font-medium">días en la pared</span>
+            </div>
+
+            {/* Envíos */}
+            <div className="flex items-center gap-3 mb-5 p-4 bg-superficie-alta/60 rounded-2xl border border-zinc-700/40">
+              <span className="text-2xl">✅</span>
+              <div>
+                <p className="text-texto-principal font-black text-2xl leading-none">{sendCount}</p>
+                <p className="text-zinc-500 text-xs mt-0.5">{sendCount === 1 ? 'persona la ha enviado' : 'personas la han enviado'}</p>
+              </div>
             </div>
 
             {/* Votos */}
