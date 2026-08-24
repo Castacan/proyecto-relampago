@@ -244,18 +244,20 @@ export async function drawWinnerImage(
   // sobra ~200px de aire antes de aquí, no debería solaparse.
   const footerY = WINNER_IMAGE_HEIGHT - 90
   if (data.sponsorName && sponsorPosition === 'bottom') {
-    const creditY = footerY - 210
+    // creditY se corrió más arriba (antes footerY-210) para que quepa el
+    // logo más grande sin pisar la línea divisoria del footer (footerY-50).
+    const creditY = footerY - 270
     ctx.fillStyle = COLOR_TEXTO_SECUNDARIO
     ctx.font = '700 26px Inter'
     ctx.fillText('PATROCINA', CX, creditY)
 
     if (sponsorLogo) {
-      const cardW = 200, cardH = 110
-      const cardY = creditY + 24
-      ctx.fillStyle = '#ffffff'
-      roundRect(ctx, CX - cardW / 2, cardY, cardW, cardH, 20)
-      ctx.fill()
-      drawImageContain(ctx, sponsorLogo, CX, cardY + cardH / 2, cardW - 36, cardH - 36)
+      // Sin card blanca detrás (2026-08-24, a pedido del usuario) — el logo
+      // se dibuja directo sobre el fondo. Bastante más grande que antes
+      // (200×110 → 320×160) ya que no compite con nada más aquí abajo.
+      const boxW = 320, boxH = 160
+      const boxY = creditY + 30
+      drawImageContain(ctx, sponsorLogo, CX, boxY + boxH / 2, boxW, boxH)
     } else {
       ctx.fillStyle = COLOR_TEXTO_PRINCIPAL
       ctx.font = '800 32px Inter'
