@@ -30,11 +30,21 @@ export function useLeaderboard() {
   useEffect(() => {
     fetchAll()
 
+    // Escucha sends (nuevos envíos) Y climbers (2026-08-24: excluir/reincluir
+    // a alguien desde /staff/sends — visible_in_leaderboard/eligible_for_prizes
+    // — no toca sends, así que sin esto la TV se queda con datos viejos hasta
+    // recargar). Solo UPDATE en climbers porque INSERT/DELETE de climbers no
+    // cambia el ranking (nuevo climber sin sends no aparece de todos modos).
     const channel = supabase
       .channel('leaderboard-sends')
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'sends' },
+        () => { fetchAll() }
+      )
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'climbers' },
         () => { fetchAll() }
       )
       .subscribe((status) => {
