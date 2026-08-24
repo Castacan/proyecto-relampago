@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { Navigate } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import { useProfile } from '../../hooks/useProfile'
@@ -68,6 +68,22 @@ export default function DisplayAdminPage() {
   const [previewSlide, setPreviewSlide] = useState<DisplaySlide | null>(null)
   const [winnerFilter, setWinnerFilter] = useState<'todos' | SponsorPeriod>('todos')
   const [winnerImageSource, setWinnerImageSource] = useState<WinnerImageSource | null>(null)
+
+  // Logos de patrocinadores YA existentes para el picker de WinnerImageModal
+  // en cards sin patrocinio (2026-08-24) — el usuario no quiere subir una
+  // foto nueva, quiere elegir una ya cargada. `sponsorships` viene ordenado
+  // por created_at desc, así que dedupe por nombre se queda con el logo más
+  // reciente si el mismo patrocinador tuvo varios periodos.
+  const existingSponsorLogos = useMemo(() => {
+    const seen = new Set<string>()
+    return sponsorships
+      .filter(s => {
+        if (seen.has(s.sponsor_name)) return false
+        seen.add(s.sponsor_name)
+        return true
+      })
+      .map(s => ({ sponsor_name: s.sponsor_name, sponsor_logo: s.sponsor_logo }))
+  }, [sponsorships])
 
   const [intervalSeconds, setIntervalSeconds] = useState<number | null>(null)
   const [fadeMs, setFadeMs] = useState<number | null>(null)
@@ -470,7 +486,7 @@ export default function DisplayAdminPage() {
       )}
 
       {winnerImageSource && (
-        <WinnerImageModal source={winnerImageSource} onClose={() => setWinnerImageSource(null)} />
+        <WinnerImageModal source={winnerImageSource} existingSponsors={existingSponsorLogos} onClose={() => setWinnerImageSource(null)} />
       )}
     </div>
   )

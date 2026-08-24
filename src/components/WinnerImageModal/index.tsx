@@ -13,6 +13,11 @@ interface Candidate {
   total_points: number
 }
 
+export interface ExistingSponsor {
+  sponsor_name: string
+  sponsor_logo: string
+}
+
 // Fuente de datos de la imagen — 'sponsor' es el flujo original (patrocinio
 // real, ya terminado); 'generic' es nuevo (2026-08-24): periodo calendario
 // SIN patrocinio, desde un card genérico de Ganadores. Los candidatos ya
@@ -25,6 +30,10 @@ export type WinnerImageSource =
 interface Props {
   source: WinnerImageSource
   onClose: () => void
+  // Solo se usa en modo 'generic' — logos de patrocinadores YA existentes en
+  // el sistema (de sponsorships reales, pasados/vigentes) para elegir uno y
+  // ponerlo como crédito abajo, sin tener que subir una foto nueva.
+  existingSponsors?: ExistingSponsor[]
 }
 
 const PERIOD_HEADLINE: Record<SponsorPeriod, string> = {
@@ -44,7 +53,7 @@ function fmtDayMonth(iso: string): string {
 // lista antes de descargar, sin tocar el ganador oficial del sistema, ver
 // AskUserQuestion respondida en la sesión original: el alcance es solo la
 // imagen.
-export default function WinnerImageModal({ source, onClose }: Props) {
+export default function WinnerImageModal({ source, onClose, existingSponsors = [] }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const [candidates, setCandidates] = useState<Candidate[] | null>(source.kind === 'generic' ? source.candidates : null)
   const [excluded, setExcluded] = useState<Set<string>>(new Set())
@@ -54,7 +63,7 @@ export default function WinnerImageModal({ source, onClose }: Props) {
   // Solo el modo 'generic' expone estos campos — en modo 'sponsor' ya
   // vienen del patrocinio real y no son editables en esta pasada.
   const [prizeText, setPrizeText] = useState('')
-  const [sponsorName, setSponsorName] = useState('')
+  const [selectedSponsor, setSelectedSponsor] = useState<ExistingSponsor | null>(null)
 
   useEffect(() => {
     if (source.kind !== 'sponsor') return
@@ -93,7 +102,7 @@ export default function WinnerImageModal({ source, onClose }: Props) {
     setRendering(true)
     ;(async () => {
       try {
-        const sponsorLogoSrc = source.kind === 'sponsor' ? source.sponsorship.sponsor_logo : null
+        const sponsorLogoSrc = source.kind === 'sponsor' ? source.sponsorship.sponsor_logo : (selectedSponsor?.sponsor_logo ?? null)
         const [gymLogo, sponsorLogo] = await Promise.all([
           loadImage(gymLogoSrc),
           sponsorLogoSrc ? loadImage(sponsorLogoSrc).catch(() => null) : Promise.resolve(null),
@@ -102,8 +111,12 @@ export default function WinnerImageModal({ source, onClose }: Props) {
         await drawWinnerImage(canvasRef.current, gymLogo, sponsorLogo, {
           periodLabel,
           dateRangeLabel,
-          sponsorName: source.kind === 'sponsor' ? source.sponsorship.sponsor_name : (sponsorName.trim() || undefined),
+          sponsorName: source.kind === 'sponsor' ? source.sponsorship.sponsor_name : selectedSponsor?.sponsor_name,
           prizeText: source.kind === 'sponsor' ? source.sponsorship.prize_text : (prizeText.trim() || undefined),
+          // Modo sponsor: card grande arriba, como siempre. Modo generic:
+          // crédito chico pegado al pie — el usuario pidió explícito que el
+          // logo elegido "vaya hasta abajo".
+          sponsorPosition: source.kind === 'sponsor' ? 'top' : 'bottom',
           top3,
         })
       } catch {
@@ -117,7 +130,7 @@ export default function WinnerImageModal({ source, onClose }: Props) {
     // top3 de candidates+excluded — meter source entero en deps dispararía
     // renders de más por la referencia nueva del objeto en cada render del padre.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [candidates, excluded, prizeText, sponsorName, source.kind === 'sponsor' ? source.sponsorship.id : `${source.rule}-${source.periodStart}`])
+  }, [candidates, excluded, prizeText, selectedSponsor, source.kind === 'sponsor' ? source.sponsorship.id : `${source.rule}-${source.periodStart}`])
 
   function toggleExclude(name: string) {
     setExcluded(prev => {
@@ -168,17 +181,36 @@ export default function WinnerImageModal({ source, onClose }: Props) {
           {source.kind === 'generic' && (
             <div className="mb-5 flex flex-col gap-3">
               <p className="text-zinc-500 text-xs font-semibold">
-                Este periodo no tuvo patrocinio — opcional, déjalo vacío para un post limpio de solo top 3.
+                Este periodo no tuvo patrocinio — todo opcional, déjalo vacío para un post limpio de solo top 3.
               </p>
               <div>
-                <label className="text-zinc-500 text-[11px] font-semibold mb-1 block">Patrocinador (opcional)</label>
-                <input
-                  type="text"
-                  value={sponsorName}
-                  onChange={e => setSponsorName(e.target.value)}
-                  placeholder="ej. Hamburguesa Clásica"
-                  className="w-full bg-fondo border border-zinc-800/80 rounded-xl px-3 py-2 text-texto-principal text-sm placeholder:text-zinc-600 focus:outline-none focus:border-primario/60"
-                />
+                <label className="text-zinc-500 text-[11px] font-semibold mb-1.5 block">Logo de patrocinador (opcional) — va hasta abajo</label>
+                {existingSponsors.length === 0 ? (
+                  <p className="text-zinc-600 text-xs">Todavía no hay patrocinadores registrados en el sistema.</p>
+                ) : (
+                  <div className="flex gap-2 overflow-x-auto pb-1">
+                    <button
+                      onClick={() => setSelectedSponsor(null)}
+                      className={`shrink-0 w-16 h-16 rounded-xl flex items-center justify-center text-[10px] font-bold uppercase transition-all border-2 ${
+                        selectedSponsor === null ? 'border-primario text-primario bg-primario/10' : 'border-zinc-700/60 text-zinc-500 bg-fondo hover:border-zinc-600'
+                      }`}
+                    >
+                      Ninguno
+                    </button>
+                    {existingSponsors.map(s => (
+                      <button
+                        key={s.sponsor_name}
+                        onClick={() => setSelectedSponsor(s)}
+                        title={s.sponsor_name}
+                        className={`shrink-0 w-16 h-16 rounded-xl bg-white flex items-center justify-center p-1.5 overflow-hidden transition-all border-2 ${
+                          selectedSponsor?.sponsor_name === s.sponsor_name ? 'border-primario' : 'border-transparent opacity-70 hover:opacity-100'
+                        }`}
+                      >
+                        <img src={s.sponsor_logo} alt={s.sponsor_name} className="max-w-full max-h-full object-contain" />
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
               <div>
                 <label className="text-zinc-500 text-[11px] font-semibold mb-1 block">Premio (opcional)</label>

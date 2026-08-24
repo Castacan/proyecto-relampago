@@ -24,10 +24,16 @@ export interface WinnerImageData {
   periodLabel: string // "GANADOR DEL MES" / "GANADOR DE LA SEMANA"
   dateRangeLabel: string // ej. "17–23 de Agosto"
   // Ambos opcionales (2026-08-24, periodos SIN patrocinio en Ganadores):
-  // vacíos/undefined → se omiten por completo la sección "PATROCINA" y la
+  // vacíos/undefined → se omiten por completo la sección de patrocinador y la
   // línea "se lleva: X" bajo el #1, queda un post limpio de solo top 3.
   sponsorName?: string
   prizeText?: string
+  // 'top' (default): card grande justo debajo del encabezado, como siempre
+  // (patrocinio real ligado al periodo). 'bottom' (2026-08-24, Ganadores sin
+  // patrocinio: el staff elige el logo de un patrocinador YA existente en
+  // el sistema, no sube uno nuevo) — crédito chico pegado al pie, arriba
+  // del footer "@jaibamuro", para no competir visualmente con el ganador.
+  sponsorPosition?: 'top' | 'bottom'
   top3: WinnerImageEntry[] // ya filtrado (sin excluidos), máx 3, top3[0] es el #1
 }
 
@@ -127,9 +133,9 @@ export async function drawWinnerImage(
 
   ctx.textAlign = 'center'
 
-  // --- Logo del gym ---
+  // --- Logo del gym (agrandado 2026-08-24, antes 420×200) ---
   let y = 130
-  const logoDims = drawImageContain(ctx, gymLogo, CX, y + 90, 420, 200)
+  const logoDims = drawImageContain(ctx, gymLogo, CX, y + 110, 520, 260)
   y += logoDims.h + 70
 
   // --- Encabezado "GANADOR DEL MES/SEMANA" ---
@@ -143,8 +149,9 @@ export async function drawWinnerImage(
   ctx.fillText(data.dateRangeLabel, CX, y)
   y += 90
 
-  // --- Patrocinador (omitido por completo si no hay sponsorName) ---
-  if (data.sponsorName) {
+  // --- Patrocinador arriba (omitido si no hay sponsorName, o si va abajo) ---
+  const sponsorPosition = data.sponsorPosition ?? 'top'
+  if (data.sponsorName && sponsorPosition === 'top') {
     ctx.fillStyle = COLOR_TEXTO_SECUNDARIO
     ctx.font = '700 28px Inter'
     ctx.fillText('PATROCINA', CX, y)
@@ -230,8 +237,33 @@ export async function drawWinnerImage(
     y += rowH + 24
   }
 
-  // --- Footer ---
+  // --- Patrocinador abajo (crédito chico, 2026-08-24) — anclado a una
+  // posición fija cerca del pie en vez de fluir con `y`, para que quede
+  // igual sin importar cuánto contenido haya arriba (top3 completo o no,
+  // premio o no). Con el layout actual (header + card #1 + hasta 2 filas)
+  // sobra ~200px de aire antes de aquí, no debería solaparse.
   const footerY = WINNER_IMAGE_HEIGHT - 90
+  if (data.sponsorName && sponsorPosition === 'bottom') {
+    const creditY = footerY - 210
+    ctx.fillStyle = COLOR_TEXTO_SECUNDARIO
+    ctx.font = '700 26px Inter'
+    ctx.fillText('PATROCINA', CX, creditY)
+
+    if (sponsorLogo) {
+      const cardW = 200, cardH = 110
+      const cardY = creditY + 24
+      ctx.fillStyle = '#ffffff'
+      roundRect(ctx, CX - cardW / 2, cardY, cardW, cardH, 20)
+      ctx.fill()
+      drawImageContain(ctx, sponsorLogo, CX, cardY + cardH / 2, cardW - 36, cardH - 36)
+    } else {
+      ctx.fillStyle = COLOR_TEXTO_PRINCIPAL
+      ctx.font = '800 32px Inter'
+      ctx.fillText(data.sponsorName, CX, creditY + 50)
+    }
+  }
+
+  // --- Footer ---
   ctx.strokeStyle = 'rgba(244,244,243,0.15)'
   ctx.lineWidth = 2
   ctx.beginPath()
