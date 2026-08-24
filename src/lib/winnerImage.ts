@@ -23,8 +23,11 @@ export interface WinnerImageEntry {
 export interface WinnerImageData {
   periodLabel: string // "GANADOR DEL MES" / "GANADOR DE LA SEMANA"
   dateRangeLabel: string // ej. "17–23 de Agosto"
-  sponsorName: string
-  prizeText: string
+  // Ambos opcionales (2026-08-24, periodos SIN patrocinio en Ganadores):
+  // vacíos/undefined → se omiten por completo la sección "PATROCINA" y la
+  // línea "se lleva: X" bajo el #1, queda un post limpio de solo top 3.
+  sponsorName?: string
+  prizeText?: string
   top3: WinnerImageEntry[] // ya filtrado (sin excluidos), máx 3, top3[0] es el #1
 }
 
@@ -140,25 +143,29 @@ export async function drawWinnerImage(
   ctx.fillText(data.dateRangeLabel, CX, y)
   y += 90
 
-  // --- Patrocinador ---
-  ctx.fillStyle = COLOR_TEXTO_SECUNDARIO
-  ctx.font = '700 28px Inter'
-  ctx.fillText('PATROCINA', CX, y)
-  y += 40
+  // --- Patrocinador (omitido por completo si no hay sponsorName) ---
+  if (data.sponsorName) {
+    ctx.fillStyle = COLOR_TEXTO_SECUNDARIO
+    ctx.font = '700 28px Inter'
+    ctx.fillText('PATROCINA', CX, y)
+    y += 40
 
-  if (sponsorLogo) {
-    const cardW = 340, cardH = 190
-    ctx.fillStyle = '#ffffff'
-    roundRect(ctx, CX - cardW / 2, y, cardW, cardH, 28)
-    ctx.fill()
-    drawImageContain(ctx, sponsorLogo, CX, y + cardH / 2, cardW - 60, cardH - 60)
-    y += cardH + 44
+    if (sponsorLogo) {
+      const cardW = 340, cardH = 190
+      ctx.fillStyle = '#ffffff'
+      roundRect(ctx, CX - cardW / 2, y, cardW, cardH, 28)
+      ctx.fill()
+      drawImageContain(ctx, sponsorLogo, CX, y + cardH / 2, cardW - 60, cardH - 60)
+      y += cardH + 44
+    }
+
+    ctx.fillStyle = COLOR_TEXTO_PRINCIPAL
+    ctx.font = '800 44px Inter'
+    ctx.fillText(data.sponsorName, CX, y)
+    y += 80
+  } else {
+    y += 30 // aire antes del card del #1, si no, queda muy pegado al rango de fechas
   }
-
-  ctx.fillStyle = COLOR_TEXTO_PRINCIPAL
-  ctx.font = '800 44px Inter'
-  ctx.fillText(data.sponsorName, CX, y)
-  y += 80
 
   // --- Card grande del #1 ---
   const winner = data.top3[0]
@@ -181,14 +188,16 @@ export async function drawWinnerImage(
     ctx.fillStyle = COLOR_TEXTO_PRINCIPAL
     const nameSize = fitFontSize(ctx, winner.display_name, CONTENT_W - 100, 76, 40, '900')
     ctx.font = `900 ${nameSize}px Inter`
-    ctx.fillText(winner.display_name, CX, innerY)
+    ctx.fillText(winner.display_name, CX, data.prizeText ? innerY : innerY + 20)
     innerY += 80
 
-    const prizeLine = `se lleva: ${data.prizeText}`
-    ctx.fillStyle = COLOR_PRIMARIO
-    const prizeSize = fitFontSize(ctx, prizeLine, CONTENT_W - 100, 40, 24, '700')
-    ctx.font = `700 ${prizeSize}px Inter`
-    ctx.fillText(prizeLine, CX, innerY)
+    if (data.prizeText) {
+      const prizeLine = `se lleva: ${data.prizeText}`
+      ctx.fillStyle = COLOR_PRIMARIO
+      const prizeSize = fitFontSize(ctx, prizeLine, CONTENT_W - 100, 40, 24, '700')
+      ctx.font = `700 ${prizeSize}px Inter`
+      ctx.fillText(prizeLine, CX, innerY)
+    }
 
     y += cardH + 50
   }

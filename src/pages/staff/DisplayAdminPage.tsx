@@ -12,6 +12,7 @@ import SponsorForm from '../../components/SponsorForm'
 import SlideForm from '../../components/SlideForm'
 import SlidePreviewModal from '../../components/SlidePreviewModal'
 import WinnerImageModal from '../../components/WinnerImageModal'
+import type { WinnerImageSource } from '../../components/WinnerImageModal'
 import Toggle from '../../components/Toggle'
 import type { Sponsorship, DisplaySlide, SponsorPeriod } from '../../types'
 
@@ -66,7 +67,7 @@ export default function DisplayAdminPage() {
   const [slideForm, setSlideForm] = useState<{ open: boolean; initial?: DisplaySlide }>({ open: false })
   const [previewSlide, setPreviewSlide] = useState<DisplaySlide | null>(null)
   const [winnerFilter, setWinnerFilter] = useState<'todos' | SponsorPeriod>('todos')
-  const [winnerImageSponsorship, setWinnerImageSponsorship] = useState<Sponsorship | null>(null)
+  const [winnerImageSource, setWinnerImageSource] = useState<WinnerImageSource | null>(null)
 
   const [intervalSeconds, setIntervalSeconds] = useState<number | null>(null)
   const [fadeMs, setFadeMs] = useState<number | null>(null)
@@ -282,7 +283,7 @@ export default function DisplayAdminPage() {
                                 queda fuera para no llenar la pantalla de botones */}
                             {s.winner_rule !== 'top_1_daily' && (
                               <button
-                                onClick={() => setWinnerImageSponsorship(s)}
+                                onClick={() => setWinnerImageSource({ kind: 'sponsor', sponsorship: s })}
                                 className="w-full mt-1 py-2.5 rounded-xl bg-superficie-alta hover:bg-superficie-alta-hover text-texto-principal font-semibold text-xs transition-all"
                               >
                                 📸 Crear imagen
@@ -317,6 +318,20 @@ export default function DisplayAdminPage() {
                             </div>
                           ))}
                         </div>
+                        {/* Nunca es 'top_1_daily' — genericWeekly/genericMonthly son las
+                            únicas fuentes de cards genéricos, ver más arriba */}
+                        <button
+                          onClick={() => setWinnerImageSource({
+                            kind: 'generic',
+                            rule: card.rule,
+                            periodStart: card.periodStart,
+                            periodEnd: card.periodEnd,
+                            candidates: card.winners,
+                          })}
+                          className="w-full mt-3 py-2.5 rounded-xl bg-superficie-alta hover:bg-superficie-alta-hover text-texto-principal font-semibold text-xs transition-all"
+                        >
+                          📸 Crear imagen
+                        </button>
                       </div>
                     )
                   })}
@@ -454,8 +469,8 @@ export default function DisplayAdminPage() {
         <SlidePreviewModal slide={previewSlide} onClose={() => setPreviewSlide(null)} />
       )}
 
-      {winnerImageSponsorship && (
-        <WinnerImageModal sponsorship={winnerImageSponsorship} onClose={() => setWinnerImageSponsorship(null)} />
+      {winnerImageSource && (
+        <WinnerImageModal source={winnerImageSource} onClose={() => setWinnerImageSource(null)} />
       )}
     </div>
   )

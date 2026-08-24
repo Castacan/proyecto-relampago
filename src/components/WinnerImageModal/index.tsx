@@ -1,21 +1,30 @@
 import { useEffect, useRef, useState } from 'react'
 import { supabase } from '../../lib/supabase'
 import { drawWinnerImage, loadImage, downloadCanvasAsPng } from '../../lib/winnerImage'
-import { MONTHS_ES } from '../../lib/dates'
+import { MONTHS_ES, fmtDayMonthOnly } from '../../lib/dates'
 import gymLogoSrc from '../../assets/logo-vertical.png'
 import type { Sponsorship, SponsorPeriod } from '../../types'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const db = supabase as unknown as any
 
-interface Props {
-  sponsorship: Sponsorship
-  onClose: () => void
-}
-
 interface Candidate {
   display_name: string
   total_points: number
+}
+
+// Fuente de datos de la imagen — 'sponsor' es el flujo original (patrocinio
+// real, ya terminado); 'generic' es nuevo (2026-08-24): periodo calendario
+// SIN patrocinio, desde un card genérico de Ganadores. Los candidatos ya
+// vienen resueltos (top 5 de get_weekly/monthly_winners_history) — no hace
+// falta pedirlos de nuevo vía get_leaderboard_for_range.
+export type WinnerImageSource =
+  | { kind: 'sponsor'; sponsorship: Sponsorship }
+  | { kind: 'generic'; rule: 'top_1_weekly' | 'top_1_monthly'; periodStart: string; periodEnd: string; candidates: Candidate[] }
+
+interface Props {
+  source: WinnerImageSource
+  onClose: () => void
 }
 
 const PERIOD_HEADLINE: Record<SponsorPeriod, string> = {
@@ -29,19 +38,27 @@ function fmtDayMonth(iso: string): string {
   return `${d.getDate()} de ${MONTHS_ES[d.getMonth()]}`
 }
 
-// Genera la imagen vertical para anunciar al ganador (2026-08-23). Trae el
-// top N real de ese periodo vía get_leaderboard_for_range (no el
-// winner_user_id ya guardado — el staff puede QUITAR gente de la lista
-// antes de descargar, sin tocar el ganador oficial del sistema, ver
-// AskUserQuestion respondida en esta sesión: el alcance es solo la imagen).
-export default function WinnerImageModal({ sponsorship, onClose }: Props) {
+// Genera la imagen vertical para anunciar al ganador (2026-08-23, generalizada
+// 2026-08-24 para periodos sin patrocinio). Trae el top N real del periodo
+// (no el winner_user_id ya guardado) — el staff puede QUITAR gente de la
+// lista antes de descargar, sin tocar el ganador oficial del sistema, ver
+// AskUserQuestion respondida en la sesión original: el alcance es solo la
+// imagen.
+export default function WinnerImageModal({ source, onClose }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
-  const [candidates, setCandidates] = useState<Candidate[] | null>(null)
+  const [candidates, setCandidates] = useState<Candidate[] | null>(source.kind === 'generic' ? source.candidates : null)
   const [excluded, setExcluded] = useState<Set<string>>(new Set())
   const [rendering, setRendering] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
+  // Solo el modo 'generic' expone estos campos — en modo 'sponsor' ya
+  // vienen del patrocinio real y no son editables en esta pasada.
+  const [prizeText, setPrizeText] = useState('')
+  const [sponsorName, setSponsorName] = useState('')
+
   useEffect(() => {
+    if (source.kind !== 'sponsor') return
+    const sponsorship = source.sponsorship
     let cancelled = false
     ;(async () => {
       const { data, error: err } = await db.rpc('get_leaderboard_for_range', {
@@ -60,9 +77,15 @@ export default function WinnerImageModal({ sponsorship, onClose }: Props) {
       setCandidates(data ?? [])
     })()
     return () => { cancelled = true }
-  }, [sponsorship.id, sponsorship.starts_at, sponsorship.ends_at, sponsorship.winner_rule])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [source.kind === 'sponsor' ? source.sponsorship.id : null])
 
   const top3 = (candidates ?? []).filter(c => !excluded.has(c.display_name)).slice(0, 3)
+
+  const periodLabel = source.kind === 'sponsor' ? PERIOD_HEADLINE[source.sponsorship.winner_rule] : PERIOD_HEADLINE[source.rule]
+  const dateRangeLabel = source.kind === 'sponsor'
+    ? `${fmtDayMonth(source.sponsorship.starts_at)} a ${fmtDayMonth(source.sponsorship.ends_at)}`
+    : `${fmtDayMonthOnly(source.periodStart)} a ${fmtDayMonthOnly(source.periodEnd)}`
 
   useEffect(() => {
     if (!candidates || !canvasRef.current) return
@@ -70,16 +93,17 @@ export default function WinnerImageModal({ sponsorship, onClose }: Props) {
     setRendering(true)
     ;(async () => {
       try {
+        const sponsorLogoSrc = source.kind === 'sponsor' ? source.sponsorship.sponsor_logo : null
         const [gymLogo, sponsorLogo] = await Promise.all([
           loadImage(gymLogoSrc),
-          sponsorship.sponsor_logo ? loadImage(sponsorship.sponsor_logo).catch(() => null) : Promise.resolve(null),
+          sponsorLogoSrc ? loadImage(sponsorLogoSrc).catch(() => null) : Promise.resolve(null),
         ])
         if (cancelled || !canvasRef.current) return
         await drawWinnerImage(canvasRef.current, gymLogo, sponsorLogo, {
-          periodLabel: PERIOD_HEADLINE[sponsorship.winner_rule],
-          dateRangeLabel: `${fmtDayMonth(sponsorship.starts_at)} a ${fmtDayMonth(sponsorship.ends_at)}`,
-          sponsorName: sponsorship.sponsor_name,
-          prizeText: sponsorship.prize_text,
+          periodLabel,
+          dateRangeLabel,
+          sponsorName: source.kind === 'sponsor' ? source.sponsorship.sponsor_name : (sponsorName.trim() || undefined),
+          prizeText: source.kind === 'sponsor' ? source.sponsorship.prize_text : (prizeText.trim() || undefined),
           top3,
         })
       } catch {
@@ -89,11 +113,11 @@ export default function WinnerImageModal({ sponsorship, onClose }: Props) {
       }
     })()
     return () => { cancelled = true }
-    // top3 se deriva de candidates+excluded, sponsorship trae los textos —
-    // meter top3/sponsorship enteros en deps sería redundante con lo de
-    // arriba y dispara renders de más por la referencia nueva del array.
+    // periodLabel/dateRangeLabel se derivan de source (estable por id/kind),
+    // top3 de candidates+excluded — meter source entero en deps dispararía
+    // renders de más por la referencia nueva del objeto en cada render del padre.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [candidates, excluded, sponsorship.id])
+  }, [candidates, excluded, prizeText, sponsorName, source.kind === 'sponsor' ? source.sponsorship.id : `${source.rule}-${source.periodStart}`])
 
   function toggleExclude(name: string) {
     setExcluded(prev => {
@@ -106,8 +130,13 @@ export default function WinnerImageModal({ sponsorship, onClose }: Props) {
 
   function handleDownload() {
     if (!canvasRef.current) return
-    const safeName = sponsorship.sponsor_name.replace(/[^a-z0-9]+/gi, '-').toLowerCase()
-    downloadCanvasAsPng(canvasRef.current, `ganador-${safeName}-${sponsorship.ends_at.slice(0, 10)}.png`)
+    if (source.kind === 'sponsor') {
+      const safeName = source.sponsorship.sponsor_name.replace(/[^a-z0-9]+/gi, '-').toLowerCase()
+      downloadCanvasAsPng(canvasRef.current, `ganador-${safeName}-${source.sponsorship.ends_at.slice(0, 10)}.png`)
+    } else {
+      const periodSlug = source.rule === 'top_1_weekly' ? 'semana' : 'mes'
+      downloadCanvasAsPng(canvasRef.current, `ganador-${periodSlug}-${source.periodEnd}.png`)
+    }
   }
 
   const canDownload = candidates !== null && candidates.length > 0 && top3.length > 0 && !rendering
@@ -135,6 +164,34 @@ export default function WinnerImageModal({ sponsorship, onClose }: Props) {
           </div>
 
           {error && <p className="text-red-400 text-xs text-center mb-4">{error}</p>}
+
+          {source.kind === 'generic' && (
+            <div className="mb-5 flex flex-col gap-3">
+              <p className="text-zinc-500 text-xs font-semibold">
+                Este periodo no tuvo patrocinio — opcional, déjalo vacío para un post limpio de solo top 3.
+              </p>
+              <div>
+                <label className="text-zinc-500 text-[11px] font-semibold mb-1 block">Patrocinador (opcional)</label>
+                <input
+                  type="text"
+                  value={sponsorName}
+                  onChange={e => setSponsorName(e.target.value)}
+                  placeholder="ej. Hamburguesa Clásica"
+                  className="w-full bg-fondo border border-zinc-800/80 rounded-xl px-3 py-2 text-texto-principal text-sm placeholder:text-zinc-600 focus:outline-none focus:border-primario/60"
+                />
+              </div>
+              <div>
+                <label className="text-zinc-500 text-[11px] font-semibold mb-1 block">Premio (opcional)</label>
+                <input
+                  type="text"
+                  value={prizeText}
+                  onChange={e => setPrizeText(e.target.value)}
+                  placeholder="ej. Playera Jaibamuro"
+                  className="w-full bg-fondo border border-zinc-800/80 rounded-xl px-3 py-2 text-texto-principal text-sm placeholder:text-zinc-600 focus:outline-none focus:border-primario/60"
+                />
+              </div>
+            </div>
+          )}
 
           {candidates !== null && candidates.length === 0 && (
             <p className="text-zinc-600 text-sm text-center mb-4">Nadie mandó rutas durante este periodo — no hay datos para la imagen.</p>

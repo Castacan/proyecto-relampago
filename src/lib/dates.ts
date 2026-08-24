@@ -19,3 +19,12 @@ export function fmtMonthOnly(dateStr: string): string {
   const [y, m] = dateStr.split('-').map(Number)
   return `${MONTHS_ES[m - 1]} ${y}`
 }
+
+// Igual que fmtDateOnly pero sin año — para el rango de fechas dentro de
+// la imagen de ganador (WinnerImageModal), mismo estilo que fmtDayMonth
+// ahí (que sí opera sobre TIMESTAMPTZ vía Date()), pero a partir de un
+// DATE puro sin pasar por Date().
+export function fmtDayMonthOnly(dateStr: string): string {
+  const [, m, d] = dateStr.split('-').map(Number)
+  return `${d} de ${MONTHS_ES[m - 1]}`
+}
