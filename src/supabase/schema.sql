@@ -838,6 +838,38 @@ GRANT EXECUTE ON FUNCTION public.get_recent_sends(TEXT, INT) TO authenticated;
 -- siguen mostrando a todos los visible_in_leaderboard=true).
 ALTER TABLE public.climbers ADD COLUMN IF NOT EXISTS eligible_for_prizes BOOLEAN NOT NULL DEFAULT true;
 
+-- ============================================================
+-- leaderboard_refresh_ping (2026-08-24): fix del bug "excluir a alguien
+-- no actualiza la TV en vivo, pero reincluir sí".
+--
+-- Causa raíz confirmada en vivo con el navegador: climbers tiene RLS con
+-- una policy de lectura del estilo USING (visible_in_leaderboard = true)
+-- (no documentada aquí, configurada desde el dashboard — mismo caso que
+-- otras policies de este archivo — necesaria para que la API pública NO
+-- exponga el email de gente que se ocultó). Realtime evalúa esa policy
+-- SOBRE LA FILA NUEVA de cada UPDATE antes de emitir el evento:
+--   visible=true → false (excluir): la fila nueva NO pasa la policy →
+--     Postgres Changes nunca entrega el evento → la TV se queda con el
+--     dato viejo hasta recargar.
+--   visible=false → true (reincluir): la fila nueva SÍ pasa la policy →
+--     el evento se entrega normal → la TV se actualiza sola.
+-- Ensanchar la policy de climbers filtraría emails de todo mundo por la
+-- API pública — no es opción. En vez de eso: una tabla puente sin nada
+-- sensible (ni PII, ni email), de lectura 100% pública, que solo sirve
+-- de "campanita" — set_climber_visibility/set_climber_prize_eligibility
+-- la tocan después de cada cambio, y useLeaderboard escucha ESTA tabla
+-- en vez de climbers directamente.
+-- ============================================================
+CREATE TABLE IF NOT EXISTS public.leaderboard_refresh_ping (
+  id         BOOLEAN PRIMARY KEY DEFAULT true CHECK (id = true), -- singleton, 1 sola fila
+  pinged_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+INSERT INTO public.leaderboard_refresh_ping (id) VALUES (true) ON CONFLICT (id) DO NOTHING;
+
+ALTER TABLE public.leaderboard_refresh_ping ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "leaderboard_refresh_ping_read_public" ON public.leaderboard_refresh_ping;
+CREATE POLICY "leaderboard_refresh_ping_read_public" ON public.leaderboard_refresh_ping FOR SELECT USING (true);
+
 CREATE OR REPLACE FUNCTION public.set_climber_prize_eligibility(p_climber_id UUID, p_eligible BOOLEAN)
 RETURNS JSONB
 LANGUAGE plpgsql
@@ -855,6 +887,8 @@ BEGIN
   IF NOT FOUND THEN
     RETURN '{"error":"not_found"}'::JSONB;
   END IF;
+
+  UPDATE public.leaderboard_refresh_ping SET pinged_at = NOW() WHERE id = true;
 
   RETURN '{"success":true}'::JSONB;
 END;
@@ -889,6 +923,8 @@ BEGIN
   IF NOT FOUND THEN
     RETURN '{"error":"not_found"}'::JSONB;
   END IF;
+
+  UPDATE public.leaderboard_refresh_ping SET pinged_at = NOW() WHERE id = true;
 
   RETURN '{"success":true}'::JSONB;
 END;

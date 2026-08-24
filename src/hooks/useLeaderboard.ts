@@ -30,11 +30,16 @@ export function useLeaderboard() {
   useEffect(() => {
     fetchAll()
 
-    // Escucha sends (nuevos envíos) Y climbers (2026-08-24: excluir/reincluir
-    // a alguien desde /staff/sends — visible_in_leaderboard/eligible_for_prizes
-    // — no toca sends, así que sin esto la TV se queda con datos viejos hasta
-    // recargar). Solo UPDATE en climbers porque INSERT/DELETE de climbers no
-    // cambia el ranking (nuevo climber sin sends no aparece de todos modos).
+    // Escucha sends (nuevos envíos) Y leaderboard_refresh_ping (2026-08-24:
+    // excluir/reincluir a alguien desde /staff/sends no toca sends, así que
+    // sin esto la TV se queda con datos viejos hasta recargar). NO escucha
+    // climbers directo — probado en vivo que Realtime evalúa la policy RLS
+    // de climbers sobre la fila NUEVA de cada UPDATE, así que excluir a
+    // alguien (visible=true→false) nunca pasaba la policy y el evento no
+    // llegaba, mientras que reincluir sí — asimetría confirmada con el
+    // navegador. leaderboard_refresh_ping es una tabla puente sin datos
+    // sensibles, 100% pública, que set_climber_visibility/
+    // set_climber_prize_eligibility tocan después de cada cambio real.
     const channel = supabase
       .channel('leaderboard-sends')
       .on(
@@ -44,7 +49,7 @@ export function useLeaderboard() {
       )
       .on(
         'postgres_changes',
-        { event: 'UPDATE', schema: 'public', table: 'climbers' },
+        { event: 'UPDATE', schema: 'public', table: 'leaderboard_refresh_ping' },
         () => { fetchAll() }
       )
       .subscribe((status) => {
