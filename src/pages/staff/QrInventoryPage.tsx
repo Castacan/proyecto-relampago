@@ -20,6 +20,8 @@ export default function QrInventoryPage() {
   const [filter, setFilter] = useState<'all' | 'available' | 'in_use'>('all')
   const [selectedQr, setSelectedQr] = useState<QrRow | null>(null)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [confirmingUnassign, setConfirmingUnassign] = useState(false)
+  const [unassigning, setUnassigning] = useState(false)
 
   useEffect(() => {
     supabase
@@ -49,6 +51,21 @@ export default function QrInventoryPage() {
       next.has(id) ? next.delete(id) : next.add(id)
       return next
     })
+  }
+
+  // Desasignar un QR de su ruta (2026-08-24) — lo libera para reusarse en
+  // otra ruta, sin tocar la ruta en sí (a diferencia de retirar una ruta,
+  // que además libera su QR desde RouteDetail). Mismo update que ahí:
+  // status vuelve a 'available' y route_id a null.
+  async function handleUnassign(qr: QrRow) {
+    setUnassigning(true)
+    const { error } = await supabase.from('qr_codes').update({ status: 'available', route_id: null }).eq('id', qr.id)
+    setUnassigning(false)
+    setConfirmingUnassign(false)
+    if (error) return
+    const updated: QrRow = { ...qr, status: 'available', routes: null }
+    setQrs(prev => prev.map(q => q.id === qr.id ? updated : q))
+    setSelectedQr(updated)
   }
 
   const toggleSelectAllFiltered = () => {
@@ -123,7 +140,7 @@ export default function QrInventoryPage() {
           {filtered.map(qr => (
             <button
               key={qr.id}
-              onClick={() => setSelectedQr(qr)}
+              onClick={() => { setSelectedQr(qr); setConfirmingUnassign(false) }}
               className={`relative p-4 rounded-2xl border text-left transition-all active:scale-95 ${
                 qr.status === 'available'
                   ? 'bg-superficie border-zinc-800/80 hover:border-zinc-700'
@@ -205,7 +222,37 @@ export default function QrInventoryPage() {
               {selectedQr.status === 'available' && (
                 <p className="text-green-400 text-xs font-medium mt-2">Disponible</p>
               )}
+              {selectedQr.status === 'in_use' && !selectedQr.routes && (
+                <p className="text-zinc-600 text-xs font-medium mt-2">Ruta retirada — este QR sigue marcado como en uso</p>
+              )}
             </div>
+
+            {selectedQr.status === 'in_use' && (
+              confirmingUnassign ? (
+                <div className="w-full flex gap-2.5">
+                  <button
+                    onClick={() => setConfirmingUnassign(false)}
+                    className="flex-1 bg-superficie-alta text-zinc-300 font-bold text-sm py-3 rounded-2xl hover:bg-superficie-alta-hover transition-all"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    onClick={() => handleUnassign(selectedQr)}
+                    disabled={unassigning}
+                    className="flex-1 bg-red-500 hover:bg-red-400 text-texto-principal font-bold text-sm py-3 rounded-2xl transition-all disabled:opacity-50"
+                  >
+                    {unassigning ? 'Desasignando...' : '¿Confirmar?'}
+                  </button>
+                </div>
+              ) : (
+                <button
+                  onClick={() => setConfirmingUnassign(true)}
+                  className="w-full bg-superficie-alta border border-dashed border-zinc-600 text-zinc-300 font-bold text-sm py-3 rounded-2xl hover:bg-superficie-alta-hover hover:border-zinc-500 hover:text-texto-principal transition-all"
+                >
+                  Desasignar QR
+                </button>
+              )
+            )}
 
             <button
               onClick={() => window.print()}

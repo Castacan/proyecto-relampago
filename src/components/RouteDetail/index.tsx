@@ -34,6 +34,8 @@ export default function RouteDetail({ route, zones, onClose, onUpdate, onRetire 
   const [sendCount, setSendCount] = useState(0)
   const [qrId, setQrId] = useState<string | null | undefined>(undefined)
   const [showScanner, setShowScanner] = useState(false)
+  const [confirmingUnassignQr, setConfirmingUnassignQr] = useState(false)
+  const [unassigningQr, setUnassigningQr] = useState(false)
 
   const days = getDaysOnWall(route.placed_at)
   const level = getFreshnessLevel(route.placed_at)
@@ -85,6 +87,18 @@ export default function RouteDetail({ route, zones, onClose, onUpdate, onRetire 
   function handleQrAssigned(id: string) {
     setQrId(id)
     setShowScanner(false)
+  }
+
+  // Desasignar el QR de esta ruta (2026-08-24) — lo libera para reusarse en
+  // otra, sin retirar la ruta (a diferencia de handleRetire, que hace lo
+  // mismo pero como efecto secundario de retirar). Mismo update que ahí.
+  async function handleUnassignQr() {
+    if (!qrId) return
+    setUnassigningQr(true)
+    await supabase.from('qr_codes').update({ status: 'available', route_id: null }).eq('id', qrId)
+    setUnassigningQr(false)
+    setConfirmingUnassignQr(false)
+    setQrId(null)
   }
 
   return (
@@ -197,10 +211,34 @@ export default function RouteDetail({ route, zones, onClose, onUpdate, onRetire 
                 Asignar QR
               </button>
             )}
-            {qrId && (
+            {qrId && !confirmingUnassignQr && (
               <div className="flex items-center gap-2 mb-3 px-3 py-2.5 bg-superficie-alta/60 rounded-xl border border-zinc-700/40">
                 <div className="w-2 h-2 rounded-full bg-green-400 shrink-0" />
-                <span className="text-zinc-400 text-xs font-mono truncate">{qrId}</span>
+                <span className="text-zinc-400 text-xs font-mono truncate flex-1">{qrId}</span>
+                <button
+                  onClick={() => setConfirmingUnassignQr(true)}
+                  className="shrink-0 text-zinc-500 hover:text-red-400 text-xs font-semibold px-2 py-1 rounded-lg hover:bg-superficie-alta-hover transition-all"
+                >
+                  Desasignar
+                </button>
+              </div>
+            )}
+            {qrId && confirmingUnassignQr && (
+              <div className="flex items-center gap-2.5 mb-3">
+                <span className="text-zinc-400 text-xs flex-1">¿Desasignar este QR de la ruta?</span>
+                <button
+                  onClick={() => setConfirmingUnassignQr(false)}
+                  className="shrink-0 text-zinc-500 hover:text-zinc-300 text-xs font-semibold px-3 py-1.5"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={handleUnassignQr}
+                  disabled={unassigningQr}
+                  className="shrink-0 bg-red-500 hover:bg-red-400 text-texto-principal text-xs font-bold px-3 py-1.5 rounded-lg transition-all disabled:opacity-50"
+                >
+                  {unassigningQr ? '...' : 'Confirmar'}
+                </button>
               </div>
             )}
 
