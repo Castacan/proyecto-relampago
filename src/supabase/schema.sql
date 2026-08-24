@@ -347,6 +347,7 @@ AS $function$
     FROM sends s JOIN climbers c ON c.id = s.user_id
     WHERE s.sent_at >= p_start AND s.sent_at <= p_end
       AND c.visible_in_leaderboard = true
+      AND c.eligible_for_prizes = true
       AND (NOT p_monthly OR s.points_monthly > 0)
     GROUP BY c.id, c.display_name ORDER BY 2 DESC LIMIT p_limit;
   $function$;
@@ -781,7 +782,8 @@ RETURNS TABLE (
   color TEXT,
   zone_name TEXT,
   route_number BIGINT,
-  visible_in_leaderboard BOOLEAN
+  visible_in_leaderboard BOOLEAN,
+  eligible_for_prizes BOOLEAN
 )
 LANGUAGE plpgsql
 SECURITY DEFINER
@@ -807,7 +809,8 @@ BEGIN
     r.color,
     z.name AS zone_name,
     r.route_number,
-    c.visible_in_leaderboard
+    c.visible_in_leaderboard,
+    c.eligible_for_prizes
   FROM sends s
   JOIN climbers c ON c.id = s.user_id
   JOIN routes r ON r.id = s.route_id
@@ -824,6 +827,40 @@ END;
 $function$;
 
 GRANT EXECUTE ON FUNCTION public.get_recent_sends(TEXT, INT) TO authenticated;
+
+-- Columna nueva: eligible_for_prizes (2026-08-24). Independiente de
+-- visible_in_leaderboard — un climber puede seguir apareciendo en el
+-- leaderboard de pantalla (TV/staff) con visible_in_leaderboard=true,
+-- pero no calificar para ganar premios/aparecer en Ganadores si esta
+-- columna es false. Filtrada por determine_sponsorship_winner,
+-- get_leaderboard_for_range y get_weekly/monthly_winners_history — NO
+-- por get_daily/weekly/monthly_leaderboard ni get_recent_events (esos
+-- siguen mostrando a todos los visible_in_leaderboard=true).
+ALTER TABLE public.climbers ADD COLUMN IF NOT EXISTS eligible_for_prizes BOOLEAN NOT NULL DEFAULT true;
+
+CREATE OR REPLACE FUNCTION public.set_climber_prize_eligibility(p_climber_id UUID, p_eligible BOOLEAN)
+RETURNS JSONB
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $function$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'admin'
+  ) THEN
+    RETURN '{"error":"not_authorized"}'::JSONB;
+  END IF;
+
+  UPDATE public.climbers SET eligible_for_prizes = p_eligible, updated_at = NOW() WHERE id = p_climber_id;
+
+  IF NOT FOUND THEN
+    RETURN '{"error":"not_found"}'::JSONB;
+  END IF;
+
+  RETURN '{"success":true}'::JSONB;
+END;
+$function$;
+
+GRANT EXECUTE ON FUNCTION public.set_climber_prize_eligibility(UUID, BOOLEAN) TO authenticated;
 
 -- set_climber_visibility (2026-08-24): permite a un admin excluir a un
 -- climber de todos los leaderboards (staff/mensual/semanal/diario/imagen
@@ -935,6 +972,9 @@ GRANT EXECUTE ON FUNCTION public.get_route_send_counts(UUID) TO authenticated;
 -- para rellenar con un card genérico los periodos que NO tuvieron
 -- patrocinio, dentro de la misma lista de Ganadores — no hay tabla
 -- aparte, se recalcula desde sends en cada llamada.
+-- Filtra también eligible_for_prizes (2026-08-24): alguien puede seguir
+-- visible en el leaderboard de pantalla pero no calificar para aparecer
+-- como ganador aquí — ver comentario junto a la columna.
 -- ============================================================
 
 DROP FUNCTION IF EXISTS public.get_weekly_winners_history(INT);
@@ -955,7 +995,7 @@ AS $function$
       SUM(s.points_daily) AS total_points
     FROM sends s
     JOIN climbers c ON c.id = s.user_id
-    WHERE c.visible_in_leaderboard = true
+    WHERE c.visible_in_leaderboard = true AND c.eligible_for_prizes = true
     GROUP BY 1, c.id, c.display_name
   ),
   ranked AS (
@@ -994,7 +1034,7 @@ AS $function$
       SUM(s.points_monthly) AS total_points
     FROM sends s
     JOIN climbers c ON c.id = s.user_id
-    WHERE c.visible_in_leaderboard = true AND s.points_monthly > 0
+    WHERE c.visible_in_leaderboard = true AND c.eligible_for_prizes = true AND s.points_monthly > 0
     GROUP BY 1, c.id, c.display_name
   ),
   ranked AS (
@@ -1113,6 +1153,9 @@ create policy "display_assets_write_admin" on storage.objects
 -- (el valor real de cada send, grado + bonus de ruta nueva del mismo día)
 -- en vez de points_monthly. 'top_1_monthly' conserva exactamente la lógica
 -- original (SUM(points_monthly), filtro > 0).
+-- Filtra también eligible_for_prizes (2026-08-24) — mismo criterio que
+-- get_leaderboard_for_range/get_weekly/monthly_winners_history: alguien
+-- puede seguir visible en pantalla pero no calificar para ganar premios.
 -- ============================================================
 CREATE OR REPLACE FUNCTION public.determine_sponsorship_winner()
 RETURNS JSONB
@@ -1137,6 +1180,7 @@ BEGIN
       WHERE s.sent_at >= v_sp.starts_at
         AND s.sent_at <= v_sp.ends_at
         AND c.visible_in_leaderboard = true
+        AND c.eligible_for_prizes = true
         AND s.points_monthly > 0
       GROUP BY s.user_id
       ORDER BY SUM(s.points_monthly) DESC, MAX(s.sent_at) ASC
@@ -1148,6 +1192,7 @@ BEGIN
       WHERE s.sent_at >= v_sp.starts_at
         AND s.sent_at <= v_sp.ends_at
         AND c.visible_in_leaderboard = true
+        AND c.eligible_for_prizes = true
       GROUP BY s.user_id
       ORDER BY SUM(s.points_daily) DESC, MAX(s.sent_at) ASC
       LIMIT 1;

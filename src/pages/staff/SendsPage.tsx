@@ -21,6 +21,7 @@ interface SendRow {
   zone_name: string | null
   route_number: number | null
   visible_in_leaderboard: boolean
+  eligible_for_prizes: boolean
 }
 
 export default function SendsPage() {
@@ -35,6 +36,7 @@ export default function SendsPage() {
   const [confirmingId, setConfirmingId] = useState<string | null>(null)
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [togglingClimberId, setTogglingClimberId] = useState<string | null>(null)
+  const [togglingPrizeId, setTogglingPrizeId] = useState<string | null>(null)
 
   useEffect(() => {
     const t = setTimeout(() => setDebouncedSearch(search.trim()), 300)
@@ -97,6 +99,22 @@ export default function SendsPage() {
     setSends(prev => prev.map(s => s.climber_id === climberId ? { ...s, visible_in_leaderboard: !currentlyVisible } : s))
   }
 
+  // Excluir/incluir a un climber SOLO de Ganadores (determine_sponsorship_winner,
+  // get_leaderboard_for_range, get_weekly/monthly_winners_history) sin tocar
+  // si aparece en el leaderboard de pantalla — para el caso de "sí que salga
+  // en pantalla, pero no que pueda ganar el premio". Columna independiente
+  // de visible_in_leaderboard, ver comentario en schema.sql.
+  const handleTogglePrizeEligibility = async (climberId: string, currentlyEligible: boolean) => {
+    setTogglingPrizeId(climberId)
+    const { data, error } = await db.rpc('set_climber_prize_eligibility', { p_climber_id: climberId, p_eligible: !currentlyEligible })
+    setTogglingPrizeId(null)
+    if (error || data?.error) {
+      setError('No se pudo cambiar la elegibilidad para Ganadores.')
+      return
+    }
+    setSends(prev => prev.map(s => s.climber_id === climberId ? { ...s, eligible_for_prizes: !currentlyEligible } : s))
+  }
+
   return (
     <div className="h-full overflow-y-auto bg-fondo px-4 pt-5 pb-10">
       <h1 className="text-texto-principal font-black text-2xl tracking-tight mb-1">Envíos</h1>
@@ -147,6 +165,9 @@ export default function SendsPage() {
                   {!s.visible_in_leaderboard && (
                     <span className="ml-1.5 text-[9px] font-bold uppercase text-alerta bg-alerta/10 px-1.5 py-0.5 rounded">Oculto</span>
                   )}
+                  {s.visible_in_leaderboard && !s.eligible_for_prizes && (
+                    <span className="ml-1.5 text-[9px] font-bold uppercase text-zinc-400 bg-superficie-alta px-1.5 py-0.5 rounded">Sin premio</span>
+                  )}
                 </div>
                 <div className="text-zinc-600 text-[10px] mt-0.5">
                   {new Date(s.sent_at).toLocaleString('es-MX', { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' })}
@@ -186,6 +207,14 @@ export default function SendsPage() {
                     className="text-zinc-500 hover:text-texto-principal text-[10px] font-semibold px-3 py-1 rounded-lg bg-superficie-alta/50 hover:bg-superficie-alta-hover border border-zinc-800/60 transition-all disabled:opacity-60"
                   >
                     {togglingClimberId === s.climber_id ? '...' : s.visible_in_leaderboard ? 'Excluir del leaderboard' : 'Reincluir'}
+                  </button>
+                  <button
+                    onClick={() => handleTogglePrizeEligibility(s.climber_id, s.eligible_for_prizes)}
+                    disabled={togglingPrizeId === s.climber_id}
+                    title="Sigue saliendo en pantalla, pero no califica para ganar premios ni aparecer en Ganadores"
+                    className="text-zinc-500 hover:text-texto-principal text-[10px] font-semibold px-3 py-1 rounded-lg bg-superficie-alta/50 hover:bg-superficie-alta-hover border border-zinc-800/60 transition-all disabled:opacity-60"
+                  >
+                    {togglingPrizeId === s.climber_id ? '...' : s.eligible_for_prizes ? 'Excluir de Ganadores' : 'Reincluir en Ganadores'}
                   </button>
                 </div>
               )}
