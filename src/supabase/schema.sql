@@ -886,25 +886,26 @@ GRANT EXECUTE ON FUNCTION public.get_route_send_counts(UUID) TO authenticated;
 
 -- ============================================================
 -- Historial de ganadores por semana/mes en /staff/display → Ganadores
--- (2026-08-24). Independiente de sponsorships por completo — antes
--- "Ganadores" solo mostraba patrocinios ya terminados (ends_at < now),
--- así que si el premio activo tenía una ventana larga (ej. 12 días en
--- vez de semana calendario) nunca se veía nada aunque sí hubiera
--- participantes. Esto calcula el top 1 real de cada semana/mes
--- calendario (lunes-domingo / día 1 a fin de mes, hora CDMX) directo
--- de sends, mismo criterio que get_weekly/monthly_leaderboard
--- (points_daily sin filtro para semana; points_monthly > 0 para mes).
--- Solo periodos YA TERMINADOS — el actual en curso ya se muestra aparte
--- vía get_weekly/monthly_leaderboard. Se "actualiza solo" cada semana/mes
--- porque no hay nada guardado: se recalcula desde sends en cada llamada.
+-- (2026-08-24, revisado el mismo día). Independiente de sponsorships:
+-- antes "Ganadores" solo mostraba patrocinios ya terminados
+-- (ends_at < now), así que si el premio activo tenía una ventana larga
+-- (ej. 12 días en vez de semana calendario) nunca se veía nada aunque
+-- sí hubiera participantes. Devuelve el TOP 5 (no solo el #1, revisión
+-- pedida por el usuario) de cada semana/mes calendario YA TERMINADO
+-- (lunes-domingo / día 1 a fin de mes, hora CDMX), directo de sends,
+-- mismo criterio que get_weekly/monthly_leaderboard (points_daily sin
+-- filtro para semana; points_monthly > 0 para mes). El front usa esto
+-- para rellenar con un card genérico los periodos que NO tuvieron
+-- patrocinio, dentro de la misma lista de Ganadores — no hay tabla
+-- aparte, se recalcula desde sends en cada llamada.
 -- ============================================================
 
-CREATE OR REPLACE FUNCTION public.get_weekly_winners_history(p_limit INT DEFAULT 8)
+DROP FUNCTION IF EXISTS public.get_weekly_winners_history(INT);
+CREATE OR REPLACE FUNCTION public.get_weekly_winners_history(p_limit INT DEFAULT 8, p_top_n INT DEFAULT 5)
 RETURNS TABLE (
   period_start DATE,
   period_end DATE,
-  display_name TEXT,
-  total_points BIGINT
+  winners JSONB
 )
 LANGUAGE sql
 SECURITY DEFINER
@@ -924,22 +925,26 @@ AS $function$
     SELECT weekly.*, ROW_NUMBER() OVER (PARTITION BY week_start ORDER BY total_points DESC) AS rn
     FROM weekly
   )
-  SELECT week_start, (week_start + interval '6 days')::date, display_name, total_points
+  SELECT
+    week_start,
+    (week_start + interval '6 days')::date,
+    jsonb_agg(jsonb_build_object('display_name', display_name, 'total_points', total_points) ORDER BY total_points DESC)
   FROM ranked
-  WHERE rn = 1
+  WHERE rn <= p_top_n
     AND week_start < date_trunc('week', now() AT TIME ZONE 'America/Mexico_City')::date
+  GROUP BY week_start
   ORDER BY week_start DESC
   LIMIT p_limit;
 $function$;
 
-GRANT EXECUTE ON FUNCTION public.get_weekly_winners_history(INT) TO anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.get_weekly_winners_history(INT, INT) TO anon, authenticated;
 
-CREATE OR REPLACE FUNCTION public.get_monthly_winners_history(p_limit INT DEFAULT 6)
+DROP FUNCTION IF EXISTS public.get_monthly_winners_history(INT);
+CREATE OR REPLACE FUNCTION public.get_monthly_winners_history(p_limit INT DEFAULT 6, p_top_n INT DEFAULT 5)
 RETURNS TABLE (
   period_start DATE,
   period_end DATE,
-  display_name TEXT,
-  total_points BIGINT
+  winners JSONB
 )
 LANGUAGE sql
 SECURITY DEFINER
@@ -959,15 +964,19 @@ AS $function$
     SELECT monthly.*, ROW_NUMBER() OVER (PARTITION BY month_start ORDER BY total_points DESC) AS rn
     FROM monthly
   )
-  SELECT month_start, (month_start + interval '1 month' - interval '1 day')::date, display_name, total_points
+  SELECT
+    month_start,
+    (month_start + interval '1 month' - interval '1 day')::date,
+    jsonb_agg(jsonb_build_object('display_name', display_name, 'total_points', total_points) ORDER BY total_points DESC)
   FROM ranked
-  WHERE rn = 1
+  WHERE rn <= p_top_n
     AND month_start < date_trunc('month', now() AT TIME ZONE 'America/Mexico_City')::date
+  GROUP BY month_start
   ORDER BY month_start DESC
   LIMIT p_limit;
 $function$;
 
-GRANT EXECUTE ON FUNCTION public.get_monthly_winners_history(INT) TO anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.get_monthly_winners_history(INT, INT) TO anon, authenticated;
 
 
 -- ============================================================

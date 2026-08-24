@@ -4,26 +4,30 @@ import { supabase } from '../lib/supabase'
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const db = supabase as unknown as any
 
-export interface WinnerHistoryEntry {
-  period_start: string
-  period_end: string
+export interface WinnerCandidate {
   display_name: string
   total_points: number
 }
 
-// Historial de ganadores por semana/mes calendario, independiente de
-// sponsorships — ver comentario en schema.sql junto a
-// get_weekly/monthly_winners_history. Solo periodos ya terminados.
+export interface WinnerHistoryPeriod {
+  period_start: string
+  period_end: string
+  winners: WinnerCandidate[]
+}
+
+// Top 5 real de cada semana/mes calendario YA TERMINADO, calculado
+// directo de sends — independiente de sponsorships. Ver comentario en
+// schema.sql junto a get_weekly/monthly_winners_history.
 export function useWinnersHistory() {
-  const [weekly, setWeekly] = useState<WinnerHistoryEntry[]>([])
-  const [monthly, setMonthly] = useState<WinnerHistoryEntry[]>([])
+  const [weekly, setWeekly] = useState<WinnerHistoryPeriod[]>([])
+  const [monthly, setMonthly] = useState<WinnerHistoryPeriod[]>([])
   const [loading, setLoading] = useState(true)
 
   const fetch = useCallback(async () => {
     setLoading(true)
     const [w, m] = await Promise.all([
-      db.rpc('get_weekly_winners_history', { p_limit: 8 }),
-      db.rpc('get_monthly_winners_history', { p_limit: 6 }),
+      db.rpc('get_weekly_winners_history', { p_limit: 8, p_top_n: 5 }),
+      db.rpc('get_monthly_winners_history', { p_limit: 6, p_top_n: 5 }),
     ])
     setWeekly(w.data ?? [])
     setMonthly(m.data ?? [])

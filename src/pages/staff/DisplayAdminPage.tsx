@@ -3,8 +3,8 @@ import { Navigate } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import { useProfile } from '../../hooks/useProfile'
 import { useSponsorships } from '../../hooks/useSponsorships'
-import { useLeaderboard } from '../../hooks/useLeaderboard'
 import { useWinnersHistory } from '../../hooks/useWinnersHistory'
+import type { WinnerCandidate } from '../../hooks/useWinnersHistory'
 import { fmtDateOnly, fmtMonthOnly } from '../../lib/dates'
 import { useDisplaySlides } from '../../hooks/useDisplaySlides'
 import { useDisplaySettings } from '../../hooks/useDisplaySettings'
@@ -58,7 +58,6 @@ export default function DisplayAdminPage() {
   const [tab, setTab] = useState<Tab>('patrocinadores')
 
   const { sponsorships, loading: sponsorsLoading, refetch: refetchSponsors } = useSponsorships({ all: true })
-  const { weekly: weeklyBoard, monthly: monthlyBoard, loading: boardLoading } = useLeaderboard()
   const { weekly: weeklyHistory, monthly: monthlyHistory, loading: historyLoading } = useWinnersHistory()
   const { slides, loading: slidesLoading, refetch: refetchSlides } = useDisplaySlides({ all: true })
   const { settings, loading: settingsLoading, refetch: refetchSettings } = useDisplaySettings()
@@ -192,83 +191,6 @@ export default function DisplayAdminPage() {
 
         {tab === 'ganadores' && (
           <>
-            {/* Líder actual de semana/mes — en vivo desde get_weekly/monthly_leaderboard
-                (misma fuente que la TV), independiente de si hay un patrocinio
-                activo o de cuándo termina su periodo. Se actualiza solo cada
-                semana/mes porque las RPCs truncan sobre la fecha real, y useLeaderboard
-                ya trae suscripción realtime a la tabla sends. */}
-            <div className="flex flex-col gap-2.5 mb-5">
-              {([
-                { label: 'Líder de la semana', emoji: '🏆', board: weeklyBoard },
-                { label: 'Líder del mes', emoji: '👑', board: monthlyBoard },
-              ] as const).map(({ label, emoji, board }) => (
-                <div key={label} className="p-4 bg-superficie border border-zinc-800/60 rounded-2xl">
-                  <p className="text-zinc-500 text-[11px] font-semibold uppercase tracking-widest mb-2">{label}</p>
-                  {boardLoading ? (
-                    <div className="h-6 flex items-center">
-                      <div className="w-5 h-5 rounded-full border-2 border-primario border-t-transparent animate-spin" />
-                    </div>
-                  ) : board.length === 0 ? (
-                    <p className="text-zinc-600 text-sm">Nadie ha enviado rutas todavía en este periodo.</p>
-                  ) : (
-                    <p className="text-texto-principal font-bold text-sm">
-                      {emoji} {board[0].display_name} <span className="text-zinc-500 font-normal">— {board[0].total_points} pts</span>
-                    </p>
-                  )}
-                </div>
-              ))}
-            </div>
-
-            {/* Historial de ganadores por semana/mes — periodos ya terminados,
-                calculado directo de sends (get_weekly/monthly_winners_history),
-                sin ninguna relación con sponsorships. Se "actualiza solo" cada
-                semana/mes porque no hay nada guardado: se recalcula en cada
-                carga de la página. */}
-            <p className="text-zinc-600 text-[11px] font-semibold uppercase tracking-widest mb-2">Historial de ganadores</p>
-            <div className="grid grid-cols-2 gap-3 mb-5">
-              <div>
-                <p className="text-zinc-500 text-xs font-semibold mb-2">Por semana</p>
-                {historyLoading ? (
-                  <div className="flex justify-center py-6">
-                    <div className="w-5 h-5 rounded-full border-2 border-primario border-t-transparent animate-spin" />
-                  </div>
-                ) : weeklyHistory.length === 0 ? (
-                  <p className="text-zinc-600 text-xs">Sin semanas terminadas todavía.</p>
-                ) : (
-                  <div className="flex flex-col gap-2">
-                    {weeklyHistory.map(w => (
-                      <div key={w.period_start} className="p-3 bg-superficie border border-zinc-800/60 rounded-xl">
-                        <p className="text-zinc-600 text-[10px] mb-1">{fmtDateOnly(w.period_start)} – {fmtDateOnly(w.period_end)}</p>
-                        <p className="text-texto-principal font-bold text-xs truncate">🏆 {w.display_name}</p>
-                        <p className="text-zinc-500 text-[11px]">{w.total_points} pts</p>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-              <div>
-                <p className="text-zinc-500 text-xs font-semibold mb-2">Por mes</p>
-                {historyLoading ? (
-                  <div className="flex justify-center py-6">
-                    <div className="w-5 h-5 rounded-full border-2 border-primario border-t-transparent animate-spin" />
-                  </div>
-                ) : monthlyHistory.length === 0 ? (
-                  <p className="text-zinc-600 text-xs">Sin meses terminados todavía.</p>
-                ) : (
-                  <div className="flex flex-col gap-2">
-                    {monthlyHistory.map(m => (
-                      <div key={m.period_start} className="p-3 bg-superficie border border-zinc-800/60 rounded-xl">
-                        <p className="text-zinc-600 text-[10px] mb-1">{fmtMonthOnly(m.period_start)}</p>
-                        <p className="text-texto-principal font-bold text-xs truncate">👑 {m.display_name}</p>
-                        <p className="text-zinc-500 text-[11px]">{m.total_points} pts</p>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </div>
-
-            <p className="text-zinc-600 text-[11px] font-semibold uppercase tracking-widest mb-2">Historial de premios</p>
             <div className="flex gap-2 mb-4 overflow-x-auto">
               {WINNER_FILTERS.map(f => (
                 <button
@@ -285,64 +207,119 @@ export default function DisplayAdminPage() {
               ))}
             </div>
 
-            {sponsorsLoading && (
+            {(sponsorsLoading || historyLoading) && (
               <div className="flex justify-center py-10">
                 <div className="w-6 h-6 rounded-full border-2 border-primario border-t-transparent animate-spin" />
               </div>
             )}
 
-            {!sponsorsLoading && (() => {
+            {!sponsorsLoading && !historyLoading && (() => {
               const nowIso = new Date().toISOString()
-              const past = sponsorships
-                .filter(s => s.ends_at < nowIso && (winnerFilter === 'todos' || s.winner_rule === winnerFilter))
-                .sort((a, b) => b.ends_at.localeCompare(a.ends_at))
+              const endedSponsorships = sponsorships.filter(s => s.ends_at < nowIso)
 
-              if (past.length === 0) {
-                return <p className="text-zinc-600 text-sm text-center py-10">Todavía no hay patrocinios terminados{winnerFilter !== 'todos' ? ` de tipo ${PERIOD_LABEL[winnerFilter]}` : ''}.</p>
+              // Un periodo calendario ya cubierto por un patrocinio terminado
+              // (su rango lo contiene completo) no necesita card genérico —
+              // el card del patrocinio ya representa ese periodo.
+              const coveredBySponsor = (rule: 'top_1_weekly' | 'top_1_monthly', start: string, end: string) =>
+                endedSponsorships.some(s => s.winner_rule === rule && s.starts_at <= start && s.ends_at >= end)
+
+              type Card =
+                | { kind: 'sponsor'; key: string; endSort: string; s: Sponsorship }
+                | { kind: 'generic'; key: string; endSort: string; rule: 'top_1_weekly' | 'top_1_monthly'; periodStart: string; periodEnd: string; winners: WinnerCandidate[] }
+
+              const sponsorCards: Card[] = endedSponsorships
+                .filter(s => winnerFilter === 'todos' || s.winner_rule === winnerFilter)
+                .map(s => ({ kind: 'sponsor', key: s.id, endSort: s.ends_at, s }))
+
+              const genericWeekly: Card[] = weeklyHistory
+                .filter(w => (winnerFilter === 'todos' || winnerFilter === 'top_1_weekly') && !coveredBySponsor('top_1_weekly', w.period_start, w.period_end))
+                .map(w => ({ kind: 'generic', key: `w_${w.period_start}`, endSort: w.period_end, rule: 'top_1_weekly', periodStart: w.period_start, periodEnd: w.period_end, winners: w.winners }))
+
+              const genericMonthly: Card[] = monthlyHistory
+                .filter(m => (winnerFilter === 'todos' || winnerFilter === 'top_1_monthly') && !coveredBySponsor('top_1_monthly', m.period_start, m.period_end))
+                .map(m => ({ kind: 'generic', key: `m_${m.period_start}`, endSort: m.period_end, rule: 'top_1_monthly', periodStart: m.period_start, periodEnd: m.period_end, winners: m.winners }))
+
+              const all = [...sponsorCards, ...genericWeekly, ...genericMonthly]
+                .sort((a, b) => b.endSort.localeCompare(a.endSort))
+
+              if (all.length === 0) {
+                return <p className="text-zinc-600 text-sm text-center py-10">Todavía no hay periodos terminados{winnerFilter !== 'todos' ? ` de tipo ${PERIOD_LABEL[winnerFilter]}` : ''}.</p>
               }
 
               return (
                 <div className="flex flex-col gap-2.5">
-                  {past.map(s => (
-                    <div key={s.id} className="p-4 bg-superficie border border-zinc-800/60 rounded-2xl">
-                      <div className="flex items-center gap-3">
-                        <div className="w-11 h-11 rounded-xl bg-zinc-950 flex items-center justify-center shrink-0 overflow-hidden">
-                          <img src={s.sponsor_logo} alt={s.sponsor_name} className="max-w-full max-h-full object-contain" />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-1.5">
-                            <p className="text-texto-principal font-semibold text-sm truncate">{s.sponsor_name}</p>
-                            <span className="text-[9px] font-bold uppercase text-zinc-500 bg-superficie-alta px-1.5 py-0.5 rounded shrink-0">{PERIOD_LABEL[s.winner_rule]}</span>
+                  {all.map(card => {
+                    if (card.kind === 'sponsor') {
+                      const s = card.s
+                      return (
+                        <div key={card.key} className="p-4 bg-superficie border border-zinc-800/60 rounded-2xl">
+                          <div className="flex items-center gap-3">
+                            <div className="w-11 h-11 rounded-xl bg-zinc-950 flex items-center justify-center shrink-0 overflow-hidden">
+                              <img src={s.sponsor_logo} alt={s.sponsor_name} className="max-w-full max-h-full object-contain" />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-1.5">
+                                <p className="text-texto-principal font-semibold text-sm truncate">{s.sponsor_name}</p>
+                                <span className="text-[9px] font-bold uppercase text-zinc-500 bg-superficie-alta px-1.5 py-0.5 rounded shrink-0">{PERIOD_LABEL[s.winner_rule]}</span>
+                              </div>
+                              <p className="text-zinc-500 text-xs mt-0.5 truncate">{s.prize_text}</p>
+                              <p className="text-zinc-600 text-[11px] mt-0.5">{fmtDate(s.starts_at)} – {fmtDate(s.ends_at)}</p>
+                            </div>
                           </div>
-                          <p className="text-zinc-500 text-xs mt-0.5 truncate">{s.prize_text}</p>
-                          <p className="text-zinc-600 text-[11px] mt-0.5">{fmtDate(s.starts_at)} – {fmtDate(s.ends_at)}</p>
+                          <div className="mt-3 pt-3 border-t border-zinc-800/60">
+                            {s.winner_user_id ? (
+                              <>
+                                <p className="text-zinc-400 text-xs mb-2">
+                                  🏆 Ganó: <span className="text-texto-principal font-semibold">{s.winner?.display_name ?? '—'}</span>
+                                </p>
+                                <Toggle checked={s.prize_delivered} onChange={() => togglePrizeDelivered(s)} label="Premio entregado" />
+                              </>
+                            ) : (
+                              <p className="text-zinc-600 text-xs mb-2">Sin ganador (nadie calificó dentro del periodo, o se calcula dentro de 60s de haber terminado).</p>
+                            )}
+                            {/* Solo semanal/mensual (2026-08-23) — el usuario pidió
+                                esto específicamente para anunciar esos dos, diario
+                                queda fuera para no llenar la pantalla de botones */}
+                            {s.winner_rule !== 'top_1_daily' && (
+                              <button
+                                onClick={() => setWinnerImageSponsorship(s)}
+                                className="w-full mt-1 py-2.5 rounded-xl bg-superficie-alta hover:bg-superficie-alta-hover text-texto-principal font-semibold text-xs transition-all"
+                              >
+                                📸 Crear imagen
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      )
+                    }
+
+                    // Card genérico (2026-08-24): periodo calendario ya terminado
+                    // sin patrocinio asociado — igual queremos ver quién iba
+                    // ganando, top 5 real de get_weekly/monthly_winners_history.
+                    const periodLabel = card.rule === 'top_1_weekly'
+                      ? `${fmtDateOnly(card.periodStart)} – ${fmtDateOnly(card.periodEnd)}`
+                      : fmtMonthOnly(card.periodStart)
+                    return (
+                      <div key={card.key} className="p-4 bg-superficie border border-zinc-800/60 rounded-2xl">
+                        <div className="flex items-center gap-1.5 mb-1">
+                          <p className="text-texto-principal font-semibold text-sm">{periodLabel}</p>
+                          <span className="text-[9px] font-bold uppercase text-zinc-500 bg-superficie-alta px-1.5 py-0.5 rounded shrink-0">{PERIOD_LABEL[card.rule]}</span>
+                        </div>
+                        <p className="text-zinc-600 text-xs mb-3">Sin patrocinio para este periodo</p>
+                        <div className="flex flex-col gap-1">
+                          {card.winners.map((w, i) => (
+                            <div key={w.display_name} className="flex items-center gap-2">
+                              <span className="text-zinc-600 font-bold text-xs w-5 shrink-0">{i + 1}</span>
+                              <span className={`flex-1 text-sm truncate ${i === 0 ? 'text-texto-principal font-bold' : 'text-zinc-400'}`}>
+                                {i === 0 ? '🏆 ' : ''}{w.display_name}
+                              </span>
+                              <span className="text-zinc-500 text-xs shrink-0">{w.total_points} pts</span>
+                            </div>
+                          ))}
                         </div>
                       </div>
-                      <div className="mt-3 pt-3 border-t border-zinc-800/60">
-                        {s.winner_user_id ? (
-                          <>
-                            <p className="text-zinc-400 text-xs mb-2">
-                              🏆 Ganó: <span className="text-texto-principal font-semibold">{s.winner?.display_name ?? '—'}</span>
-                            </p>
-                            <Toggle checked={s.prize_delivered} onChange={() => togglePrizeDelivered(s)} label="Premio entregado" />
-                          </>
-                        ) : (
-                          <p className="text-zinc-600 text-xs mb-2">Sin ganador (nadie calificó dentro del periodo, o se calcula dentro de 60s de haber terminado).</p>
-                        )}
-                        {/* Solo semanal/mensual (2026-08-23) — el usuario pidió
-                            esto específicamente para anunciar esos dos, diario
-                            queda fuera para no llenar la pantalla de botones */}
-                        {s.winner_rule !== 'top_1_daily' && (
-                          <button
-                            onClick={() => setWinnerImageSponsorship(s)}
-                            className="w-full mt-1 py-2.5 rounded-xl bg-superficie-alta hover:bg-superficie-alta-hover text-texto-principal font-semibold text-xs transition-all"
-                          >
-                            📸 Crear imagen
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  ))}
+                    )
+                  })}
                 </div>
               )
             })()}
