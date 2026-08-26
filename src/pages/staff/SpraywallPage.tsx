@@ -24,6 +24,7 @@ export default function SpraywallPage() {
   const [formOpen, setFormOpen] = useState(false)
   const [formInitial, setFormInitial] = useState<SpraywallRoute | undefined>(undefined)
   const [uploading, setUploading] = useState(false)
+  const [uploadError, setUploadError] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   function refetchAll() {
@@ -64,6 +65,7 @@ export default function SpraywallPage() {
   // sigan viéndose bien sobre ella. Ver comentario en schema.sql.
   async function handlePhotoSelected(file: File) {
     setUploading(true)
+    setUploadError(null)
     const objectUrl = URL.createObjectURL(file)
     const dims = await new Promise<{ w: number; h: number }>(resolve => {
       const img = new window.Image()
@@ -76,14 +78,15 @@ export default function SpraywallPage() {
     const { error: uploadErr } = await supabase.storage
       .from('spraywall-photos')
       .upload(path, file, { contentType: file.type })
-    if (uploadErr) { setUploading(false); return }
+    if (uploadErr) { setUploading(false); setUploadError(`No se pudo subir el archivo: ${uploadErr.message}`); return }
 
     const { data: pub } = supabase.storage.from('spraywall-photos').getPublicUrl(path)
 
-    await db.from('spraywall_photos').insert({
+    const { error: insertErr } = await db.from('spraywall_photos').insert({
       photo_url: pub.publicUrl, photo_w: dims.w, photo_h: dims.h,
       created_by: profile?.id ?? null,
     })
+    if (insertErr) { setUploading(false); setUploadError(`Se subió el archivo pero no se pudo guardar: ${insertErr.message}`); return }
 
     setUploading(false)
     refetchPhotos()
@@ -252,6 +255,9 @@ export default function SpraywallPage() {
             >
               {uploading ? 'Subiendo...' : current ? 'Subir foto nueva' : 'Subir foto'}
             </button>
+            {uploadError && (
+              <p className="text-alerta text-xs mt-3 text-center">{uploadError}</p>
+            )}
             <p className="text-zinc-600 text-xs mt-3 text-center">
               {current
                 ? 'Sube una foto nueva cuando cambien los agarres de la pared. Las rutas que ya existen se quedan viéndose sobre la foto con la que se marcaron — solo las rutas nuevas usan esta.'
