@@ -19,11 +19,9 @@ interface Props {
 // Zoom (2026-08-26): el usuario señaló que con muchos agarres apretados en
 // una foto de alta resolución, sin poder acercarse es imposible tocar el
 // correcto. Rueda del mouse + pellizco de 2 dedos + botones +/− centran el
-// zoom en el punto tocado/apuntado; el pan es el `draggable` nativo de
-// Konva Stage (distingue solo automáticamente entre arrastrar el fondo
-// —pan— y arrastrar un agarre —mover el agarre—, según qué nodo recibe el
-// toque). Coordenadas de agarres se leen con `getRelativePointerPosition()`,
-// que ya deshace el zoom/pan del Stage, así que `toNormalized` no cambia.
+// zoom en el punto tocado/apuntado. Coordenadas de agarres se leen con
+// `getRelativePointerPosition()`, que ya deshace el zoom/pan del Stage, así
+// que `toNormalized` no cambia.
 const MIN_ZOOM = 1
 const MAX_ZOOM = 6
 const WHEEL_STEP = 1.08
@@ -77,13 +75,36 @@ export default function SpraywallCanvas({
   const dh = naturalH * fitScale
   const offsetX = (size.w - dw) / 2
   const offsetY = (size.h - dh) / 2
-  const radius = Math.max(9, dw * 0.022)
+  // Agarres más delgados (2026-08-26, a pedido del usuario — el grosor de
+  // selección se veía "muy gordo" comparado con uno ya guardado). El área
+  // de TOQUE sigue siendo grande gracias a hitStrokeWidth más abajo — esto
+  // solo afecta lo visual.
+  const radius = Math.max(7, dw * 0.015)
 
   function toNormalized(px: number, py: number): { x: number; y: number } | null {
     const x = (px - offsetX) / dw
     const y = (py - offsetY) / dh
     if (x < 0 || x > 1 || y < 0 || y > 1) return null
     return { x, y }
+  }
+
+  // Evita que el pan deje la foto completamente fuera de vista (se veía
+  // media pantalla vacía tras hacer zoom+pan sin límites) — exige que al
+  // menos un 25% del contenedor siga mostrando la foto en cada eje. Si la
+  // foto ya es más chica que el contenedor en ese eje, se centra fijo.
+  function clampAxis(pos: number, offset: number, scaledSize: number, containerSize: number): number {
+    if (scaledSize <= containerSize) return (containerSize - scaledSize) / 2 - offset
+    const margin = containerSize * 0.25
+    const minPos = margin - offset - scaledSize
+    const maxPos = containerSize - margin - offset
+    return Math.min(maxPos, Math.max(minPos, pos))
+  }
+
+  function clampPos(pos: { x: number; y: number }, z: number): { x: number; y: number } {
+    return {
+      x: clampAxis(pos.x, offsetX, dw * z, size.w),
+      y: clampAxis(pos.y, offsetY, dh * z, size.h),
+    }
   }
 
   // Mantiene fijo el punto de la foto bajo `point` (coords de pantalla,
@@ -96,7 +117,7 @@ export default function SpraywallCanvas({
     const sx = (point.x - prevPos.x) / prevZoom
     const sy = (point.y - prevPos.y) / prevZoom
     setZoom(newZoom)
-    setStagePos({ x: point.x - sx * newZoom, y: point.y - sy * newZoom })
+    setStagePos(clampPos({ x: point.x - sx * newZoom, y: point.y - sy * newZoom }, newZoom))
   }
 
   function resetZoom() {
@@ -143,7 +164,7 @@ export default function SpraywallCanvas({
     const sx = (start.mid.x - start.pos.x) / start.zoom
     const sy = (start.mid.y - start.pos.y) / start.zoom
     setZoom(newZoom)
-    setStagePos({ x: start.mid.x - sx * newZoom, y: start.mid.y - sy * newZoom })
+    setStagePos(clampPos({ x: start.mid.x - sx * newZoom, y: start.mid.y - sy * newZoom }, newZoom))
   }
   function handleTouchEnd() { pinchStart.current = null }
 
@@ -185,7 +206,14 @@ export default function SpraywallCanvas({
         y={stagePos.y}
         scaleX={zoom}
         scaleY={zoom}
-        draggable
+        // Solo activo con zoom (2026-08-26): a zoom=1 la foto ya cabe
+        // completa, no hace falta pan — y dejarlo activo siempre se comía
+        // el scroll de la página en celular en cuanto el dedo tocaba la
+        // foto (no se podía bajar a ver qué había debajo de Notas).
+        draggable={zoom > 1}
+        dragBoundFunc={function (pos) {
+          return clampPos(pos, this.scaleX())
+        }}
         onDragMove={e => setStagePos({ x: e.target.x(), y: e.target.y() })}
         onDragEnd={e => setStagePos({ x: e.target.x(), y: e.target.y() })}
         onTouchMove={handleTouchMove}
@@ -206,7 +234,14 @@ export default function SpraywallCanvas({
                 y={cy}
                 radius={radius}
                 stroke={isSelected ? '#FACC15' : getHoldHex(h.role)}
-                strokeWidth={isSelected ? 4 : 3}
+                strokeWidth={isSelected ? 3 : 2}
+                // Área de toque bastante más grande que el aro visible
+                // (2026-08-26) — con fill transparente, Konva solo detecta
+                // toques justo sobre el trazo delgado por default, lo que
+                // hacía casi imposible seleccionar/arrastrar un agarre ya
+                // puesto (el toque terminaba moviendo el fondo en vez del
+                // agarre). Es la causa real de "no se puede editar".
+                hitStrokeWidth={Math.max(28, radius * 2.2)}
                 fill="transparent"
                 draggable={mode === 'edit'}
                 onClick={mode === 'edit' ? () => onSelectIndex?.(i) : undefined}
