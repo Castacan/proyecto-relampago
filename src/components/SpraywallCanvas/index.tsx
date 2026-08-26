@@ -178,7 +178,7 @@ export default function SpraywallCanvas({
         y={stagePos.y}
         scaleX={zoom}
         scaleY={zoom}
-        draggable
+        draggable={zoom > 1}
         onDragMove={e => setStagePos({ x: e.target.x(), y: e.target.y() })}
         onDragEnd={e => setStagePos({ x: e.target.x(), y: e.target.y() })}
         onTouchMove={handleTouchMove}
