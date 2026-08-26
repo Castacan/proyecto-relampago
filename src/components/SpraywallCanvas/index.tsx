@@ -188,6 +188,11 @@ export default function SpraywallCanvas({
   }
 
   function handleDragMove(i: number, e: Konva.KonvaEventObject<DragEvent>) {
+    // Sin esto, el 'dragmove' del Circle burbujea hasta el onDragMove del
+    // Stage (2026-08-26, bug real encontrado en vivo) — que interpreta la
+    // posición LOCAL del agarre como si fuera el pan del Stage entero,
+    // corriendo toda la foto en vez de solo mover el agarre.
+    e.cancelBubble = true
     if (!onHoldsChange) return
     const norm = toNormalized(e.target.x(), e.target.y())
     if (!norm) return
@@ -214,8 +219,11 @@ export default function SpraywallCanvas({
         dragBoundFunc={function (pos) {
           return clampPos(pos, this.scaleX())
         }}
-        onDragMove={e => setStagePos({ x: e.target.x(), y: e.target.y() })}
-        onDragEnd={e => setStagePos({ x: e.target.x(), y: e.target.y() })}
+        // e.target check es cinturón-y-tirantes — los Circle ya cortan la
+        // burbuja ellos mismos (cancelBubble), pero por si algún otro nodo
+        // arrastrable se agrega después sin acordarse de hacerlo.
+        onDragMove={e => { if (e.target === e.target.getStage()) setStagePos({ x: e.target.x(), y: e.target.y() }) }}
+        onDragEnd={e => { if (e.target === e.target.getStage()) setStagePos({ x: e.target.x(), y: e.target.y() }) }}
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
         onClick={handleStageClick}
@@ -247,6 +255,7 @@ export default function SpraywallCanvas({
                 onClick={mode === 'edit' ? () => onSelectIndex?.(i) : undefined}
                 onTap={mode === 'edit' ? () => onSelectIndex?.(i) : undefined}
                 onDragMove={mode === 'edit' ? e => handleDragMove(i, e) : undefined}
+                onDragEnd={mode === 'edit' ? e => { e.cancelBubble = true } : undefined}
               />
             )
           })}
