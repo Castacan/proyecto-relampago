@@ -12,9 +12,11 @@ export function useSpraywallRoutes(statuses: string[] = ['active']) {
 
   const refetch = useCallback(async () => {
     setLoading(true)
+    // photo:spraywall_photos(...) trae la foto CON LA QUE SE MARCÓ cada
+    // ruta (2026-08-26) — no la más reciente, ver comentario en schema.sql.
     const { data } = await db
       .from('spraywall_routes')
-      .select('*')
+      .select('*, photo:spraywall_photos(photo_url, photo_w, photo_h)')
       .in('status', statusesKey.split(','))
       .order('created_at', { ascending: false })
     setRoutes(data ?? [])

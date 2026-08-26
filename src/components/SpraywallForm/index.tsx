@@ -16,13 +16,17 @@ interface Props {
   photoUrl: string
   photoW?: number | null
   photoH?: number | null
+  // Requerido solo para rutas NUEVAS (fija con qué foto se marcó, para
+  // siempre — ver comentario en schema.sql, 2026-08-26). No se usa al
+  // editar: initialRoute conserva su photo_id original, nunca se reasigna.
+  photoId?: string
   initialRoute?: SpraywallRoute
   onSave: () => void
   onCancel: () => void
 }
 
 export default function SpraywallForm({
-  authorRole, authorId, authorName, photoUrl, photoW, photoH, initialRoute, onSave, onCancel,
+  authorRole, authorId, authorName, photoUrl, photoW, photoH, photoId, initialRoute, onSave, onCancel,
 }: Props) {
   const [name, setName] = useState(initialRoute?.name ?? '')
   const [grade, setGrade] = useState(initialRoute?.grade ?? 'V4')
@@ -72,12 +76,15 @@ export default function SpraywallForm({
       return
     }
 
+    if (!photoId) { setSaving(false); setError('Falta la foto base — recarga la página.'); return }
+
     const payload = authorRole === 'staff'
       ? { created_by_profile_id: authorId, created_by_climber_id: null, status: 'active' }
       : { created_by_climber_id: authorId, created_by_profile_id: null, status: 'pending' }
 
     const { error: err } = await db.from('spraywall_routes').insert({
       name: name.trim(), grade, setter_name: authorName, notes: notes.trim() || null, holds,
+      photo_id: photoId,
       ...payload,
     })
     setSaving(false)

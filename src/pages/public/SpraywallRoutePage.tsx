@@ -3,7 +3,6 @@ import { useParams, Link } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../lib/auth'
 import { useClimber } from '../../hooks/useClimber'
-import { useSpraywallSettings } from '../../hooks/useSpraywallSettings'
 import { useSpraywallSends } from '../../hooks/useSpraywallSends'
 import SpraywallCanvas from '../../components/SpraywallCanvas'
 import SpraywallLegend from '../../components/SpraywallLegend'
@@ -18,7 +17,6 @@ export default function SpraywallRoutePage() {
   const { routeId } = useParams<{ routeId: string }>()
   const { session } = useAuth()
   const { climber, loading: climberLoading, refetch: refetchClimber } = useClimber()
-  const { settings, loading: settingsLoading } = useSpraywallSettings()
   const { sentMap, toggle } = useSpraywallSends()
   const [route, setRoute] = useState<SpraywallRoute | null>(null)
   const [loading, setLoading] = useState(true)
@@ -27,7 +25,10 @@ export default function SpraywallRoutePage() {
 
   useEffect(() => {
     if (!routeId) return
-    db.from('spraywall_routes').select('*').eq('id', routeId).single()
+    // photo:spraywall_photos(...) trae la foto CON LA QUE SE MARCÓ esta
+    // ruta (2026-08-26), no necesariamente la más reciente — ver
+    // comentario en schema.sql.
+    db.from('spraywall_routes').select('*, photo:spraywall_photos(photo_url, photo_w, photo_h)').eq('id', routeId).single()
       .then(({ data, error }: { data: SpraywallRoute | null; error: unknown }) => {
         if (error || !data) setNotFound(true)
         else setRoute(data)
@@ -35,7 +36,7 @@ export default function SpraywallRoutePage() {
       })
   }, [routeId])
 
-  if (loading || settingsLoading) return (
+  if (loading) return (
     <div className="min-h-screen bg-fondo flex items-center justify-center">
       <div className="w-8 h-8 rounded-full border-2 border-primario border-t-transparent animate-spin" />
     </div>
@@ -72,11 +73,11 @@ export default function SpraywallRoutePage() {
         </div>
 
         <div className="w-full aspect-[4/3] rounded-2xl overflow-hidden border border-zinc-800/60 mb-5">
-          {settings?.photo_url ? (
+          {route.photo ? (
             <SpraywallCanvas
-              photoUrl={settings.photo_url}
-              photoW={settings.photo_w}
-              photoH={settings.photo_h}
+              photoUrl={route.photo.photo_url}
+              photoW={route.photo.photo_w}
+              photoH={route.photo.photo_h}
               holds={route.holds}
               mode="view"
             />

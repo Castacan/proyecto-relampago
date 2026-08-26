@@ -759,6 +759,45 @@ create policy "spraywall_photos_write_staff" on storage.objects
     and exists (select 1 from public.profiles where id = auth.uid())
   );
 
+-- ============================================================
+-- Spraywall: historial de fotos (2026-08-26)
+-- Antes había UNA sola foto compartida (spraywall_settings, singleton,
+-- siempre sobrescrita en la key fija storage 'base.jpg'). El usuario
+-- señaló el problema real: si se agregan agarres nuevos a la pared física
+-- y se sube una foto nueva, las rutas YA marcadas quedan con sus agarres
+-- mal alineados sobre el fondo nuevo — sus coordenadas 0-1 se calcularon
+-- contra el encuadre de la foto vieja.
+--
+-- Fix: spraywall_photos es un historial (cada subida = fila nueva, nunca
+-- se sobrescribe ni se borra), y spraywall_routes.photo_id fija para
+-- siempre con qué foto se marcó esa ruta. "Foto actual" = la fila más
+-- reciente (ORDER BY created_at DESC LIMIT 1) — así una ruta vieja se
+-- sigue viendo sobre la foto con la que se marcó, y las rutas nuevas usan
+-- la foto más reciente, sin migración de datos porque a la fecha de este
+-- commit no había ninguna ruta ni foto subida todavía (tabla vacía).
+--
+-- spraywall_settings queda huérfana a propósito (no se borra, por si
+-- acaso) pero el frontend ya no la usa.
+-- ============================================================
+
+CREATE TABLE IF NOT EXISTS public.spraywall_photos (
+  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  photo_url   TEXT NOT NULL,
+  photo_w     INT NOT NULL,
+  photo_h     INT NOT NULL,
+  created_at  TIMESTAMPTZ DEFAULT NOW(),
+  created_by  UUID REFERENCES public.profiles(id)
+);
+
+ALTER TABLE public.spraywall_photos ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "spraywall_photos_read_public" ON public.spraywall_photos
+  FOR SELECT USING (true);
+CREATE POLICY "spraywall_photos_insert_staff" ON public.spraywall_photos
+  FOR INSERT WITH CHECK (EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid()));
+
+ALTER TABLE public.spraywall_routes ADD COLUMN IF NOT EXISTS photo_id UUID REFERENCES public.spraywall_photos(id);
+
 -- ============================================
 -- Moderación de sends (admin) — get_recent_sends + delete_send
 -- Ejecutado en Supabase 2026-08-09.
@@ -1159,9 +1198,10 @@ CREATE POLICY "display_settings_write_admin" ON public.display_settings FOR ALL
   USING       (EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role = 'admin'))
   WITH CHECK  (EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role = 'admin'));
 
--- Storage: bucket público para logos e imágenes de slides. A diferencia de
--- spraywall-photos (singleton, upsert:true sobre 'base.jpg'), aquí cada fila
--- es su propia imagen → nombre único por archivo bajo sponsors/ o slides/.
+-- Storage: bucket público para logos e imágenes de slides. Incluso antes de
+-- que spraywall-photos pasara a ser un historial versionado (ver arriba,
+-- 2026-08-26), aquí cada fila ya era su propia imagen → nombre único por
+-- archivo bajo sponsors/ o slides/.
 insert into storage.buckets (id, name, public)
 values ('display-assets', 'display-assets', true)
 on conflict (id) do nothing;

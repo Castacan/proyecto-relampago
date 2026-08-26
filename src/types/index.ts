@@ -120,6 +120,14 @@ export interface SpraywallHold {
   label?: string
 }
 
+export interface SpraywallPhoto {
+  id: string
+  photo_url: string
+  photo_w: number
+  photo_h: number
+  created_at: string
+}
+
 export interface SpraywallRoute {
   id: string
   name: string
@@ -135,12 +143,13 @@ export interface SpraywallRoute {
   retired_at: string | null
   reviewed_at: string | null
   reviewed_by: string | null
-}
-
-export interface SpraywallSettings {
-  photo_url: string | null
-  photo_w: number | null
-  photo_h: number | null
+  photo_id: string | null
+  // Join embebido (spraywall_routes.photo_id → spraywall_photos.id) — la
+  // foto CON LA QUE SE MARCÓ esta ruta específica, no necesariamente la
+  // más reciente (2026-08-26, ver comentario en schema.sql). Null solo
+  // para filas viejas de antes de esta migración (no debería haber
+  // ninguna en producción a esta fecha).
+  photo: { photo_url: string; photo_w: number; photo_h: number } | null
 }
 
 export interface SpraywallSend {

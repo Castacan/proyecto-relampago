@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { useAuth } from '../../lib/auth'
 import { useClimber } from '../../hooks/useClimber'
-import { useSpraywallSettings } from '../../hooks/useSpraywallSettings'
+import { useSpraywallPhotos } from '../../hooks/useSpraywallPhotos'
 import SpraywallForm from '../../components/SpraywallForm'
 import ClimberAuthSheet from '../../components/ClimberAuthSheet'
 
@@ -10,11 +10,11 @@ export default function SpraywallProposePage() {
   const navigate = useNavigate()
   const { session } = useAuth()
   const { climber, loading: climberLoading, refetch: refetchClimber } = useClimber()
-  const { settings, loading: settingsLoading } = useSpraywallSettings()
+  const { current, loading: photosLoading } = useSpraywallPhotos()
   const [authSheetOpen, setAuthSheetOpen] = useState(true)
   const [submitted, setSubmitted] = useState(false)
 
-  if (settingsLoading || climberLoading) return (
+  if (photosLoading || climberLoading) return (
     <div className="min-h-screen bg-fondo flex items-center justify-center">
       <div className="w-8 h-8 rounded-full border-2 border-primario border-t-transparent animate-spin" />
     </div>
@@ -53,7 +53,7 @@ export default function SpraywallProposePage() {
     )
   }
 
-  if (!settings?.photo_url) {
+  if (!current) {
     return (
       <div className="min-h-screen bg-fondo flex items-center justify-center p-8 text-center">
         <p className="text-zinc-500 text-sm">La spraywall todavía no tiene foto configurada.</p>
@@ -66,9 +66,10 @@ export default function SpraywallProposePage() {
       authorRole="climber"
       authorId={climber.id}
       authorName={climber.display_name}
-      photoUrl={settings.photo_url}
-      photoW={settings.photo_w}
-      photoH={settings.photo_h}
+      photoUrl={current.photo_url}
+      photoW={current.photo_w}
+      photoH={current.photo_h}
+      photoId={current.id}
       onSave={() => setSubmitted(true)}
       onCancel={() => navigate('/spraywall')}
     />

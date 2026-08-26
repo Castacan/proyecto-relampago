@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react'
 import { supabase } from '../../lib/supabase'
 import { useProfile } from '../../hooks/useProfile'
-import { useSpraywallSettings } from '../../hooks/useSpraywallSettings'
+import { useSpraywallPhotos } from '../../hooks/useSpraywallPhotos'
 import { useSpraywallRoutes } from '../../hooks/useSpraywallRoutes'
 import SpraywallForm from '../../components/SpraywallForm'
 import SpraywallRouteDetail from '../../components/SpraywallRouteDetail'
@@ -15,7 +15,7 @@ type Tab = 'rutas' | 'propuestas' | 'foto'
 
 export default function SpraywallPage() {
   const { profile } = useProfile()
-  const { settings, loading: settingsLoading, refetch: refetchSettings } = useSpraywallSettings()
+  const { photos, current, loading: photosLoading, refetch: refetchPhotos } = useSpraywallPhotos()
   const { routes: activeRoutes, loading: activeLoading, refetch: refetchActive } = useSpraywallRoutes(['active', 'retired'])
   const { routes: pendingRoutes, loading: pendingLoading, refetch: refetchPending } = useSpraywallRoutes(['pending'])
 
@@ -58,6 +58,10 @@ export default function SpraywallPage() {
     refetchAll()
   }
 
+  // Sube una foto NUEVA (2026-08-26, ya no reemplaza la anterior) — cada
+  // subida es una fila nueva en spraywall_photos y un archivo con nombre
+  // único en storage, para que las rutas ya marcadas con la foto vieja
+  // sigan viéndose bien sobre ella. Ver comentario en schema.sql.
   async function handlePhotoSelected(file: File) {
     setUploading(true)
     const objectUrl = URL.createObjectURL(file)
@@ -67,34 +71,42 @@ export default function SpraywallPage() {
       img.src = objectUrl
     })
 
-    const path = `base.jpg`
+    const ext = file.name.split('.').pop() || 'jpg'
+    const path = `${Date.now()}-${crypto.randomUUID()}.${ext}`
     const { error: uploadErr } = await supabase.storage
       .from('spraywall-photos')
-      .upload(path, file, { upsert: true, contentType: file.type })
+      .upload(path, file, { contentType: file.type })
     if (uploadErr) { setUploading(false); return }
 
     const { data: pub } = supabase.storage.from('spraywall-photos').getPublicUrl(path)
-    const cacheBusted = `${pub.publicUrl}?v=${Date.now()}`
 
-    await db.from('spraywall_settings').update({
-      photo_url: cacheBusted, photo_w: dims.w, photo_h: dims.h,
-      updated_at: new Date().toISOString(), updated_by: profile?.id ?? null,
-    }).eq('id', true)
+    await db.from('spraywall_photos').insert({
+      photo_url: pub.publicUrl, photo_w: dims.w, photo_h: dims.h,
+      created_by: profile?.id ?? null,
+    })
 
     setUploading(false)
-    refetchSettings()
+    refetchPhotos()
   }
 
   if (formOpen) {
-    if (settingsLoading || !settings?.photo_url || !profile) return null
+    // Ruta nueva: usa la foto ACTUAL. Editar una ruta existente: conserva
+    // su propia foto original (formInitial.photo), nunca la reasigna a la
+    // más reciente — por eso photoId solo se pasa cuando no hay formInitial.
+    const editPhoto = formInitial?.photo
+    const photoUrl = formInitial ? editPhoto?.photo_url : current?.photo_url
+    const photoW = formInitial ? editPhoto?.photo_w : current?.photo_w
+    const photoH = formInitial ? editPhoto?.photo_h : current?.photo_h
+    if (photosLoading || !photoUrl || !profile) return null
     return (
       <SpraywallForm
         authorRole="staff"
         authorId={profile.id}
         authorName={profile.name}
-        photoUrl={settings.photo_url}
-        photoW={settings.photo_w}
-        photoH={settings.photo_h}
+        photoUrl={photoUrl}
+        photoW={photoW}
+        photoH={photoH}
+        photoId={formInitial ? undefined : current?.id}
         initialRoute={formInitial}
         onSave={() => { setFormOpen(false); refetchAll() }}
         onCancel={() => setFormOpen(false)}
@@ -129,12 +141,12 @@ export default function SpraywallPage() {
           <>
             <button
               onClick={openNewRoute}
-              disabled={!settings?.photo_url}
+              disabled={!current}
               className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl bg-primario hover:bg-primario-hover text-texto-en-acento font-bold text-sm mb-4 active:scale-[0.98] transition-all disabled:opacity-40 disabled:cursor-not-allowed"
             >
               + Nueva ruta
             </button>
-            {!settings?.photo_url && (
+            {!current && (
               <p className="text-zinc-600 text-xs mb-4 text-center">Sube la foto base en la pestaña "Foto" antes de crear rutas.</p>
             )}
             {activeLoading && (
@@ -187,9 +199,9 @@ export default function SpraywallPage() {
                       <p className="text-zinc-500 text-xs mt-0.5">Propuesta por {route.setter_name}</p>
                     </div>
                   </div>
-                  {settings?.photo_url && (
+                  {route.photo && (
                     <div className="w-full aspect-[4/3] rounded-xl overflow-hidden border border-zinc-800/60 mb-3">
-                      <SpraywallCanvas photoUrl={settings.photo_url} photoW={settings.photo_w} photoH={settings.photo_h} holds={route.holds} mode="view" />
+                      <SpraywallCanvas photoUrl={route.photo.photo_url} photoW={route.photo.photo_w} photoH={route.photo.photo_h} holds={route.holds} mode="view" />
                     </div>
                   )}
                   {route.notes && <p className="text-zinc-400 text-xs mb-3">{route.notes}</p>}
@@ -216,12 +228,12 @@ export default function SpraywallPage() {
         {tab === 'foto' && (
           <div>
             <div className="w-full aspect-[4/3] rounded-2xl overflow-hidden border border-zinc-800/60 mb-4 bg-superficie">
-              {settingsLoading ? (
+              {photosLoading ? (
                 <div className="w-full h-full flex items-center justify-center">
                   <div className="w-6 h-6 rounded-full border-2 border-primario border-t-transparent animate-spin" />
                 </div>
-              ) : settings?.photo_url ? (
-                <SpraywallCanvas photoUrl={settings.photo_url} photoW={settings.photo_w} photoH={settings.photo_h} holds={[]} mode="view" />
+              ) : current ? (
+                <SpraywallCanvas photoUrl={current.photo_url} photoW={current.photo_w} photoH={current.photo_h} holds={[]} mode="view" />
               ) : (
                 <div className="w-full h-full flex items-center justify-center text-zinc-600 text-sm">Sin foto configurada</div>
               )}
@@ -238,21 +250,26 @@ export default function SpraywallPage() {
               disabled={uploading}
               className="w-full py-3.5 rounded-2xl bg-primario hover:bg-primario-hover text-texto-en-acento font-bold text-sm active:scale-[0.98] transition-all disabled:opacity-50"
             >
-              {uploading ? 'Subiendo...' : settings?.photo_url ? 'Reemplazar foto' : 'Subir foto'}
+              {uploading ? 'Subiendo...' : current ? 'Subir foto nueva' : 'Subir foto'}
             </button>
             <p className="text-zinc-600 text-xs mt-3 text-center">
-              Es una sola foto compartida por todas las rutas — reemplazarla no borra las rutas existentes, solo cambia el fondo.
+              {current
+                ? 'Sube una foto nueva cuando cambien los agarres de la pared. Las rutas que ya existen se quedan viéndose sobre la foto con la que se marcaron — solo las rutas nuevas usan esta.'
+                : 'Sube la foto base de la pared para poder empezar a marcar rutas.'}
             </p>
+            {photos.length > 1 && (
+              <p className="text-zinc-600 text-xs mt-2 text-center">{photos.length} fotos en el historial.</p>
+            )}
           </div>
         )}
       </div>
 
-      {detailRoute && settings?.photo_url && (
+      {detailRoute && detailRoute.photo && (
         <SpraywallRouteDetail
           route={detailRoute}
-          photoUrl={settings.photo_url}
-          photoW={settings.photo_w}
-          photoH={settings.photo_h}
+          photoUrl={detailRoute.photo.photo_url}
+          photoW={detailRoute.photo.photo_w}
+          photoH={detailRoute.photo.photo_h}
           onClose={() => setDetailRoute(null)}
           onEdit={() => openEditRoute(detailRoute)}
           onRetired={() => { setDetailRoute(null); refetchAll() }}
