@@ -149,7 +149,14 @@ export default function SpraywallCanvas({
 
   function handleStageClick(e: Konva.KonvaEventObject<MouseEvent | TouchEvent>) {
     if (mode !== 'edit' || !activeRole || !onHoldsChange) return
-    if (e.target !== e.target.getStage()) return
+    // Bug real encontrado en vivo (2026-08-26, no tenía nada que ver con el
+    // zoom): esto comparaba contra `e.target.getStage()`, pero el click
+    // normalmente aterriza sobre la FOTO (el nodo Image), no sobre el Stage
+    // mismo — así que NUNCA se colocaba un agarre tocando la foto, en
+    // ningún commit desde que existe esta feature. Lo que en realidad hace
+    // falta descartar es un click que burbujeó desde un Circle (agarre ya
+    // existente) — para no colocar uno nuevo encima al seleccionar uno.
+    if (e.target.getClassName() === 'Circle') return
     const stage = e.target.getStage()
     const pos = stage?.getRelativePointerPosition()
     if (!pos) return
@@ -178,7 +185,7 @@ export default function SpraywallCanvas({
         y={stagePos.y}
         scaleX={zoom}
         scaleY={zoom}
-        draggable={zoom > 1}
+        draggable
         onDragMove={e => setStagePos({ x: e.target.x(), y: e.target.y() })}
         onDragEnd={e => setStagePos({ x: e.target.x(), y: e.target.y() })}
         onTouchMove={handleTouchMove}
