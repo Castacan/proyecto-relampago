@@ -16,11 +16,19 @@ interface Props {
   onClose: () => void
   onEdit: () => void
   onRetired: () => void
+  // Borrado real (2026-08-27) — a diferencia de Retirar (soft, sigue
+  // apareciendo en "Rutas" marcada como "Retirada"), esto la quita de la
+  // base para siempre. Pensado para basura/pruebas, no para el flujo
+  // normal de "esta ruta ya no está en la pared" — Retirar sigue siendo
+  // lo recomendado para eso, conserva el historial.
+  onDeleted: () => void
 }
 
-export default function SpraywallRouteDetail({ route, photoUrl, photoW, photoH, onClose, onEdit, onRetired }: Props) {
+export default function SpraywallRouteDetail({ route, photoUrl, photoW, photoH, onClose, onEdit, onRetired, onDeleted }: Props) {
   const [retiring, setRetiring] = useState(false)
   const [confirmRetire, setConfirmRetire] = useState(false)
+  const [deleting, setDeleting] = useState(false)
+  const [confirmDelete, setConfirmDelete] = useState(false)
 
   async function handleRetire() {
     if (!confirmRetire) { setConfirmRetire(true); return }
@@ -28,6 +36,14 @@ export default function SpraywallRouteDetail({ route, photoUrl, photoW, photoH, 
     await db.from('spraywall_routes').update({ status: 'retired', retired_at: new Date().toISOString() }).eq('id', route.id)
     setRetiring(false)
     onRetired()
+  }
+
+  async function handleDelete() {
+    if (!confirmDelete) { setConfirmDelete(true); return }
+    setDeleting(true)
+    await db.from('spraywall_routes').delete().eq('id', route.id)
+    setDeleting(false)
+    onDeleted()
   }
 
   return (
@@ -90,7 +106,25 @@ export default function SpraywallRouteDetail({ route, photoUrl, photoW, photoH, 
         )}
 
         {route.status === 'retired' && (
-          <p className="text-zinc-600 text-xs text-center">Ruta retirada.</p>
+          <p className="text-zinc-600 text-xs text-center mb-3">Ruta retirada.</p>
+        )}
+
+        {/* Borrado permanente — separado y menos prominente a propósito
+            (texto simple, no botón lleno) para no competir con Retirar,
+            que sigue siendo la opción recomendada para el uso normal. */}
+        <button
+          onClick={handleDelete}
+          disabled={deleting}
+          className={`w-full py-2.5 rounded-xl text-xs font-semibold transition-all mt-2 ${
+            confirmDelete ? 'bg-red-500/15 text-red-400' : 'text-zinc-600 hover:text-red-400'
+          } disabled:opacity-50`}
+        >
+          {deleting ? 'Borrando...' : confirmDelete ? '¿Borrar para siempre? No se puede deshacer' : 'Eliminar permanentemente'}
+        </button>
+        {confirmDelete && (
+          <button onClick={() => setConfirmDelete(false)} className="w-full py-2 text-zinc-500 hover:text-zinc-300 text-xs font-medium transition-colors">
+            Cancelar
+          </button>
         )}
       </div>
     </div>

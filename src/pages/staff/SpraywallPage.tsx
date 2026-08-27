@@ -291,6 +291,7 @@ export default function SpraywallPage() {
           onClose={() => setDetailRoute(null)}
           onEdit={() => openEditRoute(detailRoute)}
           onRetired={() => { setDetailRoute(null); refetchAll() }}
+          onDeleted={() => { setDetailRoute(null); refetchAll() }}
         />
       )}
     </div>
