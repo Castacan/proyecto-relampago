@@ -29,6 +29,13 @@ export default function SpraywallForm({
   authorRole, authorId, authorName, photoUrl, photoW, photoH, photoId, initialRoute, onSave, onCancel,
 }: Props) {
   const [name, setName] = useState(initialRoute?.name ?? '')
+  // Nombre de quien puso la ruta (2026-08-27): antes se guardaba siempre
+  // el nombre del perfil de staff logueado sin poder cambiarlo — para esta
+  // cuenta en particular ese "nombre" resultó ser su correo, así que salía
+  // "Por correo@..." en vez del nombre real de quien armó la ruta (puede
+  // ser otro staff, o alguien externo). Ahora es un campo editable,
+  // precargado con authorName como sugerencia pero corregible.
+  const [setterName, setSetterName] = useState(initialRoute?.setter_name ?? authorName)
   const [grade, setGrade] = useState(initialRoute?.grade ?? 'V4')
   const [notes, setNotes] = useState(initialRoute?.notes ?? '')
   const [holds, setHolds] = useState<SpraywallHold[]>(initialRoute?.holds ?? [])
@@ -65,9 +72,11 @@ export default function SpraywallForm({
     setSaving(true)
     setError('')
 
+    const finalSetterName = setterName.trim() || authorName
+
     if (initialRoute) {
       const { error: err } = await db.from('spraywall_routes').update({
-        name: name.trim(), grade, notes: notes.trim() || null, holds,
+        name: name.trim(), grade, setter_name: finalSetterName, notes: notes.trim() || null, holds,
         updated_at: new Date().toISOString(),
       }).eq('id', initialRoute.id)
       setSaving(false)
@@ -83,7 +92,7 @@ export default function SpraywallForm({
       : { created_by_climber_id: authorId, created_by_profile_id: null, status: 'pending' }
 
     const { error: err } = await db.from('spraywall_routes').insert({
-      name: name.trim(), grade, setter_name: authorName, notes: notes.trim() || null, holds,
+      name: name.trim(), grade, setter_name: finalSetterName, notes: notes.trim() || null, holds,
       photo_id: photoId,
       ...payload,
     })
@@ -109,6 +118,13 @@ export default function SpraywallForm({
           onChange={e => setName(e.target.value)}
           placeholder="Nombre de la ruta (ej. Amarillo)"
           className="w-full bg-superficie text-texto-principal rounded-xl px-4 py-3 text-sm mb-3 outline-none placeholder-zinc-600 border border-zinc-700/50 focus:border-primario/60 focus:ring-2 focus:ring-primario/20 transition-all"
+        />
+
+        <input
+          value={setterName}
+          onChange={e => setSetterName(e.target.value)}
+          placeholder="Puesta por (nombre de quien la armó)"
+          className="w-full bg-superficie text-texto-principal rounded-xl px-4 py-3 text-sm mb-4 outline-none placeholder-zinc-600 border border-zinc-700/50 focus:border-primario/60 focus:ring-2 focus:ring-primario/20 transition-all"
         />
 
         <div className="flex flex-wrap gap-2 mb-4">
