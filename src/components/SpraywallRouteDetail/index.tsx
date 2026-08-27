@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { supabase } from '../../lib/supabase'
 import SpraywallCanvas from '../SpraywallCanvas'
 import SpraywallLegend from '../SpraywallLegend'
+import { getSpraywallGradeHex } from '../../lib/spraywall'
 import type { SpraywallRoute } from '../../types'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -37,8 +38,9 @@ export default function SpraywallRouteDetail({ route, photoUrl, photoW, photoH, 
         <div className="flex items-center gap-3 mb-5">
           <div className="flex-1 min-w-0">
             <h2 className="text-texto-principal font-black text-xl leading-tight tracking-tight">{route.name}</h2>
-            <p className="text-zinc-400 text-sm font-medium">
-              <span className="font-mono font-bold">{route.grade}</span> · Por {route.setter_name}
+            <p className="text-zinc-400 text-sm font-medium flex items-center gap-1.5">
+              <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: getSpraywallGradeHex(route.grade) }} />
+              <span className="font-bold">{route.grade}</span> · Por {route.setter_name}
             </p>
           </div>
           <div className="flex gap-2 items-center shrink-0">

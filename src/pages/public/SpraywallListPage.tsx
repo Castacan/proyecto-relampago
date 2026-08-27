@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import { useSpraywallRoutes } from '../../hooks/useSpraywallRoutes'
 import { useSpraywallSends } from '../../hooks/useSpraywallSends'
 import { useClimber } from '../../hooks/useClimber'
-import { GRADES } from '../../lib/colors'
+import { SPRAYWALL_GRADES, getSpraywallGradeHex } from '../../lib/spraywall'
 import logoVertical from '../../assets/logo-vertical.png'
 
 type SendFilter = 'todas' | 'enviadas' | 'pendientes'
@@ -59,15 +59,16 @@ export default function SpraywallListPage() {
           >
             Todos
           </button>
-          {GRADES.map(g => (
+          {SPRAYWALL_GRADES.map(g => (
             <button
-              key={g}
-              onClick={() => setGradeFilter(g)}
-              className={`px-3 py-1.5 rounded-xl text-xs font-bold font-mono transition-all ${
-                gradeFilter === g ? 'bg-primario text-texto-en-acento' : 'bg-superficie-alta text-zinc-400 hover:text-texto-principal'
+              key={g.key}
+              onClick={() => setGradeFilter(g.key)}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                gradeFilter === g.key ? 'bg-primario text-texto-en-acento' : 'bg-superficie-alta text-zinc-400 hover:text-texto-principal'
               }`}
             >
-              {g}
+              <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: g.hex }} />
+              {g.key}
             </button>
           ))}
         </div>
@@ -106,12 +107,13 @@ export default function SpraywallListPage() {
               to={`/spraywall/${route.id}`}
               className="flex items-center gap-3 p-4 bg-superficie border border-zinc-800/60 rounded-2xl hover:border-zinc-700 transition-all active:scale-[0.98]"
             >
-              <div className="w-11 h-11 rounded-xl bg-superficie-alta flex items-center justify-center shrink-0">
-                <span className="text-texto-principal font-black font-mono text-sm">{route.grade}</span>
-              </div>
+              <div
+                className="w-3 h-3 rounded-full shrink-0 border border-white/10"
+                style={{ backgroundColor: getSpraywallGradeHex(route.grade) }}
+              />
               <div className="flex-1 min-w-0">
                 <p className="text-texto-principal font-semibold text-sm truncate">{route.name}</p>
-                <p className="text-zinc-500 text-xs mt-0.5">Por {route.setter_name}</p>
+                <p className="text-zinc-500 text-xs mt-0.5">{route.grade} · Por {route.setter_name}</p>
               </div>
               {climber && sentMap[route.id] && (
                 <span className="text-green-400 text-lg shrink-0">✓</span>

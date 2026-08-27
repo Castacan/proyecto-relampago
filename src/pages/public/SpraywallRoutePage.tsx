@@ -8,6 +8,7 @@ import SpraywallCanvas from '../../components/SpraywallCanvas'
 import SpraywallLegend from '../../components/SpraywallLegend'
 import SpraywallSendButton from '../../components/SpraywallSendButton'
 import ClimberAuthSheet from '../../components/ClimberAuthSheet'
+import { getSpraywallGradeHex } from '../../lib/spraywall'
 import type { SpraywallRoute } from '../../types'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -66,9 +67,10 @@ export default function SpraywallRoutePage() {
       <div className="flex-1 flex flex-col max-w-md mx-auto w-full px-5 py-4">
         <div className="mb-5">
           <h1 className="text-texto-principal font-black text-2xl tracking-tight">{route.name}</h1>
-          <p className="text-zinc-400 text-sm font-medium mt-1">
-            <span className="font-mono font-bold text-texto-principal">{route.grade}</span>
-            <span className="text-zinc-600"> · Por {route.setter_name}</span>
+          <p className="text-zinc-400 text-sm font-medium mt-1 flex items-center gap-1.5">
+            <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: getSpraywallGradeHex(route.grade) }} />
+            <span className="font-bold text-texto-principal">{route.grade}</span>
+            <span className="text-zinc-600">· Por {route.setter_name}</span>
           </p>
         </div>
 

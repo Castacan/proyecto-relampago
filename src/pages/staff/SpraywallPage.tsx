@@ -6,6 +6,7 @@ import { useSpraywallRoutes } from '../../hooks/useSpraywallRoutes'
 import SpraywallForm from '../../components/SpraywallForm'
 import SpraywallRouteDetail from '../../components/SpraywallRouteDetail'
 import SpraywallCanvas from '../../components/SpraywallCanvas'
+import { getSpraywallGradeHex } from '../../lib/spraywall'
 import type { SpraywallRoute } from '../../types'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -164,12 +165,13 @@ export default function SpraywallPage() {
                   onClick={() => setDetailRoute(route)}
                   className="flex items-center gap-3 p-4 bg-superficie border border-zinc-800/60 rounded-2xl hover:border-zinc-700 transition-all text-left"
                 >
-                  <div className="w-11 h-11 rounded-xl bg-superficie-alta flex items-center justify-center shrink-0">
-                    <span className="text-texto-principal font-black font-mono text-sm">{route.grade}</span>
-                  </div>
+                  <div
+                    className="w-3 h-3 rounded-full shrink-0 border border-white/10"
+                    style={{ backgroundColor: getSpraywallGradeHex(route.grade) }}
+                  />
                   <div className="flex-1 min-w-0">
                     <p className="text-texto-principal font-semibold text-sm truncate">{route.name}</p>
-                    <p className="text-zinc-500 text-xs mt-0.5">Por {route.setter_name}</p>
+                    <p className="text-zinc-500 text-xs mt-0.5">{route.grade} · Por {route.setter_name}</p>
                   </div>
                   {route.status === 'retired' && (
                     <span className="text-zinc-600 text-[10px] font-bold uppercase shrink-0">Retirada</span>
@@ -194,12 +196,13 @@ export default function SpraywallPage() {
               {pendingRoutes.map(route => (
                 <div key={route.id} className="p-4 bg-superficie border border-zinc-800/60 rounded-2xl">
                   <div className="flex items-center gap-3 mb-3">
-                    <div className="w-11 h-11 rounded-xl bg-superficie-alta flex items-center justify-center shrink-0">
-                      <span className="text-texto-principal font-black font-mono text-sm">{route.grade}</span>
-                    </div>
+                    <div
+                      className="w-3 h-3 rounded-full shrink-0 border border-white/10"
+                      style={{ backgroundColor: getSpraywallGradeHex(route.grade) }}
+                    />
                     <div className="flex-1 min-w-0">
                       <p className="text-texto-principal font-semibold text-sm truncate">{route.name}</p>
-                      <p className="text-zinc-500 text-xs mt-0.5">Propuesta por {route.setter_name}</p>
+                      <p className="text-zinc-500 text-xs mt-0.5">{route.grade} · Propuesta por {route.setter_name}</p>
                     </div>
                   </div>
                   {route.photo && (

@@ -1,7 +1,6 @@
 import { useState } from 'react'
 import { supabase } from '../../lib/supabase'
-import { GRADES } from '../../lib/colors'
-import { type HoldRole } from '../../lib/spraywall'
+import { SPRAYWALL_GRADES, type HoldRole } from '../../lib/spraywall'
 import SpraywallCanvas from '../SpraywallCanvas'
 import SpraywallLegend from '../SpraywallLegend'
 import type { SpraywallHold, SpraywallRoute } from '../../types'
@@ -36,7 +35,7 @@ export default function SpraywallForm({
   // ser otro staff, o alguien externo). Ahora es un campo editable,
   // precargado con authorName como sugerencia pero corregible.
   const [setterName, setSetterName] = useState(initialRoute?.setter_name ?? authorName)
-  const [grade, setGrade] = useState(initialRoute?.grade ?? 'V4')
+  const [grade, setGrade] = useState(initialRoute?.grade ?? 'Intermedio')
   const [notes, setNotes] = useState(initialRoute?.notes ?? '')
   const [holds, setHolds] = useState<SpraywallHold[]>(initialRoute?.holds ?? [])
   const [activeRole, setActiveRole] = useState<HoldRole>('inicio_mano')
@@ -128,15 +127,16 @@ export default function SpraywallForm({
         />
 
         <div className="flex flex-wrap gap-2 mb-4">
-          {GRADES.map(g => (
+          {SPRAYWALL_GRADES.map(g => (
             <button
-              key={g}
-              onClick={() => setGrade(g)}
-              className={`px-3.5 py-2 rounded-xl text-sm font-bold font-mono transition-all ${
-                grade === g ? 'bg-primario text-texto-en-acento scale-105' : 'bg-superficie-alta text-zinc-400 hover:text-texto-principal'
+              key={g.key}
+              onClick={() => setGrade(g.key)}
+              className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-sm font-bold transition-all ${
+                grade === g.key ? 'bg-primario text-texto-en-acento scale-105' : 'bg-superficie-alta text-zinc-400 hover:text-texto-principal'
               }`}
             >
-              {g}
+              <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: g.hex }} />
+              {g.key}
             </button>
           ))}
         </div>
