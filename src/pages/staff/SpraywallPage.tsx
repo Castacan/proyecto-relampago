@@ -103,18 +103,27 @@ export default function SpraywallPage() {
     const photoH = formInitial ? editPhoto?.photo_h : current?.photo_h
     if (photosLoading || !photoUrl || !profile) return null
     return (
-      <SpraywallForm
-        authorRole="staff"
-        authorId={profile.id}
-        authorName={profile.name}
-        photoUrl={photoUrl}
-        photoW={photoW}
-        photoH={photoH}
-        photoId={formInitial ? undefined : current?.id}
-        initialRoute={formInitial}
-        onSave={() => { setFormOpen(false); refetchAll() }}
-        onCancel={() => setFormOpen(false)}
-      />
+      // h-full overflow-y-auto (2026-08-27): SpraywallForm por sí solo usa
+      // min-h-screen (pensado para su otro uso, la página pública /spraywall/
+      // proponer, sin ancestro con altura fija). Pero aquí el <main> de
+      // StaffLayout es overflow-hidden — sin este wrapper, lo que no cabía
+      // se recortaba sin scrollbar en vez de poder bajar. No se tocó
+      // SpraywallForm en sí para no afectar el flujo público, que ya
+      // funciona bien con el scroll normal de la página.
+      <div className="h-full overflow-y-auto">
+        <SpraywallForm
+          authorRole="staff"
+          authorId={profile.id}
+          authorName={profile.name}
+          photoUrl={photoUrl}
+          photoW={photoW}
+          photoH={photoH}
+          photoId={formInitial ? undefined : current?.id}
+          initialRoute={formInitial}
+          onSave={() => { setFormOpen(false); refetchAll() }}
+          onCancel={() => setFormOpen(false)}
+        />
+      </div>
     )
   }
 
