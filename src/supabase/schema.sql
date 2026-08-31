@@ -285,6 +285,11 @@ CREATE POLICY "betas_write_staff" ON public.betas
 -- definición real, sin reformatear.
 -- ============================================================
 
+-- LIMIT subido de 10/5 a 50 (2026-08-30): el display TV ahora muestra todos
+-- los nombres que quepan en pantalla al tamaño de letra actual (antes el
+-- RPC mismo cortaba en 10/5 aunque hubiera espacio de sobra o más gente con
+-- puntos) — el corte real ahora lo pone el alto disponible en
+-- LeaderboardDisplay.tsx, no el RPC.
 CREATE OR REPLACE FUNCTION public.get_daily_leaderboard()
  RETURNS TABLE(display_name text, total_points bigint)
  LANGUAGE sql
@@ -293,7 +298,7 @@ AS $function$
     SELECT c.display_name, SUM(s.points_daily)
     FROM sends s JOIN climbers c ON c.id = s.user_id    WHERE s.sent_at >= date_trunc('day', now() AT TIME ZONE 'America/Mexico_City')
                         AT TIME ZONE 'America/Mexico_City'      AND c.visible_in_leaderboard = true
-    GROUP BY c.id, c.display_name ORDER BY 2 DESC LIMIT 10;
+    GROUP BY c.id, c.display_name ORDER BY 2 DESC LIMIT 50;
   $function$;
 
 CREATE OR REPLACE FUNCTION public.get_monthly_leaderboard()
@@ -305,25 +310,34 @@ AS $function$
     FROM sends s JOIN climbers c ON c.id = s.user_id    WHERE s.sent_at >= date_trunc('month', now() AT TIME ZONE 'America/Mexico_City')
                         AT TIME ZONE 'America/Mexico_City'      AND c.visible_in_leaderboard = true
       AND s.points_monthly > 0
-    GROUP BY c.id, c.display_name ORDER BY 2 DESC LIMIT 5;
+    GROUP BY c.id, c.display_name ORDER BY 2 DESC LIMIT 50;
   $function$;
 
 -- get_weekly_leaderboard (2026-08-23): agregado para el leaderboard TV de 3
 -- columnas (Hoy/Semana/Mes). Semana calendario lunes-domingo hora CDMX
 -- (date_trunc('week', ...) trunca a lunes en Postgres), mismo patrón que
--- día/mes. Usa points_daily (no existe points_weekly ni falta agregarlo:
--- points_daily ya es el valor real de cada send individual, grado + bonus
--- de ruta nueva desde el ajuste de submit_send del mismo día) — sin filtro
--- > 0 porque un send válido siempre tiene points_daily >= 1 (V0 = 1 punto).
+-- día/mes.
+-- FIX (2026-08-30): usaba SUM(points_daily), que es el valor CRUDO de cada
+-- send (sin deduplicar por ruta repetida) — a diferencia de Mes, que usa
+-- points_monthly (0 si esa ruta ya se había mandado antes ese mismo mes
+-- calendario). Resultado: alguien que repetía las mismas rutas varios días
+-- dentro de la semana inflaba Semana sin límite mientras Mes se quedaba
+-- corto (solo cuenta la primera vez que se manda cada ruta en el mes) —
+-- reportado por el usuario como "tuve más puntos en semana que en mes",
+-- algo que en teoría no debería pasar. Ahora Semana también usa
+-- points_monthly: como toda semana (salvo la que cruza fin de mes) es un
+-- subconjunto de fechas del mes actual, esto garantiza Semana ≤ Mes
+-- siempre (misma regla de deduplicación, solo que sumada sobre menos días).
 CREATE OR REPLACE FUNCTION public.get_weekly_leaderboard()
  RETURNS TABLE(display_name text, total_points bigint)
  LANGUAGE sql
  SECURITY DEFINER
 AS $function$
-    SELECT c.display_name, SUM(s.points_daily)
+    SELECT c.display_name, SUM(s.points_monthly)
     FROM sends s JOIN climbers c ON c.id = s.user_id    WHERE s.sent_at >= date_trunc('week', now() AT TIME ZONE 'America/Mexico_City')
                         AT TIME ZONE 'America/Mexico_City'      AND c.visible_in_leaderboard = true
-    GROUP BY c.id, c.display_name ORDER BY 2 DESC LIMIT 10;
+      AND s.points_monthly > 0
+    GROUP BY c.id, c.display_name ORDER BY 2 DESC LIMIT 50;
   $function$;
 
 GRANT EXECUTE ON FUNCTION public.get_weekly_leaderboard() TO anon, authenticated;
@@ -336,23 +350,31 @@ GRANT EXECUTE ON FUNCTION public.get_weekly_leaderboard() TO anon, authenticated
 -- ventana starts_at/ends_at ya no coincide con "esta semana"/"este mes"
 -- para cuando el staff genera la imagen días o semanas después.
 -- p_monthly=true replica el criterio de determine_sponsorship_winner para
--- 'top_1_monthly' (SUM(points_monthly), filtro > 0); false replica
--- 'top_1_daily'/'top_1_weekly' (SUM(points_daily), sin filtro).
-CREATE OR REPLACE FUNCTION public.get_leaderboard_for_range(p_start TIMESTAMPTZ, p_end TIMESTAMPTZ, p_monthly BOOLEAN DEFAULT false, p_limit INT DEFAULT 10)
+-- 'top_1_monthly' (SUM(points_monthly), filtro > 0).
+-- p_weekly_dedup (2026-08-30, nuevo): replica 'top_1_weekly' — mismo
+-- SUM(points_monthly) que Mes, mismo fix que get_weekly_leaderboard de
+-- arriba (ver ese comentario), pero SIN cambiar 'top_1_daily' (sigue
+-- p_monthly=false, p_weekly_dedup=false → SUM(points_daily) crudo, correcto
+-- para un solo día calendario donde no puede haber ruta repetida).
+-- DROP explícito porque el número de parámetros cambió: CREATE OR REPLACE
+-- por sí solo no reemplaza una función cuando la firma no coincide EXACTO,
+-- crearía un segundo overload en vez de reemplazar el viejo de 4 params.
+DROP FUNCTION IF EXISTS public.get_leaderboard_for_range(TIMESTAMPTZ, TIMESTAMPTZ, BOOLEAN, INT);
+CREATE OR REPLACE FUNCTION public.get_leaderboard_for_range(p_start TIMESTAMPTZ, p_end TIMESTAMPTZ, p_monthly BOOLEAN DEFAULT false, p_limit INT DEFAULT 10, p_weekly_dedup BOOLEAN DEFAULT false)
  RETURNS TABLE(display_name text, total_points bigint)
  LANGUAGE sql
  SECURITY DEFINER
 AS $function$
-    SELECT c.display_name, SUM(CASE WHEN p_monthly THEN s.points_monthly ELSE s.points_daily END)
+    SELECT c.display_name, SUM(CASE WHEN p_monthly OR p_weekly_dedup THEN s.points_monthly ELSE s.points_daily END)
     FROM sends s JOIN climbers c ON c.id = s.user_id
     WHERE s.sent_at >= p_start AND s.sent_at <= p_end
       AND c.visible_in_leaderboard = true
       AND c.eligible_for_prizes = true
-      AND (NOT p_monthly OR s.points_monthly > 0)
+      AND (NOT (p_monthly OR p_weekly_dedup) OR s.points_monthly > 0)
     GROUP BY c.id, c.display_name ORDER BY 2 DESC LIMIT p_limit;
   $function$;
 
-GRANT EXECUTE ON FUNCTION public.get_leaderboard_for_range(TIMESTAMPTZ, TIMESTAMPTZ, BOOLEAN, INT) TO anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.get_leaderboard_for_range(TIMESTAMPTZ, TIMESTAMPTZ, BOOLEAN, INT, BOOLEAN) TO anon, authenticated;
 
 CREATE OR REPLACE FUNCTION public.get_recent_events(lim integer DEFAULT 8)
  RETURNS TABLE(display_name text, grade text, color text, sent_at timestamp with time zone)
@@ -1050,6 +1072,10 @@ GRANT EXECUTE ON FUNCTION public.get_route_send_counts(UUID) TO authenticated;
 -- Filtra también eligible_for_prizes (2026-08-24): alguien puede seguir
 -- visible en el leaderboard de pantalla pero no calificar para aparecer
 -- como ganador aquí — ver comentario junto a la columna.
+-- FIX (2026-08-30): usaba SUM(points_daily) sin dedup, mismo bug de fondo
+-- que get_weekly_leaderboard (ver ese comentario) — cambiado a
+-- SUM(points_monthly) + filtro > 0 para que el histórico semanal sea
+-- consistente con el mensual y nunca muestre semana > mes.
 -- ============================================================
 
 DROP FUNCTION IF EXISTS public.get_weekly_winners_history(INT);
@@ -1067,10 +1093,10 @@ AS $function$
       date_trunc('week', s.sent_at AT TIME ZONE 'America/Mexico_City')::date AS week_start,
       c.id AS climber_id,
       c.display_name,
-      SUM(s.points_daily) AS total_points
+      SUM(s.points_monthly) AS total_points
     FROM sends s
     JOIN climbers c ON c.id = s.user_id
-    WHERE c.visible_in_leaderboard = true AND c.eligible_for_prizes = true
+    WHERE c.visible_in_leaderboard = true AND c.eligible_for_prizes = true AND s.points_monthly > 0
     GROUP BY 1, c.id, c.display_name
   ),
   ranked AS (
@@ -1225,13 +1251,18 @@ create policy "display_assets_write_admin" on storage.objects
 -- Empate: gana quien llegó primero a esa cantidad de puntos (MAX(sent_at)
 -- más temprano entre los empatados en el máximo de puntos).
 -- Ampliado (2026-08-23) para leaderboard TV de 3 columnas: winner_rule ahora
--- también puede ser 'top_1_daily'/'top_1_weekly', que suman points_daily
--- (el valor real de cada send, grado + bonus de ruta nueva del mismo día)
--- en vez de points_monthly. 'top_1_monthly' conserva exactamente la lógica
--- original (SUM(points_monthly), filtro > 0).
+-- también puede ser 'top_1_daily'/'top_1_weekly'. 'top_1_monthly' conserva
+-- exactamente la lógica original (SUM(points_monthly), filtro > 0).
 -- Filtra también eligible_for_prizes (2026-08-24) — mismo criterio que
 -- get_leaderboard_for_range/get_weekly/monthly_winners_history: alguien
 -- puede seguir visible en pantalla pero no calificar para ganar premios.
+-- FIX (2026-08-30): 'top_1_daily' y 'top_1_weekly' compartían una sola rama
+-- que sumaba points_daily (crudo, sin dedup) para ambos. Correcto para
+-- daily (un día no puede repetir ruta), pero le daba a un patrocinio semanal
+-- el mismo bug de "semana > mes" que ya se arregló en get_weekly_leaderboard
+-- — alguien podía ganar un premio semanal inflando puntos con rutas ya
+-- mandadas antes ese mes. Separado en su propia rama con SUM(points_monthly)
+-- + filtro > 0, igual que Mes.
 -- ============================================================
 CREATE OR REPLACE FUNCTION public.determine_sponsorship_winner()
 RETURNS JSONB
@@ -1261,7 +1292,19 @@ BEGIN
       GROUP BY s.user_id
       ORDER BY SUM(s.points_monthly) DESC, MAX(s.sent_at) ASC
       LIMIT 1;
-    ELSE -- top_1_daily / top_1_weekly
+    ELSIF v_sp.winner_rule = 'top_1_weekly' THEN
+      SELECT s.user_id INTO v_winner
+      FROM public.sends s
+      JOIN public.climbers c ON c.id = s.user_id
+      WHERE s.sent_at >= v_sp.starts_at
+        AND s.sent_at <= v_sp.ends_at
+        AND c.visible_in_leaderboard = true
+        AND c.eligible_for_prizes = true
+        AND s.points_monthly > 0
+      GROUP BY s.user_id
+      ORDER BY SUM(s.points_monthly) DESC, MAX(s.sent_at) ASC
+      LIMIT 1;
+    ELSE -- top_1_daily
       SELECT s.user_id INTO v_winner
       FROM public.sends s
       JOIN public.climbers c ON c.id = s.user_id

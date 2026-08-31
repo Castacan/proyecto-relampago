@@ -184,7 +184,12 @@ function LeaderboardColumn({ title, titleAccent, subtitle, entries, emptyTitle, 
             </div>
           </div>
         ) : (
-          <div className="flex flex-col gap-2 overflow-y-auto">
+          // overflow-hidden, no -auto (2026-08-30): la TV no tiene con qué
+          // hacer scroll, así que un scrollbar fantasma no sirve de nada —
+          // el RPC ahora trae hasta 50 filas y el corte real lo pone el
+          // alto disponible: se ven todos los que quepan al tamaño de letra
+          // actual, ni uno menos.
+          <div className="flex flex-col gap-2 overflow-hidden">
             {entries.map((entry, i) => (
               <LeaderboardRow key={entry.display_name} rank={i + 1} name={entry.display_name} points={Number(entry.total_points)} />
             ))}

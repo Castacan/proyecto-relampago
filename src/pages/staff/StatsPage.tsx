@@ -98,15 +98,17 @@ function ColumnChart({ items }: { items: ColItem[] }) {
   )
 }
 
-// Promedio real de vida (played_at → retired_at para retirados, → hoy para activos)
-function avgLifespan(vols: Volume[]): number {
-  if (!vols.length) return 0
+// Promedio real de vida (placed_at → retired_at para retirados, → hoy para
+// activos). Genérico (2026-08-30): antes solo tomaba Volume[], ahora también
+// se usa para Route[] en el card "Promedio" de la vista Históricas.
+function avgLifespan(items: { placed_at: string; retired_at: string | null }[]): number {
+  if (!items.length) return 0
   const now = Date.now()
-  const sum = vols.reduce((acc, v) => {
+  const sum = items.reduce((acc, v) => {
     const end = v.retired_at ? new Date(v.retired_at).getTime() : now
     return acc + Math.max(0, (end - new Date(v.placed_at).getTime()) / 86400000)
   }, 0)
-  return Math.round(sum / vols.length)
+  return Math.round(sum / items.length)
 }
 
 // ── Página ───────────────────────────────────────────────────────────────────
@@ -199,8 +201,11 @@ export default function StatsPage() {
   const totalF = routes.length || 1
 
   // ── Cálculos vista histórica ───────────────────────────────────────────────
-  const activeNow   = historicalRoutes.filter(r => r.status === 'active').length
   const retiredSince = historicalRoutes.filter(r => r.status === 'retired').length
+  // Días promedio que duran las rutas en la pared (placed_at → retired_at, o
+  // → hoy si siguen activas) — reemplaza al card "Activas en el muro ahora"
+  // (2026-08-30), que era redundante con la vista "Actuales".
+  const routeAvgLifespan = avgLifespan(historicalRoutes)
 
   // ── Color × Grado ──────────────────────────────────────────────────────────
   const colorGradeMatrix: Record<string, Record<string, number>> = {}
@@ -258,7 +263,7 @@ export default function StatsPage() {
             ) : (
               <div className="flex gap-3">
                 <StatCard value={historicalRoutes.length} label="Total rutas" sub="desde jul 2026" />
-                <StatCard value={activeNow} label="Activas" sub="en el muro ahora" />
+                <StatCard value={historicalRoutes.length ? `${routeAvgLifespan}d` : '—'} label="Promedio" sub="días en pared" />
                 <StatCard value={retiredSince} label="Retiradas" sub="desde jul 2026" />
               </div>
             )}

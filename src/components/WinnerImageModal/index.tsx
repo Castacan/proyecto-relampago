@@ -75,6 +75,9 @@ export default function WinnerImageModal({ source, onClose, existingSponsors = [
         p_end: sponsorship.ends_at,
         p_monthly: sponsorship.winner_rule === 'top_1_monthly',
         p_limit: 8,
+        // 2026-08-30: dedup mensual también para semanal, ver comentario en
+        // schema.sql junto a get_leaderboard_for_range (fix "semana > mes").
+        p_weekly_dedup: sponsorship.winner_rule === 'top_1_weekly',
       })
       if (cancelled) return
       if (err) {
