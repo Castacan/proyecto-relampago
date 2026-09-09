@@ -22,6 +22,7 @@ interface SendRow {
   route_number: number | null
   visible_in_leaderboard: boolean
   eligible_for_prizes: boolean
+  points_multiplier: number
 }
 
 export default function SendsPage() {
@@ -37,6 +38,7 @@ export default function SendsPage() {
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [togglingClimberId, setTogglingClimberId] = useState<string | null>(null)
   const [togglingPrizeId, setTogglingPrizeId] = useState<string | null>(null)
+  const [togglingMultiplierId, setTogglingMultiplierId] = useState<string | null>(null)
 
   useEffect(() => {
     const t = setTimeout(() => setDebouncedSearch(search.trim()), 300)
@@ -115,6 +117,24 @@ export default function SendsPage() {
     setSends(prev => prev.map(s => s.climber_id === climberId ? { ...s, eligible_for_prizes: !currentlyEligible } : s))
   }
 
+  // Hace que un climber gane solo la mitad de sus puntos al mandar rutas
+  // de aquí en adelante (no recalcula sends pasados) — caso de uso: staff
+  // (ej. Erick) que sube y prueba rutas, pero no debe competir a puntaje
+  // completo contra los clientes. Independiente de visible_in_leaderboard/
+  // eligible_for_prizes: sigue apareciendo y pudiendo ganar, solo que con
+  // la mitad del puntaje. Actualiza climbers.points_multiplier vía RPC.
+  const handleToggleHalfPoints = async (climberId: string, currentMultiplier: number) => {
+    const isHalf = currentMultiplier < 1
+    setTogglingMultiplierId(climberId)
+    const { data, error } = await db.rpc('set_climber_points_multiplier', { p_climber_id: climberId, p_multiplier: isHalf ? 1 : 0.5 })
+    setTogglingMultiplierId(null)
+    if (error || data?.error) {
+      setError('No se pudo cambiar el multiplicador de puntos.')
+      return
+    }
+    setSends(prev => prev.map(s => s.climber_id === climberId ? { ...s, points_multiplier: isHalf ? 1 : 0.5 } : s))
+  }
+
   return (
     <div className="h-full overflow-y-auto bg-fondo px-4 pt-5 pb-10">
       <h1 className="text-texto-principal font-black text-2xl tracking-tight mb-1">Envíos</h1>
@@ -168,6 +188,9 @@ export default function SendsPage() {
                   {s.visible_in_leaderboard && !s.eligible_for_prizes && (
                     <span className="ml-1.5 text-[9px] font-bold uppercase text-zinc-400 bg-superficie-alta px-1.5 py-0.5 rounded">Sin premio</span>
                   )}
+                  {s.points_multiplier < 1 && (
+                    <span className="ml-1.5 text-[9px] font-bold uppercase text-zinc-400 bg-superficie-alta px-1.5 py-0.5 rounded">½ puntos</span>
+                  )}
                 </div>
                 <div className="text-zinc-600 text-[10px] mt-0.5">
                   {new Date(s.sent_at).toLocaleString('es-MX', { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' })}
@@ -215,6 +238,14 @@ export default function SendsPage() {
                     className="text-zinc-500 hover:text-texto-principal text-[10px] font-semibold px-3 py-1 rounded-lg bg-superficie-alta/50 hover:bg-superficie-alta-hover border border-zinc-800/60 transition-all disabled:opacity-60"
                   >
                     {togglingPrizeId === s.climber_id ? '...' : s.eligible_for_prizes ? 'Excluir de Ganadores' : 'Reincluir en Ganadores'}
+                  </button>
+                  <button
+                    onClick={() => handleToggleHalfPoints(s.climber_id, s.points_multiplier)}
+                    disabled={togglingMultiplierId === s.climber_id}
+                    title="Puntaje reducido a la mitad en todos sus envíos futuros (ej. staff que prueba rutas)"
+                    className="text-zinc-500 hover:text-texto-principal text-[10px] font-semibold px-3 py-1 rounded-lg bg-superficie-alta/50 hover:bg-superficie-alta-hover border border-zinc-800/60 transition-all disabled:opacity-60"
+                  >
+                    {togglingMultiplierId === s.climber_id ? '...' : s.points_multiplier < 1 ? 'Quitar ½ puntos' : 'Poner a ½ puntos'}
                   </button>
                 </div>
               )}

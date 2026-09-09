@@ -523,6 +523,12 @@ $$;
 --     evita repetir el bonus reenviando la "más nueva" día tras día dentro
 --     del mismo mes (el dedup DIARIO ya lo impedía de por sí, por ruta).
 -- Requiere scan reciente (<30 min) en `scans` por user_id o device_id.
+-- Actualizada 2026-09-09: aplica climbers.points_multiplier (default 1,
+-- sin efecto) DESPUÉS de grado+bonus, redondeado para no romper el tipo
+-- INT de points_daily/points_monthly — ver set_climber_points_multiplier
+-- más abajo. Caso de uso: alguien de staff (ej. Erick) que también manda
+-- rutas para probarlas, pero no debe competir a puntaje completo contra
+-- los clientes.
 -- ============================================================
 
 CREATE OR REPLACE FUNCTION public.submit_send(p_route_id uuid, p_device_id text)
@@ -542,6 +548,7 @@ AS $function$
     v_newest_day DATE;
     v_route_day DATE;
     v_bonus INT;
+    v_multiplier NUMERIC;
   BEGIN
     IF v_uid IS NULL THEN RETURN '{"error":"not_authenticated"}'::JSONB; END IF;
 
@@ -576,6 +583,9 @@ AS $function$
     v_bonus := CASE WHEN v_route_day = v_newest_day THEN 1 ELSE 0 END;
 
     v_pts_daily := v_pts + v_bonus;
+
+    SELECT points_multiplier INTO v_multiplier FROM climbers WHERE id = v_uid;
+    v_pts_daily := ROUND(v_pts_daily * COALESCE(v_multiplier, 1))::INT;
 
     v_pts_monthly := CASE WHEN EXISTS (
       SELECT 1 FROM sends
@@ -865,7 +875,8 @@ RETURNS TABLE (
   zone_name TEXT,
   route_number BIGINT,
   visible_in_leaderboard BOOLEAN,
-  eligible_for_prizes BOOLEAN
+  eligible_for_prizes BOOLEAN,
+  points_multiplier NUMERIC
 )
 LANGUAGE plpgsql
 SECURITY DEFINER
@@ -892,7 +903,8 @@ BEGIN
     z.name AS zone_name,
     r.route_number,
     c.visible_in_leaderboard,
-    c.eligible_for_prizes
+    c.eligible_for_prizes,
+    c.points_multiplier
   FROM sends s
   JOIN climbers c ON c.id = s.user_id
   JOIN routes r ON r.id = s.route_id
@@ -1380,3 +1392,46 @@ GRANT EXECUTE ON FUNCTION public.determine_sponsorship_winner() TO anon, authent
 ALTER TABLE public.sponsorships DROP CONSTRAINT IF EXISTS sponsorships_winner_rule_check;
 ALTER TABLE public.sponsorships ADD CONSTRAINT sponsorships_winner_rule_check
   CHECK (winner_rule IN ('top_1_daily', 'top_1_weekly', 'top_1_monthly'));
+
+-- ============================================================
+-- Columna nueva: points_multiplier (2026-09-09)
+-- Permite a un admin hacer que un climber específico gane solo una
+-- fracción de sus puntos normales al mandar una ruta. Caso de uso:
+-- Erick (staff) también sube y prueba rutas, pero no debe competir a
+-- puntaje completo contra los clientes en el leaderboard — en vez de
+-- ocultarlo del todo (visible_in_leaderboard) o quitarle el premio
+-- (eligible_for_prizes), sigue apareciendo pero con puntaje reducido.
+-- Aplicado en submit_send (ver función arriba, actualizada) sobre
+-- points_daily, y points_monthly hereda el efecto porque se calcula a
+-- partir de points_daily. Default 1 = sin cambio para todos los demás.
+-- Solo afecta sends NUEVOS, no recalcula el historial.
+-- ============================================================
+ALTER TABLE public.climbers ADD COLUMN IF NOT EXISTS points_multiplier NUMERIC NOT NULL DEFAULT 1;
+
+CREATE OR REPLACE FUNCTION public.set_climber_points_multiplier(p_climber_id UUID, p_multiplier NUMERIC)
+RETURNS JSONB
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $function$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'admin'
+  ) THEN
+    RETURN '{"error":"not_authorized"}'::JSONB;
+  END IF;
+
+  IF p_multiplier < 0 OR p_multiplier > 1 THEN
+    RETURN '{"error":"invalid_multiplier"}'::JSONB;
+  END IF;
+
+  UPDATE public.climbers SET points_multiplier = p_multiplier, updated_at = NOW() WHERE id = p_climber_id;
+
+  IF NOT FOUND THEN
+    RETURN '{"error":"not_found"}'::JSONB;
+  END IF;
+
+  RETURN '{"success":true}'::JSONB;
+END;
+$function$;
+
+GRANT EXECUTE ON FUNCTION public.set_climber_points_multiplier(UUID, NUMERIC) TO authenticated;
