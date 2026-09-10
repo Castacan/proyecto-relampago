@@ -80,11 +80,17 @@ export default function LeaderboardPage() {
         ) : (
           <div className="space-y-2">
             {entries.map((entry, i) => {
-              const isMe = climber != null && entry.display_name === climber.display_name
+              // Comparar por climber_id (2026-09-10) — antes comparaba
+              // display_name, que dejó de ser confiable el día que dos
+              // climbers distintos terminaron con el mismo alias (ver
+              // schema.sql). El índice único en climbers.display_name ya
+              // lo previene hacia adelante, pero comparar por id es
+              // correcto siempre, sin depender de esa invariante.
+              const isMe = climber != null && entry.climber_id === climber.id
               const rank = i + 1
               return (
                 <div
-                  key={entry.display_name + i}
+                  key={entry.climber_id}
                   className={`flex items-center gap-3 px-4 py-3 rounded-xl border ${
                     isMe
                       ? 'bg-primario/10 border-primario/40'

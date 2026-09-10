@@ -46,6 +46,7 @@ export default function MyAccountPage() {
   const [editVisible, setEditVisible] = useState(true)
   const [saving, setSaving] = useState(false)
   const [saveSuccess, setSaveSuccess] = useState(false)
+  const [saveError, setSaveError] = useState<string | null>(null)
 
   // Auth sheet (for unauthenticated visitors)
   const [authSheetOpen, setAuthSheetOpen] = useState(false)
@@ -80,7 +81,8 @@ export default function MyAccountPage() {
     if (!session?.user || !editName.trim()) return
     setSaving(true)
     setSaveSuccess(false)
-    await db.from('climbers').upsert({
+    setSaveError(null)
+    const { error } = await db.from('climbers').upsert({
       id: session.user.id,
       email: session.user.email ?? '',
       display_name: editName.trim(),
@@ -88,6 +90,16 @@ export default function MyAccountPage() {
       updated_at: new Date().toISOString(),
     })
     setSaving(false)
+    if (error) {
+      // 23505 = unique_violation en climbers_display_name_unique_idx (ver
+      // schema.sql, 2026-09-10) — alguien más ya tiene ese alias.
+      setSaveError(
+        error.code === '23505'
+          ? 'Ese nombre ya lo está usando alguien más. Prueba con otro.'
+          : 'No se pudo guardar. Intenta de nuevo.'
+      )
+      return
+    }
     setSaveSuccess(true)
     refetchClimber()
     setTimeout(() => setSaveSuccess(false), 2500)
@@ -163,11 +175,12 @@ export default function MyAccountPage() {
             <input
               type="text"
               value={editName}
-              onChange={e => { setEditName(e.target.value); setSaveSuccess(false) }}
+              onChange={e => { setEditName(e.target.value); setSaveSuccess(false); setSaveError(null) }}
               maxLength={24}
               placeholder="Tu nombre o alias"
               className="w-full bg-superficie-alta text-texto-principal rounded-xl px-4 py-3 text-sm outline-none border border-zinc-700/50 focus:border-primario/60 transition-all placeholder:text-zinc-600"
             />
+            {saveError && <p className="text-alerta text-xs">{saveError}</p>}
             <button
               onClick={() => setEditVisible(v => !v)}
               className="w-full flex items-center gap-3 py-3 px-4 rounded-xl bg-superficie-alta border border-zinc-700/50 text-left hover:bg-superficie-alta-hover transition-all"

@@ -104,6 +104,12 @@ export interface Send {
 export interface LeaderboardEntry {
   display_name: string
   total_points: number
+  // Agregado 2026-09-10: antes el RPC no lo exponía, y con dos climbers
+  // que terminan con el mismo display_name (bug real, ver schema.sql)
+  // el frontend no tenía forma de distinguirlos — se usaba display_name
+  // como key de React, causando reconciliación incorrecta (rank/puntos
+  // mezclados entre personas distintas en LeaderboardDisplay.tsx).
+  climber_id: string
 }
 
 export interface RecentEvent {

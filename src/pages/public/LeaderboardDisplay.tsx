@@ -191,7 +191,7 @@ function LeaderboardColumn({ title, titleAccent, subtitle, entries, emptyTitle, 
           // actual, ni uno menos.
           <div className="flex flex-col gap-2 overflow-hidden">
             {entries.map((entry, i) => (
-              <LeaderboardRow key={entry.display_name} rank={i + 1} name={entry.display_name} points={Number(entry.total_points)} />
+              <LeaderboardRow key={entry.climber_id} rank={i + 1} name={entry.display_name} points={Number(entry.total_points)} />
             ))}
           </div>
         )}

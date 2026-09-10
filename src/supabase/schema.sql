@@ -290,23 +290,38 @@ CREATE POLICY "betas_write_staff" ON public.betas
 -- RPC mismo cortaba en 10/5 aunque hubiera espacio de sobra o más gente con
 -- puntos) — el corte real ahora lo pone el alto disponible en
 -- LeaderboardDisplay.tsx, no el RPC.
+-- climber_id agregado a las 4 RPCs de leaderboard de abajo (2026-09-10):
+-- antes solo regresaban display_name + total_points, sin ningún id. Eso
+-- funcionaba bien mientras cada nombre fuera único, pero el día que dos
+-- climbers distintos terminan con el mismo display_name (ver el índice
+-- único agregado arriba, y el bug real que resolvió) el frontend no
+-- tenía forma de distinguirlos: React usaba display_name como `key` en
+-- LeaderboardDisplay.tsx (TV) y eso rompe la reconciliación de React con
+-- keys duplicadas — filas/números de rank se pintaban mezclados entre
+-- climbers distintos aunque el SUM() de cada quien sí estaba bien
+-- calculado (GROUP BY ya era por c.id). Con climber_id expuesto,
+-- LeaderboardDisplay.tsx y LeaderboardPage.tsx ya usan un key real.
+-- DROP explícito porque CREATE OR REPLACE no permite cambiar las
+-- columnas de un RETURNS TABLE existente.
+DROP FUNCTION IF EXISTS public.get_daily_leaderboard();
 CREATE OR REPLACE FUNCTION public.get_daily_leaderboard()
- RETURNS TABLE(display_name text, total_points bigint)
+ RETURNS TABLE(display_name text, total_points bigint, climber_id uuid)
  LANGUAGE sql
  SECURITY DEFINER
 AS $function$
-    SELECT c.display_name, SUM(s.points_daily)
+    SELECT c.display_name, SUM(s.points_daily), c.id
     FROM sends s JOIN climbers c ON c.id = s.user_id    WHERE s.sent_at >= date_trunc('day', now() AT TIME ZONE 'America/Mexico_City')
                         AT TIME ZONE 'America/Mexico_City'      AND c.visible_in_leaderboard = true
     GROUP BY c.id, c.display_name ORDER BY 2 DESC LIMIT 50;
   $function$;
 
+DROP FUNCTION IF EXISTS public.get_monthly_leaderboard();
 CREATE OR REPLACE FUNCTION public.get_monthly_leaderboard()
- RETURNS TABLE(display_name text, total_points bigint)
+ RETURNS TABLE(display_name text, total_points bigint, climber_id uuid)
  LANGUAGE sql
  SECURITY DEFINER
 AS $function$
-    SELECT c.display_name, SUM(s.points_monthly)
+    SELECT c.display_name, SUM(s.points_monthly), c.id
     FROM sends s JOIN climbers c ON c.id = s.user_id    WHERE s.sent_at >= date_trunc('month', now() AT TIME ZONE 'America/Mexico_City')
                         AT TIME ZONE 'America/Mexico_City'      AND c.visible_in_leaderboard = true
       AND s.points_monthly > 0
@@ -340,8 +355,9 @@ AS $function$
 --       de ser "la más nueva" en cuanto se agrega otra) — nunca puede
 --       revivir en un reenvío posterior, así que el valor por ruta nunca
 --       es mayor en una semana posterior que el valor ya acreditado a Mes.
+DROP FUNCTION IF EXISTS public.get_weekly_leaderboard();
 CREATE OR REPLACE FUNCTION public.get_weekly_leaderboard()
- RETURNS TABLE(display_name text, total_points bigint)
+ RETURNS TABLE(display_name text, total_points bigint, climber_id uuid)
  LANGUAGE sql
  SECURITY DEFINER
 AS $function$
@@ -351,7 +367,7 @@ AS $function$
     FROM sends s
     WHERE s.sent_at >= date_trunc('week', now() AT TIME ZONE 'America/Mexico_City') AT TIME ZONE 'America/Mexico_City'
   )
-  SELECT c.display_name, SUM(ws.points_daily)
+  SELECT c.display_name, SUM(ws.points_daily), c.id
   FROM week_sends ws
   JOIN climbers c ON c.id = ws.user_id
   WHERE ws.rn = 1 AND c.visible_in_leaderboard = true
@@ -374,8 +390,9 @@ GRANT EXECUTE ON FUNCTION public.get_weekly_leaderboard() TO anon, authenticated
 -- para el porqué), sin cambiar 'top_1_daily' (sigue p_monthly=false,
 -- p_weekly_dedup=false → SUM(points_daily) crudo, correcto para un solo
 -- día calendario donde no puede haber ruta repetida).
+DROP FUNCTION IF EXISTS public.get_leaderboard_for_range(TIMESTAMPTZ, TIMESTAMPTZ, BOOLEAN, INT, BOOLEAN);
 CREATE OR REPLACE FUNCTION public.get_leaderboard_for_range(p_start TIMESTAMPTZ, p_end TIMESTAMPTZ, p_monthly BOOLEAN DEFAULT false, p_limit INT DEFAULT 10, p_weekly_dedup BOOLEAN DEFAULT false)
- RETURNS TABLE(display_name text, total_points bigint)
+ RETURNS TABLE(display_name text, total_points bigint, climber_id uuid)
  LANGUAGE sql
  SECURITY DEFINER
 AS $function$
@@ -385,7 +402,7 @@ AS $function$
     FROM sends s
     WHERE s.sent_at >= p_start AND s.sent_at <= p_end
   )
-  SELECT c.display_name, SUM(CASE WHEN p_monthly THEN rs.points_monthly ELSE rs.points_daily END)
+  SELECT c.display_name, SUM(CASE WHEN p_monthly THEN rs.points_monthly ELSE rs.points_daily END), c.id
   FROM range_sends rs
   JOIN climbers c ON c.id = rs.user_id
   WHERE c.visible_in_leaderboard = true
@@ -1435,3 +1452,45 @@ END;
 $function$;
 
 GRANT EXECUTE ON FUNCTION public.set_climber_points_multiplier(UUID, NUMERIC) TO authenticated;
+
+-- ============================================================
+-- Nombres únicos por climber (2026-09-10)
+-- Bug real reportado por el usuario con screenshot del TV: alguien le
+-- copió el alias a Erick "de broma" y varios climbers más se copiaron
+-- entre sí, dejando 4 filas "Erick Jiménez" distintas (con puntos
+-- distintos) en cada columna del leaderboard. No era un bug de
+-- agregación — GROUP BY ya es por c.id (ver get_daily/weekly/monthly_
+-- leaderboard), cada fila SÍ era una persona distinta — el problema es
+-- que nunca hubo validación de que display_name fuera único, ni en
+-- ClimberAuthSheet (registro) ni en MyAccountPage (editar alias).
+--
+-- Fix en 2 partes:
+-- 1) Resuelve los duplicados YA existentes en la tabla (necesario antes
+--    de poder crear el índice único de abajo, que si no fallaría).
+--    Para decidir a quién le queda el nombre "limpio" en cada grupo de
+--    duplicados: PRIMERO al climber con points_multiplier < 1 si existe
+--    en el grupo (es Erick — su medio-puntaje, ver set_climber_points_
+--    multiplier arriba, es la marca inequívoca de cuál cuenta es la
+--    real, independiente del nombre), si no aplica al más antiguo
+--    (created_at). Al resto se le agrega un sufijo " (2)", " (3)"... para
+--    que sigan siendo identificables sin perder su historial de puntos.
+-- 2) Índice único case-insensitive sobre display_name — a partir de
+--    ahora Postgres RECHAZA cualquier intento de guardar un alias ya
+--    usado (error 23505 unique_violation). El frontend (ClimberAuthSheet
+--    y MyAccountPage) debe capturar ese código y mostrar un mensaje
+--    amigable en vez del genérico "Error al guardar".
+-- ============================================================
+WITH ranked AS (
+  SELECT id, display_name, points_multiplier,
+         ROW_NUMBER() OVER (
+           PARTITION BY LOWER(display_name)
+           ORDER BY (points_multiplier < 1) DESC, created_at ASC
+         ) AS rn
+  FROM public.climbers
+)
+UPDATE public.climbers c
+SET display_name = c.display_name || ' (' || ranked.rn || ')', updated_at = NOW()
+FROM ranked
+WHERE c.id = ranked.id AND ranked.rn > 1;
+
+CREATE UNIQUE INDEX IF NOT EXISTS climbers_display_name_unique_idx ON public.climbers (LOWER(display_name));

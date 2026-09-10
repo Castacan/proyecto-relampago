@@ -160,7 +160,13 @@ export default function ClimberAuthSheet({ isOpen, onClose, onDone, startAtSetup
       updated_at: new Date().toISOString(),
     })
     if (error) {
-      setSaveError('Error al guardar. Intenta de nuevo.')
+      // 23505 = unique_violation en climbers_display_name_unique_idx (ver
+      // schema.sql, 2026-09-10) — alguien más ya tiene ese alias.
+      setSaveError(
+        error.code === '23505'
+          ? 'Ese nombre ya lo está usando alguien más. Prueba con otro.'
+          : 'Error al guardar. Intenta de nuevo.'
+      )
       setStep('setup')
       return
     }
