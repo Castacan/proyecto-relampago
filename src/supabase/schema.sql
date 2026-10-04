@@ -869,6 +869,11 @@ CREATE POLICY "spraywall_photos_insert_staff" ON public.spraywall_photos
 ALTER TABLE public.spraywall_routes ADD COLUMN IF NOT EXISTS photo_id UUID REFERENCES public.spraywall_photos(id);
 
 -- ============================================
+-- Competencia (inscripciones): tablas y RPCs viven en un archivo aparte,
+-- src/supabase/competencia.sql (2026-10-04).
+-- ============================================
+
+-- ============================================
 -- Moderación de sends (admin) — get_recent_sends + delete_send
 -- Ejecutado en Supabase 2026-08-09.
 -- ============================================

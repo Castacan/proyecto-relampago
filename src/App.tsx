@@ -22,6 +22,9 @@ import SpraywallRoutePage from './pages/public/SpraywallRoutePage'
 import SpraywallProposePage from './pages/public/SpraywallProposePage'
 import SpraywallPage from './pages/staff/SpraywallPage'
 import DisplayAdminPage from './pages/staff/DisplayAdminPage'
+import CompetitionPage from './pages/public/CompetitionPage'
+import CompetitionLookupPage from './pages/public/CompetitionLookupPage'
+import CompetitionAdminPage from './pages/staff/CompetitionAdminPage'
 import NotFoundPage from './pages/public/NotFoundPage'
 import { useAuth } from './lib/auth'
 
@@ -46,6 +49,8 @@ export default function App() {
         <Route path="/spraywall" element={<SpraywallListPage />} />
         <Route path="/spraywall/proponer" element={<SpraywallProposePage />} />
         <Route path="/spraywall/:routeId" element={<SpraywallRoutePage />} />
+        <Route path="/competencia" element={<CompetitionPage />} />
+        <Route path="/competencia/consulta" element={<CompetitionLookupPage />} />
         <Route
           path="/staff"
           element={
@@ -64,6 +69,7 @@ export default function App() {
           <Route path="volume-catalog" element={<ErrorBoundary label="Catálogo de Volúmenes"><VolumeCatalogPage /></ErrorBoundary>} />
           <Route path="spraywall" element={<ErrorBoundary label="Spraywall"><SpraywallPage /></ErrorBoundary>} />
           <Route path="display" element={<ErrorBoundary label="Display"><DisplayAdminPage /></ErrorBoundary>} />
+          <Route path="competencia" element={<ErrorBoundary label="Competencia"><CompetitionAdminPage /></ErrorBoundary>} />
         </Route>
         <Route path="/" element={<HubPage />} />
         <Route path="*" element={<NotFoundPage />} />
