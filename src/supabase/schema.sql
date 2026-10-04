@@ -312,7 +312,7 @@ AS $function$
     SELECT c.display_name, SUM(s.points_daily), c.id
     FROM sends s JOIN climbers c ON c.id = s.user_id    WHERE s.sent_at >= date_trunc('day', now() AT TIME ZONE 'America/Mexico_City')
                         AT TIME ZONE 'America/Mexico_City'      AND c.visible_in_leaderboard = true
-    GROUP BY c.id, c.display_name ORDER BY 2 DESC LIMIT 50;
+    GROUP BY c.id, c.display_name ORDER BY 2 DESC LIMIT 200;
   $function$;
 
 DROP FUNCTION IF EXISTS public.get_monthly_leaderboard();
@@ -325,7 +325,7 @@ AS $function$
     FROM sends s JOIN climbers c ON c.id = s.user_id    WHERE s.sent_at >= date_trunc('month', now() AT TIME ZONE 'America/Mexico_City')
                         AT TIME ZONE 'America/Mexico_City'      AND c.visible_in_leaderboard = true
       AND s.points_monthly > 0
-    GROUP BY c.id, c.display_name ORDER BY 2 DESC LIMIT 50;
+    GROUP BY c.id, c.display_name ORDER BY 2 DESC LIMIT 200;
   $function$;
 
 -- get_weekly_leaderboard (2026-08-23): agregado para el leaderboard TV de 3
@@ -371,7 +371,7 @@ AS $function$
   FROM week_sends ws
   JOIN climbers c ON c.id = ws.user_id
   WHERE ws.rn = 1 AND c.visible_in_leaderboard = true
-  GROUP BY c.id, c.display_name ORDER BY 2 DESC LIMIT 50;
+  GROUP BY c.id, c.display_name ORDER BY 2 DESC LIMIT 200;
 $function$;
 
 GRANT EXECUTE ON FUNCTION public.get_weekly_leaderboard() TO anon, authenticated;

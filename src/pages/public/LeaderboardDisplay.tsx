@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useLeaderboard } from '../../hooks/useLeaderboard'
 import { useSponsorships } from '../../hooks/useSponsorships'
 import { useDisplaySlides } from '../../hooks/useDisplaySlides'
@@ -159,7 +159,61 @@ interface ColumnProps {
   tinted?: boolean
 }
 
+const SCROLL_HOLD_TOP_MS = 10_000   // espera arriba antes de empezar a bajar
+const SCROLL_HOLD_BOTTOM_MS = 4_000 // espera abajo antes de regresar al #1
+const SCROLL_SPEED_PX_S = 40        // velocidad de bajada (constante)
+const SCROLL_RETURN_MS = 1200       // animación de regreso al #1
+
+interface ScrollState { offset: number; durationMs: number; easing: string }
+const SCROLL_TOP: ScrollState = { offset: 0, durationMs: SCROLL_RETURN_MS, easing: 'ease-in-out' }
+
+// Auto-scroll continuo de una lista que no cabe en su contenedor: espera
+// arriba, baja sin detenerse a velocidad constante hasta que se ve la
+// última fila, espera, regresa al #1 y repite. Es una sola transición CSS
+// lineal por bajada (duración = distancia / velocidad), no un rAF — la
+// anima el compositor, más fluido en la Raspberry Pi. Si todo cabe, no se
+// mueve y solo vuelve a medir en el siguiente ciclo.
+function useAutoScroll(rowCount: number) {
+  const viewportRef = useRef<HTMLDivElement>(null)
+  const listRef = useRef<HTMLDivElement>(null)
+  const [scroll, setScroll] = useState<ScrollState>(SCROLL_TOP)
+
+  const overflowPx = () => {
+    const viewport = viewportRef.current
+    const list = listRef.current
+    return viewport && list ? list.scrollHeight - viewport.clientHeight : 0
+  }
+
+  useEffect(() => {
+    let t: ReturnType<typeof setTimeout>
+    const holdTop = () => {
+      setScroll(SCROLL_TOP)
+      t = setTimeout(scrollDown, SCROLL_HOLD_TOP_MS)
+    }
+    const scrollDown = () => {
+      const max = overflowPx()
+      if (max <= 0) { t = setTimeout(scrollDown, SCROLL_HOLD_TOP_MS); return }
+      const durationMs = (max / SCROLL_SPEED_PX_S) * 1000
+      setScroll({ offset: max, durationMs, easing: 'linear' })
+      t = setTimeout(holdTop, durationMs + SCROLL_HOLD_BOTTOM_MS)
+    }
+    holdTop()
+    return () => clearTimeout(t)
+  }, [])
+
+  // Si la lista se acorta (borrado de sends, alguien excluido, cambio de
+  // día) y el offset quedó más allá del final, regresar arriba de inmediato
+  // en vez de mostrar un hueco hasta que termine el ciclo.
+  useEffect(() => {
+    const max = Math.max(overflowPx(), 0)
+    setScroll(cur => (cur.offset > max ? SCROLL_TOP : cur))
+  }, [rowCount])
+
+  return { viewportRef, listRef, scroll }
+}
+
 function LeaderboardColumn({ title, titleAccent, subtitle, entries, emptyTitle, emptySubtitle, period, sponsorships, borderRight, tinted }: ColumnProps) {
+  const { viewportRef, listRef, scroll } = useAutoScroll(entries.length)
   return (
     // Tinte muy sutil (5% blanco) solo en la columna Semana — deja claro
     // a simple vista que son 3 secciones distintas sin competir con el
@@ -185,14 +239,24 @@ function LeaderboardColumn({ title, titleAccent, subtitle, entries, emptyTitle, 
           </div>
         ) : (
           // overflow-hidden, no -auto (2026-08-30): la TV no tiene con qué
-          // hacer scroll, así que un scrollbar fantasma no sirve de nada —
-          // el RPC ahora trae hasta 50 filas y el corte real lo pone el
-          // alto disponible: se ven todos los que quepan al tamaño de letra
-          // actual, ni uno menos.
-          <div className="flex flex-col gap-2 overflow-hidden">
-            {entries.map((entry, i) => (
-              <LeaderboardRow key={entry.climber_id} rank={i + 1} name={entry.display_name} points={Number(entry.total_points)} />
-            ))}
+          // hacer scroll, así que un scrollbar fantasma no sirve de nada.
+          // Auto-scroll continuo (2026-10-04): si la lista no cabe, baja
+          // lento y sin pausas hasta el último lugar y regresa al #1 — así
+          // el #100 también ve su nombre. Ver useAutoScroll.
+          <div ref={viewportRef} className="flex-1 min-h-0 overflow-hidden">
+            <div
+              ref={listRef}
+              className="flex flex-col gap-2 transition-transform"
+              style={{
+                transform: `translateY(-${scroll.offset}px)`,
+                transitionDuration: `${scroll.durationMs}ms`,
+                transitionTimingFunction: scroll.easing,
+              }}
+            >
+              {entries.map((entry, i) => (
+                <LeaderboardRow key={entry.climber_id} rank={i + 1} name={entry.display_name} points={Number(entry.total_points)} />
+              ))}
+            </div>
           </div>
         )}
       </div>
