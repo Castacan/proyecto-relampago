@@ -19,8 +19,7 @@ lista baje sola para que el último lugar (ej. el #100) también vea su nombre.
 - Probado en local con 100 nombres falsos en Hoy y 23 en Semana: llega al
   #100, velocidad constante medida, regresa al #1.
 
-**Pendiente (SQL en Supabase):** los RPC `get_daily_leaderboard`,
-`get_weekly_leaderboard` y `get_monthly_leaderboard` cortan en `LIMIT 50`
-en producción. `src/supabase/schema.sql` ya dice `LIMIT 200`, pero hay que
-correr esas 3 funciones en el SQL Editor para que del 51 en adelante
-aparezcan. Mientras no se corra, el scroll funciona pero solo hasta el #50.
+**SQL en Supabase (corrido por el usuario, 2026-10-04):** los RPC
+`get_daily_leaderboard`, `get_weekly_leaderboard` y
+`get_monthly_leaderboard` pasaron de `LIMIT 50` a `LIMIT 200`, igual que
+`src/supabase/schema.sql`. También aplica a `/leaderboard` (celular).
