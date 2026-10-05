@@ -276,3 +276,6 @@ lista baje sola para que el último lugar (ej. el #100) también vea su nombre.
   no la regrese a la versión vieja.
 - Probado en PGlite partiendo del estado de producción. Falta que el
   usuario corra el SQL (solo las dos funciones que cambian).
+- 2026-10-05: el usuario confirmó que corrió el SQL del método `card`
+  ("success"). No verificado por Claude en producción (requiere sesión de
+  admin y crear una inscripción real).
