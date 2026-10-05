@@ -143,3 +143,18 @@ lista baje sola para que el último lugar (ej. el #100) también vea su nombre.
 `get_daily_leaderboard`, `get_weekly_leaderboard` y
 `get_monthly_leaderboard` pasaron de `LIMIT 50` a `LIMIT 200`, igual que
 `src/supabase/schema.sql`. También aplica a `/leaderboard` (celular).
+
+## 2026-10-04 (noche) — Estado del despliegue de Clip
+
+- Usuario corrió `competencia_pagos.sql` y desplegó `competition-payments`
+  con Verify JWT apagado. Verificado con llamadas inofensivas a producción:
+  `check` responde `{"checked":0}`, `pay` responde `not_configured` (faltan
+  llaves), `reconcile` anónimo responde `forbidden`.
+- **Bloqueo:** en `dashboard.developer.clip.mx/credentials` (se llega por
+  "Panel de desarrolladores" en el panel de Clip; la URL vieja
+  `dashboard.clip.mx/applications` sale en blanco) Clip pide **validar
+  identidad** antes de dar credenciales de producción. Las de "Pruebas"
+  solo sirven para Checkout Transparente, no para links de pago.
+- Arreglo menor en el repo (aún no desplegado): el webhook respondía 500
+  en vez de 403 cuando no hay `CLIP_API_SECRET`. Con el secreto puesto no
+  ocurre; se sincroniza en el próximo despliegue de la función.

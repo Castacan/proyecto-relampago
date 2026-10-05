@@ -199,7 +199,8 @@ async function handleReconcile(req: Request): Promise<Response> {
 async function handleWebhook(req: Request, url: URL): Promise<Response> {
   const paymentId = url.searchParams.get('wh') ?? ''
   const sig = url.searchParams.get('s') ?? ''
-  if (!/^[0-9a-f-]{36}$/.test(paymentId) || sig !== await sign(paymentId)) return json({ error: 'forbidden' }, 403)
+  // Sin secreto de Clip no hay firma que comparar (y firmar con llave vacía truena).
+  if (!CLIP_API_SECRET || !/^[0-9a-f-]{36}$/.test(paymentId) || sig !== await sign(paymentId)) return json({ error: 'forbidden' }, 403)
 
   let body: unknown = null
   try { body = await req.json() } catch { /* cuerpo vacío o no-JSON: se guarda null */ }
