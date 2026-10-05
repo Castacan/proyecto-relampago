@@ -2,6 +2,68 @@
 
 Registro de lo que se va haciendo, sesión por sesión. Lo más reciente arriba.
 
+## 2026-10-04 — Competencia: cobro en línea con Clip (Etapa 2)
+
+**Decisión del usuario:** cobrar con **Clip** (no Openpay), solo tarjeta.
+Probar primero con un cobro real de $1.
+
+**Por qué Clip por API y no un link a mano:** un link hecho a mano no
+lleva nuestro folio. Con la API (`POST api.payclip.com/v2/checkout`) la app
+crea un link por inscripción con el folio en `metadata.external_reference`.
+
+**Hecho:**
+- `src/supabase/competencia_pagos.sql`: `competition_payments`,
+  `competition_payment_events` (solo inserción) y funciones solo para
+  `service_role`: `competition_begin_payment` (escribe el pago local antes
+  de pedir el link; si la reserva venció y no hay cupo, NO cobra),
+  `competition_attach_payment`, `competition_fail_payment`,
+  `competition_record_payment_event`, `competition_apply_payment_status`
+  (idempotente, nunca retrocede), `competition_payments_to_check`. Admin:
+  `get_competition_payments_admin`, `admin_resolve_payment_review`, y
+  `admin_update_competition` ahora acepta `price_cents`.
+- `supabase/functions/competition-payments/index.ts`: una sola Edge
+  Function con `pay`, `check`, `reconcile` (solo admin) y el webhook.
+- Frontend: `CompetitionPayButton` en `/competencia` y
+  `/competencia/consulta` (al volver de Clip con `?pago=ok` insiste unos
+  segundos hasta confirmar); panel con "Pagos en línea (Clip)", botón
+  "Revisar pagos con Clip", pagos por revisar, y precio en Ajustes.
+
+**Reglas de seguridad de pagos:**
+- El webhook de Clip NO trae firma. Su cuerpo solo se guarda como
+  evidencia; el estado se toma SIEMPRE de `GET /v2/checkout/{id}` con
+  nuestras credenciales. La URL del webhook lleva una firma HMAC por pago.
+- Un pago completado que no se puede aplicar limpio queda con
+  `review_reason` (`duplicate`, `amount_mismatch`, `no_room`,
+  `registration_inactive`) y sale en el panel; nunca se descarta.
+- Si el link manual (`payment_link_url`) está vacío se cobra con Clip; si
+  tiene valor, se usa ese link y se confirma a mano.
+
+**Probado en local (sin tocar producción ni Clip):** SQL de pagos con 37
+casos en PGlite; la Edge Function real (transpilada) contra un Clip
+simulado con 27 casos (webhook falso, webhook que miente, webhook que no
+llega, conciliación, monto distinto, Clip caído, rechazo de campos
+opcionales, cobro de $1); y el recorrido en navegador inscribir → pagar →
+volver confirmado. NO probado: Clip real (formato exacto de sus
+respuestas, su webhook real, su sandbox).
+
+**PENDIENTE (lo hace el usuario; Claude no puede desplegar a producción
+ni capturar llaves):**
+1. Correr `src/supabase/competencia_pagos.sql` en el SQL Editor.
+2. Desplegar la función `competition-payments` (Edge Functions → editor)
+   y APAGAR "Verify JWT" en sus detalles.
+3. Crear credenciales de API en dashboard.clip.mx/applications y guardar
+   `CLIP_API_KEY` y `CLIP_API_SECRET` en Edge Functions → Secrets.
+4. Prueba real: en `/staff/competencia` → Ajustes poner precio $1, abrir
+   inscripciones, inscribirse, pagar, verificar que queda "Pagado" solo.
+   Luego regresar el precio a $500 y marcar esa inscripción como reembolso.
+
+**Limitaciones conocidas:**
+- "Recaudado" en el panel = pagados × precio actual: la inscripción de
+  prueba de $1 contará como $500 hasta marcarla reembolsada.
+- No hay revisión automática programada (cron): la red de seguridad es el
+  botón "Revisar pagos con Clip" y la consulta que hace cada participante.
+- Sin correos de confirmación todavía.
+
 ## 2026-10-04 — Inscripciones a la competencia (Etapa 1)
 
 **Contexto:** competencia de boulder el 7-nov-2026, 6 categorías, 80–100
