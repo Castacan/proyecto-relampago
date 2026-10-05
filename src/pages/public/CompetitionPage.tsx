@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import { fmtDateOnly } from '../../lib/dates'
 import {
-  COMPETITION_SLUG, LAST_REGISTRATION_KEY, SHIRT_SIZES, SPOTS_NOTICE_THRESHOLD, MINOR_NOTICE, REGISTER_ERRORS, formatPrice, formatDeadline,
+  COMPETITION_SLUG, CATEGORY_NOTICE, LAST_REGISTRATION_KEY, SHIRT_SIZES, SPOTS_NOTICE_THRESHOLD, MINOR_NOTICE, REGISTER_ERRORS, formatPrice, formatDeadline,
   type PublicCompetition, type RegistrationResult, type ShirtSize,
 } from '../../lib/competition'
 import CompetitionPayButton from '../../components/CompetitionPayButton'
@@ -83,7 +83,7 @@ export default function CompetitionPage() {
     if (!categoryId) return 'Elige una categoría.'
     if (!shirtSize) return 'Elige una talla de playera.'
     if (!acceptPrivacy) return 'Debes aceptar el aviso de privacidad.'
-    if (comp.waiver_text && !acceptWaiver) return 'Debes aceptar el deslinde de responsabilidad.'
+    if (comp.waiver_text && !acceptWaiver) return 'Debes aceptar las reglas y el deslinde de responsabilidad.'
     return null
   }
 
@@ -208,6 +208,7 @@ export default function CompetitionPage() {
 
                 <fieldset>
                   <legend className={labelClass}>Categoría</legend>
+                  <p className="text-zinc-300 text-xs leading-relaxed mb-2.5">{CATEGORY_NOTICE}</p>
                   <div className="space-y-2">
                     {comp.categories.map(cat => {
                       const selected = categoryId === cat.id
@@ -251,8 +252,8 @@ export default function CompetitionPage() {
                   <ConsentBox title="Aviso de privacidad" text={comp.privacy_text}
                     label="Acepto el aviso de privacidad" checked={acceptPrivacy} onChange={setAcceptPrivacy} />
                   {comp.waiver_text && (
-                    <ConsentBox title="Deslinde de responsabilidad" text={comp.waiver_text}
-                      label="Acepto el deslinde de responsabilidad" checked={acceptWaiver} onChange={setAcceptWaiver} />
+                    <ConsentBox title="Reglas y deslinde de responsabilidad" text={comp.waiver_text}
+                      label="Acepto las reglas y el deslinde de responsabilidad" checked={acceptWaiver} onChange={setAcceptWaiver} />
                   )}
                 </div>
 

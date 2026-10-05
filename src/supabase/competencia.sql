@@ -619,7 +619,7 @@ GRANT EXECUTE ON FUNCTION public.admin_update_competition(TEXT, JSONB) TO authen
 
 -- ------------------------------------------------------------
 -- Datos iniciales — PROVISIONALES, cerrada (is_open = false).
--- Todo lo marcado "POR DEFINIR" se corrige antes de abrir. El slug
+-- Los datos reales se aplican con competencia_datos.sql. El slug
 -- 'competencia-2026' es el que usa el frontend (src/lib/competition.ts).
 -- ------------------------------------------------------------
 INSERT INTO public.competitions (
@@ -639,12 +639,12 @@ INSERT INTO public.competition_categories (competition_id, name, gender, level, 
 SELECT c.id, v.name, v.gender, v.level, v.description, v.sort_order
 FROM public.competitions c
 CROSS JOIN (VALUES
-  ('Femenil Principiante', 'femenil', 'principiante', 'POR DEFINIR', 1),
-  ('Femenil Intermedio',   'femenil', 'intermedio',   'POR DEFINIR', 2),
-  ('Femenil Avanzado',     'femenil', 'avanzado',     'POR DEFINIR', 3),
-  ('Varonil Principiante', 'varonil', 'principiante', 'POR DEFINIR', 4),
-  ('Varonil Intermedio',   'varonil', 'intermedio',   'POR DEFINIR', 5),
-  ('Varonil Avanzado',     'varonil', 'avanzado',     'POR DEFINIR', 6)
+  ('Femenil Básico',       'femenil', 'basico',       NULL, 1),
+  ('Femenil Intermedio',   'femenil', 'intermedio',   NULL, 2),
+  ('Femenil Avanzado',     'femenil', 'avanzado',     NULL, 3),
+  ('Varonil Básico',       'varonil', 'basico',       NULL, 4),
+  ('Varonil Intermedio',   'varonil', 'intermedio',   NULL, 5),
+  ('Varonil Avanzado',     'varonil', 'avanzado',     NULL, 6)
 ) AS v(name, gender, level, description, sort_order)
 WHERE c.slug = 'competencia-2026'
 ON CONFLICT (competition_id, name) DO NOTHING;

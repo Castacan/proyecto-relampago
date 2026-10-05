@@ -82,6 +82,10 @@ export interface RegistrationLookup {
   place: string | null
 }
 
+// Aviso junto al selector de categoría. El mismo criterio va, más
+// completo, en el texto de reglas que se acepta (competitions.waiver_text).
+export const CATEGORY_NOTICE = 'Elige la categoría de tu nivel real. Medimos el desempeño de todos los participantes y podemos mover a una categoría más difícil a quien compita por debajo de su nivel.'
+
 export const MINOR_NOTICE = 'Eres menor de edad: el día del evento debes llegar con un mayor de edad para firmar tu registro.'
 
 export function formatPrice(cents: number): string {
@@ -105,7 +109,7 @@ export const REGISTER_ERRORS: Record<string, string> = {
   invalid_shirt_size: 'Elige una talla de playera.',
   invalid_category: 'Elige una categoría.',
   privacy_required: 'Debes aceptar el aviso de privacidad.',
-  waiver_required: 'Debes aceptar el deslinde de responsabilidad.',
+  waiver_required: 'Debes aceptar las reglas y el deslinde de responsabilidad.',
   closed: 'Las inscripciones están cerradas.',
   full: 'Ya no quedan lugares.',
   category_full: 'Esa categoría ya está llena. Elige otra.',

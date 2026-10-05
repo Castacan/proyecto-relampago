@@ -192,3 +192,17 @@ lista baje sola para que el último lugar (ej. el #100) también vea su nombre.
   devolver dinero.
 - Siguen pendientes: nombres/criterios definitivos de las 6 categorías,
   qué incluye la inscripción, revisar textos de privacidad y deslinde.
+
+## 2026-10-04 (noche) — Categoría "Básico" y regla de reubicación
+
+- Pedido del usuario: el nivel de entrada se llama **Básico** (no
+  Principiante); no se muestra nada en "qué incluye"; y hace falta avisar
+  que se puede mover de categoría a quien compita por debajo de su nivel
+  (práctica común: gente que se inscribe en una categoría más fácil).
+- Hecho: aviso corto junto al selector de categoría (`CATEGORY_NOTICE` en
+  `src/lib/competition.ts`) y párrafo "Categorías" al inicio del texto que
+  se acepta (ahora "Reglas y deslinde de responsabilidad"), con
+  `waiver_version = 'v2'`. Todo en `src/supabase/competencia_datos.sql`
+  (lo corre el usuario). El seed de `competencia.sql` ya usa "Básico".
+- El texto de la regla es redacción de Claude a partir de lo que dictó el
+  usuario; no dice nada sobre reembolsos ni sobre si la decisión es apelable.
