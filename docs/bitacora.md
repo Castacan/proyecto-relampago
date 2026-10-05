@@ -206,3 +206,21 @@ lista baje sola para que el último lugar (ej. el #100) también vea su nombre.
   (lo corre el usuario). El seed de `competencia.sql` ya usa "Básico".
 - El texto de la regla es redacción de Claude a partir de lo que dictó el
   usuario; no dice nada sobre reembolsos ni sobre si la decisión es apelable.
+
+## 2026-10-04 (noche) — Correo de confirmación y fin del mensaje de "48 horas"
+
+- **Correo "Pago confirmado"** desde la Edge Function vía Resend
+  (`hola@jaibamuro.com`, dominio ya verificado): folio, nombre, categoría,
+  talla, fecha/hora/lugar, monto y recibo de Clip, aviso de menor si
+  aplica, botón a la consulta. Se manda UNA vez, solo cuando el pago pasa a
+  completado y la inscripción queda pagada (no en reprocesos, no si queda
+  "por atender"). Si Resend falla, el pago sigue confirmado y el fallo queda
+  en `competition_payment_events` (source `email`).
+  Requiere el secreto `RESEND_API_KEY` y volver a desplegar la función.
+  NO se manda correo cuando staff marca pagado a mano.
+- **48 horas:** era la reserva de lugar mientras se paga. Con cupo sin
+  límite no tiene sentido, así que con cupo ilimitado las pantallas ya no
+  mencionan reserva ni fecha límite ("Tu inscripción queda confirmada en
+  cuanto se aprueba tu pago").
+- Probado en local con Resend simulado: 11 casos (contenido, escape de
+  HTML en el nombre, no reenvío, vía de respaldo, Resend caído, por atender).

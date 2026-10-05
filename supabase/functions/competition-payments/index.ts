@@ -14,6 +14,8 @@
 //
 // Secretos que hay que definir en Supabase (Edge Functions → Secrets):
 //   CLIP_API_KEY, CLIP_API_SECRET   (panel de desarrolladores de Clip)
+//   RESEND_API_KEY                  (para el correo de confirmación; sin ella no se envía)
+//   EMAIL_FROM                      (opcional; default Jaibamuro <hola@jaibamuro.com>)
 //   APP_URL                         (opcional; default https://app.jaibamuro.com)
 // SUPABASE_URL / SUPABASE_ANON_KEY / SUPABASE_SERVICE_ROLE_KEY los pone Supabase.
 //
@@ -27,8 +29,11 @@ const ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY') ?? ''
 const CLIP_API_KEY = Deno.env.get('CLIP_API_KEY') ?? ''
 const CLIP_API_SECRET = Deno.env.get('CLIP_API_SECRET') ?? ''
 const APP_URL = (Deno.env.get('APP_URL') ?? 'https://app.jaibamuro.com').replace(/\/$/, '')
+const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY') ?? ''
+const EMAIL_FROM = Deno.env.get('EMAIL_FROM') ?? 'Jaibamuro <hola@jaibamuro.com>'
 
 const CLIP_API = 'https://api.payclip.com/v2/checkout'
+const RESEND_API = 'https://api.resend.com/emails'
 const FUNCTION_URL = `${SUPABASE_URL}/functions/v1/competition-payments`
 
 const db = createClient(SUPABASE_URL, SERVICE_KEY, { auth: { persistSession: false } })
@@ -69,6 +74,88 @@ async function clip(url: string, init: RequestInit = {}): Promise<{ ok: boolean;
   return { ok: res.ok, status: res.status, body }
 }
 
+const MESES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre']
+
+function esc(v: unknown): string {
+  return String(v ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c] as string))
+}
+
+// Correo de "pago confirmado". Se llama UNA vez: solo cuando un pago pasa
+// a completado y la inscripción queda pagada (no en reprocesos). Si falla,
+// el pago sigue confirmado; el fallo queda en competition_payment_events.
+async function sendConfirmationEmail(providerPaymentId: string): Promise<void> {
+  if (!RESEND_API_KEY) return
+  let to = ''
+  try {
+    const { data: pay } = await db.from('competition_payments')
+      .select('registration_id, amount_cents, receipt_no').eq('provider_payment_id', providerPaymentId).maybeSingle()
+    if (!pay) return
+    const { data: reg } = await db.from('competition_registrations')
+      .select('folio, full_name, email, shirt_size, birth_date, category_id, competition_id').eq('id', pay.registration_id).maybeSingle()
+    if (!reg) return
+    const { data: cat } = await db.from('competition_categories').select('name').eq('id', reg.category_id).maybeSingle()
+    const { data: comp } = await db.from('competitions')
+      .select('name, event_date, event_time_text, place').eq('id', reg.competition_id).maybeSingle()
+    if (!comp) return
+    to = reg.email
+
+    const [ey, em, ed] = String(comp.event_date).split('-').map(Number)
+    const [by, bm, bd] = String(reg.birth_date).split('-').map(Number)
+    const isMinor = ey - by - (em < bm || (em === bm && ed < bd) ? 1 : 0) < 18
+    const fecha = `${ed} de ${MESES[em - 1]} de ${ey}` + (comp.event_time_text ? ` · ${comp.event_time_text}` : '')
+    const monto = `$${(pay.amount_cents / 100).toLocaleString('es-MX')} MXN`
+    const row = (k: string, v: string) =>
+      `<tr><td style="padding:6px 0;color:#9fc3cf;font-size:14px;width:110px;vertical-align:top">${k}</td><td style="padding:6px 0;color:#f4f4f3;font-size:14px;font-weight:600">${v}</td></tr>`
+
+    const html = `<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"></head><body style="margin:0;padding:0;background:#013a4b;font-family:Inter,Arial,Helvetica,sans-serif">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#013a4b;padding:32px 16px"><tr><td align="center">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:480px">
+<tr><td align="center" style="padding-bottom:24px"><img src="https://jaibamuro.com/logo-email.png" alt="Jaibamuro" height="36" style="height:36px;width:auto"></td></tr>
+<tr><td style="background:#015169;border-radius:16px;padding:28px 24px">
+<p style="margin:0 0 6px;color:#22c55e;font-size:14px;font-weight:700">Pago confirmado</p>
+<h1 style="margin:0 0 18px;color:#f4f4f3;font-size:22px;line-height:1.25">Ya estás dentro de ${esc(comp.name)}, ${esc(String(reg.full_name).split(' ')[0])}.</h1>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#013a4b;border-radius:12px;margin-bottom:18px"><tr><td align="center" style="padding:16px">
+<p style="margin:0 0 4px;color:#9fc3cf;font-size:11px;font-weight:700;letter-spacing:2px">TU FOLIO</p>
+<p style="margin:0;color:#ff4d15;font-size:30px;font-weight:800;letter-spacing:3px;font-family:'JetBrains Mono',Consolas,monospace">${esc(reg.folio)}</p>
+</td></tr></table>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+${row('Nombre', esc(reg.full_name))}
+${row('Categoría', esc(cat?.name ?? ''))}
+${row('Talla', esc(reg.shirt_size))}
+${row('Cuándo', esc(fecha))}
+${comp.place ? row('Dónde', esc(comp.place)) : ''}
+${row('Pagaste', esc(monto) + (pay.receipt_no ? ` · recibo Clip ${esc(pay.receipt_no)}` : ''))}
+</table>
+${isMinor ? `<p style="margin:18px 0 0;padding:12px 14px;border:1px solid #ffd260;border-radius:12px;color:#ffd260;font-size:14px;font-weight:600">Eres menor de edad: el día del evento debes llegar con un mayor de edad para firmar tu registro.</p>` : ''}
+<p style="margin:18px 0 0;color:#cfe3ea;font-size:14px;line-height:1.5">El día del evento da tu nombre o tu folio en el registro. Puedes revisar tu inscripción cuando quieras:</p>
+<p style="margin:14px 0 0"><a href="${APP_URL}/competencia/consulta" style="display:inline-block;background:#ff4d15;color:#1a1a1a;font-weight:800;font-size:14px;text-decoration:none;padding:12px 20px;border-radius:12px">Consultar mi inscripción</a></p>
+</td></tr>
+<tr><td align="center" style="padding-top:18px;color:#7fa9b7;font-size:12px">Jaibamuro · Instagram @jaibamuro</td></tr>
+</table></td></tr></table></body></html>`
+
+    const res = await fetch(RESEND_API, {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${RESEND_API_KEY}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        from: EMAIL_FROM, to: [reg.email],
+        subject: `Pago confirmado · ${comp.name} · Folio ${reg.folio}`,
+        html,
+      }),
+      signal: AbortSignal.timeout(10_000),
+    })
+    const text = await res.text()
+    await db.rpc('competition_record_payment_event', {
+      p_provider_payment_id: providerPaymentId, p_source: 'email', p_kind: res.ok ? 'email_sent' : 'email_error',
+      p_payload: { to: reg.email, http: res.status, body: text.slice(0, 500) },
+    })
+  } catch (e) {
+    await db.rpc('competition_record_payment_event', {
+      p_provider_payment_id: providerPaymentId, p_source: 'email', p_kind: 'email_error',
+      p_payload: { to, message: String((e as Error)?.message ?? e) },
+    })
+  }
+}
+
 // Consulta el estado real de un link en Clip y lo aplica. Devuelve lo que
 // decidió la base (o el error de comunicación, que también queda guardado).
 async function checkWithClip(providerPaymentId: string, source: string): Promise<Record<string, unknown>> {
@@ -90,7 +177,11 @@ async function checkWithClip(providerPaymentId: string, source: string): Promise
       p_raw: res.body,
     })
     if (error) throw new Error(error.message)
-    return data as Record<string, unknown>
+    const result = data as Record<string, unknown>
+    if (result.status === 'completed' && !result.noop && result.registration_status === 'paid') {
+      await sendConfirmationEmail(providerPaymentId)
+    }
+    return result
   } catch (e) {
     await db.rpc('competition_record_payment_event', {
       p_provider_payment_id: providerPaymentId, p_source: source, p_kind: 'error',

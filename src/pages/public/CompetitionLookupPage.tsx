@@ -3,7 +3,7 @@ import { Link, useSearchParams } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import { fmtDateOnly } from '../../lib/dates'
 import {
-  LAST_REGISTRATION_KEY, MINOR_NOTICE, formatPrice, formatDeadline, refreshOnlinePayment, type RegistrationLookup,
+  COMPETITION_SLUG, LAST_REGISTRATION_KEY, MINOR_NOTICE, isUnlimitedCapacity, formatPrice, formatDeadline, refreshOnlinePayment, type RegistrationLookup,
 } from '../../lib/competition'
 import CompetitionPayButton from '../../components/CompetitionPayButton'
 import logoHorizontal from '../../assets/logo-horizontal.png'
@@ -20,6 +20,15 @@ export default function CompetitionLookupPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [reg, setReg] = useState<RegistrationLookup | null>(null)
+
+  // Con cupo sin límite no se habla de reserva ni de fecha límite.
+  const [unlimited, setUnlimited] = useState(false)
+  useEffect(() => {
+    db.rpc('get_competition_public', { p_slug: COMPETITION_SLUG })
+      .then(({ data }: { data: { spots_left?: number } | null }) => {
+        if (typeof data?.spots_left === 'number') setUnlimited(isUnlimitedCapacity(data.spots_left))
+      })
+  }, [])
 
   // ?pago=ok|error: la persona viene de regreso de la página de Clip.
   const [searchParams] = useSearchParams()
@@ -125,13 +134,13 @@ export default function CompetitionLookupPage() {
             El pago no se completó. No se te cobró; puedes intentarlo de nuevo.
           </p>
         )}
-        {reg && <RegistrationCard reg={reg} email={email} />}
+        {reg && <RegistrationCard reg={reg} email={email} unlimited={unlimited} />}
       </div>
     </div>
   )
 }
 
-function RegistrationCard({ reg, email }: { reg: RegistrationLookup; email: string }) {
+function RegistrationCard({ reg, email, unlimited }: { reg: RegistrationLookup; email: string; unlimited: boolean }) {
   const unpaid = reg.status === 'pending_payment'
 
   const headline =
@@ -140,6 +149,7 @@ function RegistrationCard({ reg, email }: { reg: RegistrationLookup; email: stri
     : reg.status === 'cancelled' ? { text: 'Esta inscripción fue cancelada.', color: 'text-zinc-300' }
     : reg.status === 'refunded' ? { text: 'Esta inscripción fue reembolsada.', color: 'text-zinc-300' }
     : reg.status === 'expired' ? { text: 'Esta inscripción venció sin pago.', color: 'text-zinc-300' }
+    : unlimited ? { text: 'Pendiente de pago.', color: 'text-amarillo-suave' }
     : reg.hold_expired ? { text: 'Tu reserva venció y tu lugar ya no está apartado.', color: 'text-amarillo-suave' }
     : { text: 'Pendiente de pago. Tu lugar está apartado.', color: 'text-amarillo-suave' }
 
@@ -159,7 +169,11 @@ function RegistrationCard({ reg, email }: { reg: RegistrationLookup; email: stri
 
       {unpaid && (
         <div className="bg-superficie rounded-2xl border border-zinc-800/60 p-5 space-y-3">
-          {reg.hold_expired ? (
+          {unlimited ? (
+            <p className="text-zinc-300 text-sm">
+              Tu inscripción queda confirmada en cuanto se aprueba tu pago de {formatPrice(reg.price_cents)}. Si ya pagaste, lo confirmaremos en cuanto lo verifiquemos.
+            </p>
+          ) : reg.hold_expired ? (
             <p className="text-zinc-300 text-sm">
               Si ya pagaste, tu pago no se pierde: lo confirmaremos en cuanto lo verifiquemos. Si aún no pagas, todavía puedes hacerlo, pero el lugar depende de que quede cupo.
             </p>

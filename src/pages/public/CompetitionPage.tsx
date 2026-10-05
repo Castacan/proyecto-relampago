@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import { fmtDateOnly } from '../../lib/dates'
 import {
-  COMPETITION_SLUG, CATEGORY_NOTICE, LAST_REGISTRATION_KEY, SHIRT_SIZES, SPOTS_NOTICE_THRESHOLD, MINOR_NOTICE, REGISTER_ERRORS, formatPrice, formatDeadline,
+  COMPETITION_SLUG, CATEGORY_NOTICE, isUnlimitedCapacity, LAST_REGISTRATION_KEY, SHIRT_SIZES, SPOTS_NOTICE_THRESHOLD, MINOR_NOTICE, REGISTER_ERRORS, formatPrice, formatDeadline,
   type PublicCompetition, type RegistrationResult, type ShirtSize,
 } from '../../lib/competition'
 import CompetitionPayButton from '../../components/CompetitionPayButton'
@@ -131,7 +131,7 @@ export default function CompetitionPage() {
 
       <div className="max-w-md mx-auto w-full px-5 py-6 space-y-6">
         {result ? (
-          <RegistrationDone result={result} email={resultEmail} />
+          <RegistrationDone result={result} email={resultEmail} unlimited={isUnlimitedCapacity(comp.spots_left)} />
         ) : (
           <>
             <div>
@@ -270,8 +270,10 @@ export default function CompetitionPage() {
                   className="w-full py-4 rounded-2xl bg-primario hover:bg-primario-hover text-texto-en-acento font-black text-base transition-all disabled:opacity-50 active:scale-95">
                   {submitting ? 'Inscribiendo...' : 'Inscribirme'}
                 </button>
-                <p className="text-zinc-500 text-xs text-center">
-                  Al inscribirte apartamos tu lugar por {comp.hold_hours} horas mientras pagas.
+                <p className="text-zinc-400 text-xs text-center">
+                  {isUnlimitedCapacity(comp.spots_left)
+                    ? 'Tu inscripción queda confirmada en cuanto se aprueba tu pago.'
+                    : `Al inscribirte apartamos tu lugar por ${comp.hold_hours} horas mientras pagas.`}
                 </p>
               </form>
             )}
@@ -297,11 +299,11 @@ function ConsentBox({ title, text, label, checked, onChange }: {
   )
 }
 
-function RegistrationDone({ result, email }: { result: RegistrationResult; email: string }) {
+function RegistrationDone({ result, email, unlimited }: { result: RegistrationResult; email: string; unlimited: boolean }) {
   return (
     <div className="space-y-5">
       <div>
-        <h1 className="text-texto-principal font-black text-2xl tracking-tight">Tu lugar está apartado</h1>
+        <h1 className="text-texto-principal font-black text-2xl tracking-tight">{unlimited ? 'Ya casi: falta tu pago' : 'Tu lugar está apartado'}</h1>
         <p className="text-zinc-300 text-sm mt-1">
           {result.full_name} · {result.category_name} · talla {result.shirt_size}
         </p>
@@ -315,9 +317,13 @@ function RegistrationDone({ result, email }: { result: RegistrationResult; email
 
       <div className="bg-superficie rounded-2xl border border-zinc-800/60 p-5 space-y-3">
         <p className="text-texto-principal font-bold">Falta tu pago de {formatPrice(result.price_cents)}</p>
-        <p className="text-zinc-300 text-sm">
-          Tienes hasta el <span className="font-bold text-texto-principal">{formatDeadline(result.hold_expires_at)}</span> para pagar; después de esa hora tu lugar se libera.
-        </p>
+        {unlimited ? (
+          <p className="text-zinc-300 text-sm">Tu inscripción queda confirmada en cuanto se aprueba tu pago.</p>
+        ) : (
+          <p className="text-zinc-300 text-sm">
+            Tienes hasta el <span className="font-bold text-texto-principal">{formatDeadline(result.hold_expires_at)}</span> para pagar; después de esa hora tu lugar se libera.
+          </p>
+        )}
         {result.payment_instructions && (
           <p className="text-zinc-300 text-sm whitespace-pre-line">{result.payment_instructions}</p>
         )}

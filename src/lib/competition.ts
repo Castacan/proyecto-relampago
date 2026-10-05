@@ -16,6 +16,12 @@ export const LAST_REGISTRATION_KEY = 'relampago_competition_last'
 // panel dice "sin límite" en vez de mostrar el número.
 export const UNLIMITED_CAPACITY = 100000
 
+// Con cupo sin límite no hay lugar que "apartar": las pantallas no hablan
+// de reserva ni de fecha límite, solo de que falta el pago.
+export function isUnlimitedCapacity(spotsLeft: number): boolean {
+  return spotsLeft >= UNLIMITED_CAPACITY / 2
+}
+
 // La página pública solo menciona lugares disponibles cuando quedan pocos.
 export const SPOTS_NOTICE_THRESHOLD = 20
 
