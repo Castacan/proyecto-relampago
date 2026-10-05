@@ -52,7 +52,7 @@ BEGIN
   END IF;
   IF v_phone IS NOT NULL AND length(v_phone) <> 10 THEN RETURN jsonb_build_object('error', 'invalid_phone'); END IF;
   IF p_shirt_size IS NULL OR p_shirt_size NOT IN ('S','M','L','XL') THEN RETURN jsonb_build_object('error', 'invalid_shirt_size'); END IF;
-  IF p_method IS NULL OR p_method NOT IN ('link','transfer','cash','other') THEN RETURN jsonb_build_object('error', 'invalid_method'); END IF;
+  IF p_method IS NULL OR p_method NOT IN ('cash','card','transfer','link','other') THEN RETURN jsonb_build_object('error', 'invalid_method'); END IF;
 
   SELECT c.* INTO v_comp FROM competitions c WHERE c.slug = p_slug FOR UPDATE;
   IF NOT FOUND THEN RETURN jsonb_build_object('error', 'not_found'); END IF;

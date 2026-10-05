@@ -260,3 +260,19 @@ lista baje sola para que el último lugar (ej. el #100) también vea su nombre.
 - A las inscripciones manuales NO se les manda correo de confirmación.
 - Probado: SQL con 20 casos en PGlite. El formulario NO se probó en
   navegador. Falta que el usuario corra el SQL.
+
+## 2026-10-05 — Método de pago "Tarjeta en sucursal"
+
+- El usuario ya corrió `competencia_manual.sql` (inscripción manual activa).
+- Pedido: agregar **tarjeta** a "¿Cómo pagó?", porque en el gym también
+  cobran con terminal. Nuevo método `card` ("Tarjeta en sucursal") en
+  `admin_register_participant` y en `mark_paid` de
+  `admin_update_registration`; el panel lo ofrece en la inscripción manual
+  y al marcar pagado (orden: Efectivo, Tarjeta en sucursal, Transferencia,
+  Link de pago, Otro; default Efectivo). `clip` sigue siendo solo para el
+  pago en línea.
+- De paso: `admin_update_competition` en `competencia.sql` quedó igual a la
+  versión vigente (con `price_cents`), para que volver a correr ese archivo
+  no la regrese a la versión vieja.
+- Probado en PGlite partiendo del estado de producción. Falta que el
+  usuario corra el SQL (solo las dos funciones que cambian).

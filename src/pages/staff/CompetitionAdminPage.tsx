@@ -63,13 +63,14 @@ const ACTION_LABELS: Record<Action, string> = {
 // elegible al marcar pagado a mano (MANUAL_METHODS).
 const PAYMENT_METHODS: Record<string, string> = {
   clip: 'Clip en línea',
+  cash: 'Efectivo',
+  card: 'Tarjeta en sucursal',
   link: 'Link de pago',
   transfer: 'Transferencia',
-  cash: 'Efectivo',
   other: 'Otro',
 }
 
-const MANUAL_METHODS = ['link', 'transfer', 'cash', 'other']
+const MANUAL_METHODS = ['cash', 'card', 'transfer', 'link', 'other']
 
 interface PaymentReview {
   id: string
@@ -515,7 +516,7 @@ function SettingsForm({ comp, onSaved }: { comp: AdminCompetition; onSaved: () =
 function ActionPanel({ reg, categories, onDone }: { reg: AdminRegistration; categories: AdminCategory[]; onDone: () => void }) {
   const [action, setAction] = useState<Action | null>(null)
   const [reason, setReason] = useState('')
-  const [method, setMethod] = useState('link')
+  const [method, setMethod] = useState('cash')
   const [edit, setEdit] = useState({
     full_name: reg.full_name, email: reg.email ?? '', phone: reg.phone ?? '',
     category_id: reg.category_id, shirt_size: reg.shirt_size,
@@ -749,7 +750,7 @@ function ManualRegistrationForm({ categories, onDone }: { categories: AdminCateg
           <div>
             <label htmlFor="man-method" className={fieldLabel}>¿Cómo pagó?</label>
             <select id="man-method" value={form.method} onChange={e => set({ method: e.target.value })} className={inputClass}>
-              {['cash', 'transfer', 'link', 'other'].map(k => <option key={k} value={k}>{PAYMENT_METHODS[k]}</option>)}
+              {MANUAL_METHODS.map(k => <option key={k} value={k}>{PAYMENT_METHODS[k]}</option>)}
             </select>
           </div>
         </div>

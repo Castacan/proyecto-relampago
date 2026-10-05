@@ -70,7 +70,7 @@ CREATE TABLE IF NOT EXISTS public.competition_registrations (
                       CHECK (status IN ('pending_payment','paid','expired','cancelled','refunded','needs_attention')),
   hold_expires_at     TIMESTAMPTZ,
   paid_at             TIMESTAMPTZ,
-  payment_method      TEXT,                   -- 'link' | 'transfer' | 'cash' | 'other'
+  payment_method      TEXT,                   -- 'clip' (en línea) | 'cash' | 'card' (terminal en el gym) | 'transfer' | 'link' | 'other'
   checked_in_at       TIMESTAMPTZ,
   privacy_accepted_at TIMESTAMPTZ NOT NULL,
   waiver_accepted_at  TIMESTAMPTZ,
@@ -402,7 +402,7 @@ $function$;
 
 -- Acciones de staff sobre una inscripción. Todas dejan rastro en
 -- competition_audit_log; el motivo es obligatorio salvo en check-in.
---   mark_paid         payload {method: 'link'|'transfer'|'cash'|'other'}
+--   mark_paid         payload {method: 'cash'|'card'|'transfer'|'link'|'other'} ('card' = terminal en el gym)
 --   resolve_attention needs_attention → paid (staff decide admitirlo)
 --   cancel            solo si NO hay dinero recibido
 --   mark_refunded     paid/needs_attention → refunded
@@ -459,7 +459,7 @@ BEGIN
   IF p_action = 'mark_paid' THEN
     IF v_reg.status NOT IN ('pending_payment','expired') THEN RETURN jsonb_build_object('error', 'invalid_state'); END IF;
     v_method := v_payload->>'method';
-    IF v_method IS NULL OR v_method NOT IN ('link','transfer','cash','other') THEN
+    IF v_method IS NULL OR v_method NOT IN ('cash','card','transfer','link','other') THEN
       RETURN jsonb_build_object('error', 'invalid_method');
     END IF;
     -- Otra inscripción activa de la misma persona (se reinscribió tras
@@ -562,7 +562,7 @@ END;
 $function$;
 
 -- Ajustes operativos de la competencia desde el panel. Solo estas llaves:
--- is_open, capacity_total, hold_hours, payment_link_url, payment_instructions.
+-- is_open, capacity_total, hold_hours, price_cents, payment_link_url, payment_instructions.
 -- (Nombre, fechas, textos y categorías se editan por SQL / Table Editor.)
 CREATE OR REPLACE FUNCTION public.admin_update_competition(p_slug TEXT, p_patch JSONB)
 RETURNS JSONB
@@ -581,10 +581,12 @@ BEGIN
   IF p_patch ? 'is_open' THEN v_new.is_open := (p_patch->>'is_open')::boolean; END IF;
   IF p_patch ? 'capacity_total' THEN v_new.capacity_total := (p_patch->>'capacity_total')::int; END IF;
   IF p_patch ? 'hold_hours' THEN v_new.hold_hours := (p_patch->>'hold_hours')::int; END IF;
+  IF p_patch ? 'price_cents' THEN v_new.price_cents := (p_patch->>'price_cents')::int; END IF;
   IF p_patch ? 'payment_link_url' THEN v_new.payment_link_url := nullif(btrim(p_patch->>'payment_link_url'), ''); END IF;
   IF p_patch ? 'payment_instructions' THEN v_new.payment_instructions := nullif(btrim(p_patch->>'payment_instructions'), ''); END IF;
 
-  IF v_new.capacity_total < 0 OR v_new.hold_hours < 1 OR v_new.hold_hours > 720 THEN
+  IF v_new.capacity_total < 0 OR v_new.hold_hours < 1 OR v_new.hold_hours > 720
+     OR v_new.price_cents IS NULL OR v_new.price_cents < 100 THEN
     RETURN jsonb_build_object('error', 'invalid_value');
   END IF;
   IF v_new.payment_link_url IS NOT NULL AND v_new.payment_link_url !~* '^https://' THEN
@@ -593,6 +595,7 @@ BEGIN
 
   UPDATE competitions c SET
     is_open = v_new.is_open, capacity_total = v_new.capacity_total, hold_hours = v_new.hold_hours,
+    price_cents = v_new.price_cents,
     payment_link_url = v_new.payment_link_url, payment_instructions = v_new.payment_instructions
   WHERE c.id = v_comp.id;
 
