@@ -478,6 +478,11 @@ function SettingsForm({ comp, onSaved }: { comp: AdminCompetition; onSaved: () =
           <input id="set-hold" type="number" min={1} max={720} value={holdHours} onChange={e => setHoldHours(e.target.value)} className={inputClass} />
         </div>
       </div>
+      {Number(capacity) >= UNLIMITED_CAPACITY && (
+        <p className="text-zinc-400 text-xs">
+          Con cupo sin límite, "Horas para pagar" no se le muestra a nadie ni le quita su lugar: solo decide cuándo una inscripción sin pagar aparece aquí como "Vencido". Puede pagar igual después.
+        </p>
+      )}
       <div>
         <label htmlFor="set-link" className="block text-zinc-300 text-xs font-bold mb-1">Link de pago manual (déjalo vacío para cobrar con Clip en línea)</label>
         <input id="set-link" type="url" value={link} onChange={e => setLink(e.target.value)} placeholder="https://..." className={inputClass} />
