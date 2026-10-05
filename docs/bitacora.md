@@ -178,3 +178,17 @@ lista baje sola para que el último lugar (ej. el #100) también vea su nombre.
   competencia (nombre, hora, lugar, cupo, 6 categorías, textos) antes de abrir.
 - Observado una vez, sin diagnosticar: abrir `/staff/competencia` por URL
   directa terminó en `/staff`; entrando por el tab funciona.
+
+## 2026-10-04 (noche) — Datos reales de la competencia
+
+- Dictados por el usuario: nombre **JAM Jaibas Al Muro**, inicio 10:00 am
+  (horarios por categoría por definir), lugar Jaibamuro, cupo ilimitado y
+  sin anunciarlo. SQL en `src/supabase/competencia_datos.sql` (lo corre el
+  usuario). Cupo ilimitado = `capacity_total = 100000`.
+- La página pública ya solo menciona lugares disponibles cuando quedan 20
+  o menos; el panel dice "sin límite de cupo".
+- Aclarado al usuario: "Registrar reembolso" en el panel SOLO registra; el
+  reembolso real se hace en el panel de Clip. La app no le pide a Clip
+  devolver dinero.
+- Siguen pendientes: nombres/criterios definitivos de las 6 categorías,
+  qué incluye la inscripción, revisar textos de privacidad y deslinde.

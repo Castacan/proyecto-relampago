@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import { fmtDateOnly } from '../../lib/dates'
 import {
-  COMPETITION_SLUG, LAST_REGISTRATION_KEY, SHIRT_SIZES, MINOR_NOTICE, REGISTER_ERRORS, formatPrice, formatDeadline,
+  COMPETITION_SLUG, LAST_REGISTRATION_KEY, SHIRT_SIZES, SPOTS_NOTICE_THRESHOLD, MINOR_NOTICE, REGISTER_ERRORS, formatPrice, formatDeadline,
   type PublicCompetition, type RegistrationResult, type ShirtSize,
 } from '../../lib/competition'
 import CompetitionPayButton from '../../components/CompetitionPayButton'
@@ -149,7 +149,9 @@ export default function CompetitionPage() {
                 <p className="text-primario font-black text-2xl leading-tight">{formatPrice(comp.price_cents)}</p>
                 {comp.includes_text && <p className="text-zinc-400 text-xs mt-1">{comp.includes_text}</p>}
               </div>
-              {comp.state === 'open' && (
+              {/* El cupo solo se anuncia cuando ya quedan pocos lugares; con
+                  cupo sin límite (UNLIMITED_CAPACITY) nunca aparece. */}
+              {comp.state === 'open' && comp.spots_left <= SPOTS_NOTICE_THRESHOLD && (
                 <div className="text-right shrink-0">
                   <p className="text-texto-principal font-black text-2xl leading-tight">{comp.spots_left}</p>
                   <p className="text-zinc-400 text-xs font-semibold">{comp.spots_left === 1 ? 'lugar disponible' : 'lugares disponibles'}</p>

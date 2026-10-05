@@ -3,7 +3,7 @@ import { Navigate } from 'react-router-dom'
 import { useProfile } from '../../hooks/useProfile'
 import { supabase } from '../../lib/supabase'
 import {
-  COMPETITION_SLUG, SHIRT_SIZES, STATUS_LABELS, formatPrice, formatDeadline,
+  COMPETITION_SLUG, SHIRT_SIZES, STATUS_LABELS, UNLIMITED_CAPACITY, formatPrice, formatDeadline,
   type RegistrationStatus, type ShirtSize,
 } from '../../lib/competition'
 
@@ -294,7 +294,9 @@ export default function CompetitionAdminPage() {
             <Counter label="Pagados" value={counts.paid} sub={formatPrice(counts.paid * comp.price_cents)} accent />
             <Counter label="Pendientes" value={counts.pending} sub="con lugar apartado" />
             <Counter label="Por atender" value={counts.attention} sub={counts.attention > 0 ? 'requieren decisión' : 'todo en orden'} alert={counts.attention > 0} />
-            <Counter label="Cupo libre" value={Math.max(comp.capacity_total - counts.taken, 0)} sub={`de ${comp.capacity_total}`} />
+            {comp.capacity_total >= UNLIMITED_CAPACITY
+              ? <Counter label="Lugares ocupados" value={counts.taken} sub="sin límite de cupo" />
+              : <Counter label="Cupo libre" value={Math.max(comp.capacity_total - counts.taken, 0)} sub={`de ${comp.capacity_total}`} />}
           </div>
 
           <div className="bg-superficie rounded-2xl border border-zinc-800/80 px-4 py-3 mb-3 flex flex-wrap items-center gap-x-5 gap-y-1 text-xs">
@@ -468,7 +470,7 @@ function SettingsForm({ comp, onSaved }: { comp: AdminCompetition; onSaved: () =
           <input id="set-price" type="number" min={1} step="0.01" value={price} onChange={e => setPrice(e.target.value)} className={inputClass} />
         </div>
         <div>
-          <label htmlFor="set-capacity" className="block text-zinc-300 text-xs font-bold mb-1">Cupo total</label>
+          <label htmlFor="set-capacity" className="block text-zinc-300 text-xs font-bold mb-1">Cupo total ({UNLIMITED_CAPACITY} = sin límite)</label>
           <input id="set-capacity" type="number" min={0} value={capacity} onChange={e => setCapacity(e.target.value)} className={inputClass} />
         </div>
         <div>

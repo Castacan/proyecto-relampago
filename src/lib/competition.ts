@@ -11,7 +11,15 @@ export const COMPETITION_SLUG = 'competencia-2026'
 // consulta lo precarga si la persona cerró la pestaña antes de pagar.
 export const LAST_REGISTRATION_KEY = 'relampago_competition_last'
 
-export const SHIRT_SIZES = ['S', 'M', 'L', 'XL'] as const
+// "Cupo ilimitado" se guarda como un cupo enorme (capacity_total es NOT
+// NULL y toda la lógica de cupo sigue igual). De este valor para arriba el
+// panel dice "sin límite" en vez de mostrar el número.
+export const UNLIMITED_CAPACITY = 100000
+
+// La página pública solo menciona lugares disponibles cuando quedan pocos.
+export const SPOTS_NOTICE_THRESHOLD = 20
+
+export const SHIRT_SIZES =['S', 'M', 'L', 'XL'] as const
 export type ShirtSize = typeof SHIRT_SIZES[number]
 
 export type RegistrationStatus =
