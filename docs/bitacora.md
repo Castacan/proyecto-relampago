@@ -233,3 +233,15 @@ lista baje sola para que el último lugar (ej. el #100) también vea su nombre.
 - Aún NO se ha enviado un correo real: se probará con el primer pago real.
   Si no llega, revisar `competition_payment_events` con `source = 'email'`
   (kind `email_sent` / `email_error`) y los Logs de la función.
+
+## 2026-10-04 (noche) — Abierta al público y primer inscrito real
+
+- El usuario abrió inscripciones y mandó `https://app.jaibamuro.com/competencia`
+  a un amigo: se inscribió, pagó $500 con Clip y recibió el correo de
+  confirmación. Confirmado por el usuario ("todo perfecto"). Primera prueba
+  real del correo: OK.
+- En Ajustes se agregó una nota: con cupo sin límite, "Horas para pagar"
+  solo decide cuándo una inscripción sin pagar se ve como "Vencido" en el
+  panel (commit `8505a54`).
+- Ofrecido, sin respuesta aún: resumen de inscritos por categoría en el
+  panel (hoy se ve con el filtro o en el CSV).
