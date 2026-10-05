@@ -32,8 +32,8 @@ interface AdminRegistration {
   folio: string
   full_name: string
   birth_date: string
-  email: string
-  phone: string
+  email: string | null   // null en inscripciones manuales sin correo
+  phone: string | null
   category_id: string
   shirt_size: ShirtSize
   status: RegistrationStatus
@@ -98,6 +98,11 @@ const REVIEW_REASONS: Record<string, string> = {
 }
 
 const ACTION_ERRORS: Record<string, string> = {
+  invalid_birth_date: 'Revisa la fecha de nacimiento.',
+  invalid_shirt_size: 'Elige una talla.',
+  invalid_category: 'Elige una categoría.',
+  duplicate: 'Esa persona ya tiene una inscripción activa. Búscala en la lista: si está pendiente, márcala como pagada.',
+  category_full: 'Esa categoría ya está llena.',
   forbidden: 'No tienes permiso.',
   reason_required: 'Escribe el motivo.',
   invalid_state: 'La inscripción ya cambió de estado. Actualiza la lista.',
@@ -158,6 +163,7 @@ export default function CompetitionAdminPage() {
   const [minorsOnly, setMinorsOnly] = useState(false)
   const [openId, setOpenId] = useState<string | null>(null)
   const [showSettings, setShowSettings] = useState(false)
+  const [showManual, setShowManual] = useState(false)
   const [payments, setPayments] = useState<PaymentsSummary | null>(null)
   const [reconciling, setReconciling] = useState(false)
   const [reconcileMsg, setReconcileMsg] = useState<string | null>(null)
@@ -237,7 +243,7 @@ export default function CompetitionAdminPage() {
       if (minorsOnly && !r.is_minor) return false
       if (!q) return true
       return r.full_name.toLowerCase().includes(q) || r.folio.toLowerCase().includes(q)
-        || r.email.includes(q) || r.phone.includes(q)
+        || (r.email ?? '').includes(q) || (r.phone ?? '').includes(q)
     })
   }, [regs, search, statusFilter, categoryFilter, minorsOnly])
 
@@ -277,6 +283,10 @@ export default function CompetitionAdminPage() {
           <p className="text-zinc-400 text-xs truncate">{comp?.name ?? 'Inscripciones'}</p>
         </div>
         <div className="flex gap-2 shrink-0">
+          <button onClick={() => setShowManual(v => !v)}
+            className="text-xs font-bold px-3 py-2 rounded-xl bg-primario hover:bg-primario-hover text-texto-en-acento transition-all">
+            {showManual ? 'Cerrar' : '+ Inscribir aquí'}
+          </button>
           <button onClick={fetchAll} className={smallBtn}>Actualizar</button>
           <button onClick={exportCsv} disabled={regs.length === 0} className={smallBtn}>CSV</button>
         </div>
@@ -290,6 +300,8 @@ export default function CompetitionAdminPage() {
         </div>
       ) : comp && (
         <>
+          {showManual && <ManualRegistrationForm categories={categories} onDone={fetchAll} />}
+
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-3">
             <Counter label="Pagados" value={counts.paid} sub={formatPrice(counts.paid * comp.price_cents)} accent />
             <Counter label="Pendientes" value={counts.pending} sub="con lugar apartado" />
@@ -394,7 +406,7 @@ export default function CompetitionAdminPage() {
                         <div className="text-zinc-300 text-xs mt-0.5">
                           <span className="font-mono font-bold">{r.folio}</span> · {categoryName(r.category_id)} · talla {r.shirt_size}
                         </div>
-                        <div className="text-zinc-400 text-xs truncate">{r.email} · {r.phone}</div>
+                        <div className="text-zinc-400 text-xs truncate">{[r.email, r.phone].filter(Boolean).join(' · ') || 'Sin correo ni celular'}</div>
                         <div className="text-zinc-400 text-[10px] mt-0.5">
                           Inscrito {fmtDateTime(r.created_at)}
                           {r.paid_at && ` · pagado ${fmtDateTime(r.paid_at)}${r.payment_method ? ` (${PAYMENT_METHODS[r.payment_method] ?? r.payment_method})` : ''}`}
@@ -505,7 +517,7 @@ function ActionPanel({ reg, categories, onDone }: { reg: AdminRegistration; cate
   const [reason, setReason] = useState('')
   const [method, setMethod] = useState('link')
   const [edit, setEdit] = useState({
-    full_name: reg.full_name, email: reg.email, phone: reg.phone,
+    full_name: reg.full_name, email: reg.email ?? '', phone: reg.phone ?? '',
     category_id: reg.category_id, shirt_size: reg.shirt_size,
   })
   const [busy, setBusy] = useState(false)
@@ -519,7 +531,14 @@ function ActionPanel({ reg, categories, onDone }: { reg: AdminRegistration; cate
     if (act !== 'check_in' && act !== 'undo_check_in' && reason.trim().length < 3) { setError('Escribe el motivo.'); return }
     setBusy(true)
     setError(null)
-    const payload = act === 'mark_paid' ? { method } : act === 'edit' ? edit : {}
+    // Correo y celular vacíos no se mandan (una inscripción manual puede no tenerlos).
+    const { email: editEmail, phone: editPhone, ...editRest } = edit
+    const editPayload = {
+      ...editRest,
+      ...(editEmail.trim() ? { email: editEmail } : {}),
+      ...(editPhone.trim() ? { phone: editPhone } : {}),
+    }
+    const payload = act === 'mark_paid' ? { method } : act === 'edit' ? editPayload : {}
     const { data, error } = await db.rpc('admin_update_registration', {
       p_id: reg.id, p_action: act, p_reason: reason, p_payload: payload,
     })
@@ -642,5 +661,117 @@ function PaymentReviewRow({ review, onDone }: { review: PaymentReview; onDone: (
       </div>
       {error && <p className="text-alerta text-xs">{error}</p>}
     </div>
+  )
+}
+
+// Inscripción de mostrador: alguien llega al gym y paga en efectivo (u otro
+// medio fuera de la app). Queda PAGADA de inmediato. Correo y celular son
+// opcionales; a estas inscripciones no se les manda correo de confirmación.
+function ManualRegistrationForm({ categories, onDone }: { categories: AdminCategory[]; onDone: () => void }) {
+  const empty = { full_name: '', birth_date: '', category_id: '', shirt_size: '' as ShirtSize | '', method: 'cash', phone: '', email: '', note: '' }
+  const [form, setForm] = useState(empty)
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [done, setDone] = useState<{ folio: string; full_name: string; category_name: string; is_minor: boolean } | null>(null)
+
+  const set = (patch: Partial<typeof empty>) => { setForm(f => ({ ...f, ...patch })); setError(null) }
+
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (form.full_name.trim().length < 3) { setError('Escribe el nombre completo.'); return }
+    if (!form.birth_date) { setError('Falta la fecha de nacimiento.'); return }
+    if (!form.category_id) { setError('Elige una categoría.'); return }
+    if (!form.shirt_size) { setError('Elige una talla.'); return }
+    setBusy(true)
+    setError(null)
+    const { data, error } = await db.rpc('admin_register_participant', {
+      p_slug: COMPETITION_SLUG,
+      p_full_name: form.full_name,
+      p_birth_date: form.birth_date,
+      p_category_id: form.category_id,
+      p_shirt_size: form.shirt_size,
+      p_method: form.method,
+      p_email: form.email.trim() || null,
+      p_phone: form.phone.trim() || null,
+      p_note: form.note.trim() || null,
+    })
+    setBusy(false)
+    if (error || !data || data.error) {
+      setError(ACTION_ERRORS[data?.error] ?? 'No se pudo inscribir. Intenta de nuevo.')
+      return
+    }
+    setDone(data)
+    setForm(empty)
+    onDone()
+  }
+
+  const fieldLabel = 'block text-zinc-300 text-xs font-bold mb-1'
+
+  return (
+    <form onSubmit={submit} noValidate className="bg-superficie rounded-2xl border border-primario/40 px-4 py-4 mb-4 space-y-3">
+      <div>
+        <p className="text-texto-principal text-sm font-bold">Inscribir a alguien aquí en el gym</p>
+        <p className="text-zinc-400 text-xs">Queda como pagado de inmediato. Úsalo cuando ya recibiste el dinero.</p>
+      </div>
+
+      {done && (
+        <p role="status" className="rounded-xl bg-superficie-alta border border-exito/50 px-3 py-2 text-texto-principal text-sm">
+          Inscrito: <span className="font-bold">{done.full_name}</span> · {done.category_name} · folio{' '}
+          <span className="font-mono font-black text-primario">{done.folio}</span>
+          {done.is_minor && <span className="block text-amarillo-suave text-xs font-semibold mt-1">Es menor: debe firmar un mayor de edad.</span>}
+        </p>
+      )}
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div>
+          <label htmlFor="man-name" className={fieldLabel}>Nombre completo</label>
+          <input id="man-name" value={form.full_name} onChange={e => set({ full_name: e.target.value })} maxLength={120} className={inputClass} />
+        </div>
+        <div>
+          <label htmlFor="man-birth" className={fieldLabel}>Fecha de nacimiento</label>
+          <input id="man-birth" type="date" value={form.birth_date} onChange={e => set({ birth_date: e.target.value })} min="1920-01-01" className={inputClass} />
+        </div>
+        <div>
+          <label htmlFor="man-cat" className={fieldLabel}>Categoría</label>
+          <select id="man-cat" value={form.category_id} onChange={e => set({ category_id: e.target.value })} className={inputClass}>
+            <option value="">Elige...</option>
+            {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+          </select>
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label htmlFor="man-size" className={fieldLabel}>Talla</label>
+            <select id="man-size" value={form.shirt_size} onChange={e => set({ shirt_size: e.target.value as ShirtSize | '' })} className={inputClass}>
+              <option value="">Elige...</option>
+              {SHIRT_SIZES.map(sz => <option key={sz} value={sz}>{sz}</option>)}
+            </select>
+          </div>
+          <div>
+            <label htmlFor="man-method" className={fieldLabel}>¿Cómo pagó?</label>
+            <select id="man-method" value={form.method} onChange={e => set({ method: e.target.value })} className={inputClass}>
+              {['cash', 'transfer', 'link', 'other'].map(k => <option key={k} value={k}>{PAYMENT_METHODS[k]}</option>)}
+            </select>
+          </div>
+        </div>
+        <div>
+          <label htmlFor="man-phone" className={fieldLabel}>Celular (opcional)</label>
+          <input id="man-phone" type="tel" inputMode="numeric" value={form.phone} onChange={e => set({ phone: e.target.value })} placeholder="10 dígitos" className={inputClass} />
+        </div>
+        <div>
+          <label htmlFor="man-email" className={fieldLabel}>Correo (opcional)</label>
+          <input id="man-email" type="email" value={form.email} onChange={e => set({ email: e.target.value })} className={inputClass} />
+        </div>
+      </div>
+      <div>
+        <label htmlFor="man-note" className={fieldLabel}>Nota (opcional, queda en el registro)</label>
+        <input id="man-note" value={form.note} onChange={e => set({ note: e.target.value })} placeholder="Ej. pagó $500 en efectivo a Erick" className={inputClass} />
+      </div>
+
+      {error && <p role="alert" className="text-alerta text-xs font-semibold">{error}</p>}
+      <button type="submit" disabled={busy}
+        className="text-sm font-bold px-4 py-2.5 rounded-xl bg-primario hover:bg-primario-hover text-texto-en-acento disabled:opacity-50">
+        {busy ? 'Inscribiendo...' : 'Inscribir como pagado'}
+      </button>
+    </form>
   )
 }

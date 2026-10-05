@@ -245,3 +245,18 @@ lista baje sola para que el último lugar (ej. el #100) también vea su nombre.
   panel (commit `8505a54`).
 - Ofrecido, sin respuesta aún: resumen de inscritos por categoría en el
   panel (hoy se ve con el filtro o en el CSV).
+
+## 2026-10-04 (noche) — Inscripción manual (pago en efectivo en el gym)
+
+- Pedido del usuario: poder meter a mano a quien llega y paga en efectivo.
+- `src/supabase/competencia_manual.sql`: `email` y `phone` de
+  `competition_registrations` ahora aceptan NULL, y nueva RPC solo-admin
+  `admin_register_participant` que crea la inscripción YA PAGADA (método
+  efectivo por defecto), aunque las inscripciones en línea estén cerradas.
+  Respeta cupo y duplicados; deja rastro `manual_register` en la auditoría.
+- Panel: botón "+ Inscribir aquí" con formulario (nombre, nacimiento,
+  categoría, talla, cómo pagó; celular, correo y nota opcionales). Muestra
+  el folio al terminar.
+- A las inscripciones manuales NO se les manda correo de confirmación.
+- Probado: SQL con 20 casos en PGlite. El formulario NO se probó en
+  navegador. Falta que el usuario corra el SQL.
