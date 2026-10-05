@@ -158,3 +158,23 @@ lista baje sola para que el último lugar (ej. el #100) también vea su nombre.
 - Arreglo menor en el repo (aún no desplegado): el webhook respondía 500
   en vez de 403 cuando no hay `CLIP_API_SECRET`. Con el secreto puesto no
   ocurre; se sincroniza en el próximo despliegue de la función.
+
+## 2026-10-04 (noche) — Prueba real de $1 con Clip: EXITOSA
+
+- Usuario validó identidad en Clip, creó la credencial de producción
+  "JaibamuroCompetencia" (uso: Tienda online, URL https://app.jaibamuro.com)
+  y guardó `CLIP_API_KEY` / `CLIP_API_SECRET` en Supabase.
+- Prueba en producción: precio a $1, inscripción "Prueba Pago Clip"
+  (folio JM-5G36F), link real de Clip (`pago.clip.mx/v3/<id>`), pago con
+  tarjeta por el usuario. Resultado: la consulta mostró "Pago confirmado" y
+  el panel la muestra PAGADO vía "Clip en línea".
+- **El webhook real de Clip SÍ llega y funciona:** en Invocations se ve un
+  POST con `?wh=...&s=...` (user agent Go-http-client) respondido 200 a la
+  hora del pago. No hizo falta la revisión de respaldo.
+- Al terminar: precio regresado a $500 e inscripciones CERRADAS.
+- Pendiente: la inscripción de prueba JM-5G36F sigue como pagada (ocupa 1
+  lugar y cuenta $500 en "recaudado"); hay que reembolsar el $1 en Clip y
+  marcarla "Registrar reembolso" en el panel. Faltan los datos reales de la
+  competencia (nombre, hora, lugar, cupo, 6 categorías, textos) antes de abrir.
+- Observado una vez, sin diagnosticar: abrir `/staff/competencia` por URL
+  directa terminó en `/staff`; entrando por el tab funciona.
