@@ -224,3 +224,12 @@ lista baje sola para que el último lugar (ej. el #100) también vea su nombre.
   cuanto se aprueba tu pago").
 - Probado en local con Resend simulado: 11 casos (contenido, escape de
   HTML en el nombre, no reenvío, vía de respaldo, Resend caído, por atender).
+
+## 2026-10-04 (noche) — Correo de confirmación activado
+
+- Usuario desplegó la función con el código del correo y guardó
+  `RESEND_API_KEY` en Supabase (verificado: el secreto aparece listado y
+  el código desplegado incluye `sendConfirmationEmail`).
+- Aún NO se ha enviado un correo real: se probará con el primer pago real.
+  Si no llega, revisar `competition_payment_events` con `source = 'email'`
+  (kind `email_sent` / `email_error`) y los Logs de la función.
