@@ -59,11 +59,42 @@ const ACTION_LABELS: Record<Action, string> = {
   undo_check_in: 'Quitar check-in',
 }
 
+// 'clip' lo pone el sistema cuando el pago en línea se confirma; no es
+// elegible al marcar pagado a mano (MANUAL_METHODS).
 const PAYMENT_METHODS: Record<string, string> = {
+  clip: 'Clip en línea',
   link: 'Link de pago',
   transfer: 'Transferencia',
   cash: 'Efectivo',
   other: 'Otro',
+}
+
+const MANUAL_METHODS = ['link', 'transfer', 'cash', 'other']
+
+interface PaymentReview {
+  id: string
+  folio: string
+  full_name: string
+  registration_status: RegistrationStatus
+  amount_cents: number
+  receipt_no: string | null
+  review_reason: string
+  completed_at: string | null
+}
+
+interface PaymentsSummary {
+  completed: number
+  open: number
+  last_check_at: string | null
+  unknown_events: number
+  review: PaymentReview[]
+}
+
+const REVIEW_REASONS: Record<string, string> = {
+  duplicate: 'Pago duplicado: esta inscripción ya tenía un pago. Hay que reembolsar uno en Clip.',
+  amount_mismatch: 'El monto cobrado no coincide con el precio.',
+  no_room: 'Pagó después de que venció su reserva y ya no había cupo. Admítelo o reembólsalo.',
+  registration_inactive: 'Pagó una inscripción cancelada, reembolsada o vencida. Hay que reembolsar o reactivar.',
 }
 
 const ACTION_ERRORS: Record<string, string> = {
@@ -127,6 +158,9 @@ export default function CompetitionAdminPage() {
   const [minorsOnly, setMinorsOnly] = useState(false)
   const [openId, setOpenId] = useState<string | null>(null)
   const [showSettings, setShowSettings] = useState(false)
+  const [payments, setPayments] = useState<PaymentsSummary | null>(null)
+  const [reconciling, setReconciling] = useState(false)
+  const [reconcileMsg, setReconcileMsg] = useState<string | null>(null)
 
   const fetchAll = () => {
     if (!isAdmin) return
@@ -144,6 +178,31 @@ export default function CompetitionAdminPage() {
         }
         setLoading(false)
       })
+    db.rpc('get_competition_payments_admin', { p_slug: COMPETITION_SLUG })
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      .then(({ data, error }: { data: any; error: unknown }) => {
+        // Si el SQL de pagos aún no se corre, el panel sigue funcionando sin esta sección.
+        setPayments(!error && data && !data.error ? data : null)
+      })
+  }
+
+  // Le pide al servidor que consulte en Clip TODOS los links abiertos. Es
+  // la red de seguridad por si un aviso automático de Clip no llegó.
+  const reconcile = async () => {
+    setReconciling(true)
+    setReconcileMsg(null)
+    const { data, error } = await supabase.functions.invoke('competition-payments', { body: { action: 'reconcile' } })
+    setReconciling(false)
+    if (error || !data || data.error) {
+      setReconcileMsg('No se pudo revisar con Clip. Intenta de nuevo.')
+      return
+    }
+    setReconcileMsg(
+      `Revisados ${data.checked} links abiertos: ${data.completed} pagos nuevos confirmados` +
+      (data.errors > 0 ? `, ${data.errors} no se pudieron consultar` : '') +
+      (data.pending_more > 0 ? `. Faltan ${data.pending_more}: presiona de nuevo` : '') + '.'
+    )
+    fetchAll()
   }
 
   useEffect(() => {
@@ -252,7 +311,9 @@ export default function CompetitionAdminPage() {
                 <p className={`text-sm font-bold ${comp.is_open ? 'text-exito' : 'text-zinc-300'}`}>
                   Inscripciones {comp.is_open ? 'abiertas' : 'cerradas'}
                 </p>
-                {!comp.payment_link_url && <p className="text-alerta text-xs font-semibold">Falta el link de pago.</p>}
+                <p className="text-zinc-400 text-xs">
+                  {formatPrice(comp.price_cents)} · {comp.payment_link_url ? 'pago por link manual' : 'pago en línea con Clip'}
+                </p>
               </div>
               <button onClick={() => setShowSettings(v => !v)} className={smallBtn}>
                 {showSettings ? 'Ocultar ajustes' : 'Ajustes'}
@@ -260,6 +321,35 @@ export default function CompetitionAdminPage() {
             </div>
             {showSettings && <SettingsForm comp={comp} onSaved={fetchAll} />}
           </div>
+
+          {payments && (
+            <div className={`bg-superficie rounded-2xl border px-4 py-3 mb-4 ${payments.review.length > 0 || payments.unknown_events > 0 ? 'border-alerta' : 'border-zinc-800/80'}`}>
+              <div className="flex items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="text-texto-principal text-sm font-bold">Pagos en línea (Clip)</p>
+                  <p className="text-zinc-400 text-xs">
+                    {payments.completed} confirmados · {payments.open} links abiertos
+                    {payments.last_check_at && ` · última revisión ${fmtDateTime(payments.last_check_at)}`}
+                  </p>
+                </div>
+                <button onClick={reconcile} disabled={reconciling} className={smallBtn}>
+                  {reconciling ? 'Revisando...' : 'Revisar pagos con Clip'}
+                </button>
+              </div>
+              {reconcileMsg && <p role="status" className="text-zinc-200 text-xs mt-2">{reconcileMsg}</p>}
+              {payments.unknown_events > 0 && (
+                <p className="text-alerta text-xs font-semibold mt-2">
+                  Clip reportó {payments.unknown_events} {payments.unknown_events === 1 ? 'pago que no corresponde' : 'pagos que no corresponden'} a ninguna inscripción. Revísalo en tu panel de Clip.
+                </p>
+              )}
+              {payments.review.length > 0 && (
+                <div className="mt-3 pt-3 border-t border-zinc-800/60 space-y-3">
+                  <p className="text-alerta text-xs font-bold">Pagos que requieren tu decisión</p>
+                  {payments.review.map(pr => <PaymentReviewRow key={pr.id} review={pr} onDone={fetchAll} />)}
+                </div>
+              )}
+            </div>
+          )}
 
           <div className="space-y-2 mb-4">
             <input type="text" value={search} onChange={e => { setSearch(e.target.value); setOpenId(null) }}
@@ -338,6 +428,7 @@ function SettingsForm({ comp, onSaved }: { comp: AdminCompetition; onSaved: () =
   const [isOpen, setIsOpen] = useState(comp.is_open)
   const [capacity, setCapacity] = useState(String(comp.capacity_total))
   const [holdHours, setHoldHours] = useState(String(comp.hold_hours))
+  const [price, setPrice] = useState(String(comp.price_cents / 100))
   const [link, setLink] = useState(comp.payment_link_url ?? '')
   const [instructions, setInstructions] = useState(comp.payment_instructions ?? '')
   const [saving, setSaving] = useState(false)
@@ -352,6 +443,7 @@ function SettingsForm({ comp, onSaved }: { comp: AdminCompetition; onSaved: () =
         is_open: isOpen,
         capacity_total: Number(capacity),
         hold_hours: Number(holdHours),
+        price_cents: Math.round(Number(price) * 100),
         payment_link_url: link,
         payment_instructions: instructions,
       },
@@ -370,7 +462,11 @@ function SettingsForm({ comp, onSaved }: { comp: AdminCompetition; onSaved: () =
         <input type="checkbox" checked={isOpen} onChange={e => setIsOpen(e.target.checked)} className="w-5 h-5 accent-primario" />
         <span className="text-texto-principal text-sm font-semibold">Inscripciones abiertas</span>
       </label>
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-3 gap-3">
+        <div>
+          <label htmlFor="set-price" className="block text-zinc-300 text-xs font-bold mb-1">Precio (MXN)</label>
+          <input id="set-price" type="number" min={1} step="0.01" value={price} onChange={e => setPrice(e.target.value)} className={inputClass} />
+        </div>
         <div>
           <label htmlFor="set-capacity" className="block text-zinc-300 text-xs font-bold mb-1">Cupo total</label>
           <input id="set-capacity" type="number" min={0} value={capacity} onChange={e => setCapacity(e.target.value)} className={inputClass} />
@@ -381,7 +477,7 @@ function SettingsForm({ comp, onSaved }: { comp: AdminCompetition; onSaved: () =
         </div>
       </div>
       <div>
-        <label htmlFor="set-link" className="block text-zinc-300 text-xs font-bold mb-1">Link de pago</label>
+        <label htmlFor="set-link" className="block text-zinc-300 text-xs font-bold mb-1">Link de pago manual (déjalo vacío para cobrar con Clip en línea)</label>
         <input id="set-link" type="url" value={link} onChange={e => setLink(e.target.value)} placeholder="https://..." className={inputClass} />
       </div>
       <div>
@@ -464,7 +560,7 @@ function ActionPanel({ reg, categories, onDone }: { reg: AdminRegistration; cate
         <div>
           <label htmlFor={`method-${reg.id}`} className="block text-zinc-300 text-xs font-bold mb-1">¿Cómo pagó?</label>
           <select id={`method-${reg.id}`} value={method} onChange={e => setMethod(e.target.value)} className={inputClass}>
-            {Object.entries(PAYMENT_METHODS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+            {MANUAL_METHODS.map(k => <option key={k} value={k}>{PAYMENT_METHODS[k]}</option>)}
           </select>
         </div>
       )}
@@ -503,6 +599,40 @@ function ActionPanel({ reg, categories, onDone }: { reg: AdminRegistration; cate
         </>
       )}
 
+      {error && <p className="text-alerta text-xs">{error}</p>}
+    </div>
+  )
+}
+
+function PaymentReviewRow({ review, onDone }: { review: PaymentReview; onDone: () => void }) {
+  const [reason, setReason] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  const resolve = async () => {
+    if (reason.trim().length < 3) { setError('Escribe qué se hizo con este pago.'); return }
+    setBusy(true)
+    setError(null)
+    const { data, error } = await db.rpc('admin_resolve_payment_review', { p_payment_id: review.id, p_reason: reason })
+    setBusy(false)
+    if (error || !data || data.error) { setError('No se pudo guardar.'); return }
+    onDone()
+  }
+
+  return (
+    <div className="space-y-2">
+      <p className="text-texto-principal text-xs">
+        <span className="font-bold">{review.full_name}</span> · <span className="font-mono font-bold">{review.folio}</span>
+        {' · '}{formatPrice(review.amount_cents)}
+        {review.receipt_no && ` · recibo Clip ${review.receipt_no}`}
+        {review.completed_at && ` · ${fmtDateTime(review.completed_at)}`}
+      </p>
+      <p className="text-zinc-300 text-xs">{REVIEW_REASONS[review.review_reason] ?? review.review_reason}</p>
+      <div className="flex gap-2">
+        <input aria-label={`Qué se hizo con el pago de ${review.full_name}`} value={reason} onChange={e => setReason(e.target.value)}
+          placeholder="Qué se hizo (ej. reembolsado en Clip el 5 oct)" className={inputClass} />
+        <button onClick={resolve} disabled={busy} className={smallBtn + ' shrink-0'}>{busy ? '...' : 'Marcar resuelto'}</button>
+      </div>
       {error && <p className="text-alerta text-xs">{error}</p>}
     </div>
   )

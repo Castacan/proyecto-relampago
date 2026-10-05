@@ -1,0 +1,7 @@
+# Solo lo que necesitan las Edge Functions de este repo.
+project_id = "nptpavtkqskzqurwaysm"
+
+# Clip llama al webhook sin JWT de Supabase; la función valida por su
+# cuenta (firma por pago en la URL + consulta a la API de Clip).
+[functions.competition-payments]
+verify_jwt = false

@@ -1,10 +1,11 @@
-import { useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { useEffect, useRef, useState } from 'react'
+import { Link, useSearchParams } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import { fmtDateOnly } from '../../lib/dates'
 import {
-  LAST_REGISTRATION_KEY, MINOR_NOTICE, formatPrice, formatDeadline, type RegistrationLookup,
+  LAST_REGISTRATION_KEY, MINOR_NOTICE, formatPrice, formatDeadline, refreshOnlinePayment, type RegistrationLookup,
 } from '../../lib/competition'
+import CompetitionPayButton from '../../components/CompetitionPayButton'
 import logoHorizontal from '../../assets/logo-horizontal.png'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -20,14 +21,49 @@ export default function CompetitionLookupPage() {
   const [error, setError] = useState<string | null>(null)
   const [reg, setReg] = useState<RegistrationLookup | null>(null)
 
+  // ?pago=ok|error: la persona viene de regreso de la página de Clip.
+  const [searchParams] = useSearchParams()
+  const returnedFrom = searchParams.get('pago')
+  const [confirming, setConfirming] = useState(false)
+  const cancelled = useRef(false)
+  useEffect(() => {
+    // Se rearma al montar: en desarrollo StrictMode monta, desmonta y vuelve
+    // a montar, y sin esto el ref se quedaba en true para siempre.
+    cancelled.current = false
+    return () => { cancelled.current = true }
+  }, [])
+
+  const fetchStatus = async (f: string, e: string): Promise<RegistrationLookup | 'not_found' | 'error'> => {
+    const { data, error } = await db.rpc('get_registration_status', { p_folio: f, p_email: e })
+    if (error || !data) return 'error'
+    if (data.error) return 'not_found'
+    return data as RegistrationLookup
+  }
+
   const lookup = async (f: string, e: string) => {
     setLoading(true)
     setError(null)
-    const { data, error } = await db.rpc('get_registration_status', { p_folio: f, p_email: e })
+    let result = await fetchStatus(f, e)
     setLoading(false)
-    if (error || !data) { setError('No se pudo consultar. Intenta de nuevo.'); return }
-    if (data.error) { setReg(null); setError('No encontramos una inscripción con ese folio y correo. Revisa que estén bien escritos.'); return }
-    setReg(data as RegistrationLookup)
+    if (result === 'error') { setError('No se pudo consultar. Intenta de nuevo.'); return }
+    if (result === 'not_found') { setReg(null); setError('No encontramos una inscripción con ese folio y correo. Revisa que estén bien escritos.'); return }
+    setReg(result)
+
+    // Sigue pendiente: se le pide al servidor que revise con Clip (por si
+    // el aviso automático no llegó). Si viene de pagar, se insiste unos
+    // segundos porque la confirmación puede tardar un momento.
+    if (result.status !== 'pending_payment') return
+    const attempts = returnedFrom === 'ok' ? 8 : 1
+    setConfirming(returnedFrom === 'ok')
+    for (let i = 0; i < attempts && !cancelled.current; i++) {
+      if (i > 0) await new Promise(r => setTimeout(r, 3000))
+      await refreshOnlinePayment(f, e)
+      result = await fetchStatus(f, e)
+      if (cancelled.current || typeof result === 'string') break
+      setReg(result)
+      if (result.status !== 'pending_payment') break
+    }
+    setConfirming(false)
   }
 
   // Precarga el último folio creado en este dispositivo.
@@ -78,13 +114,24 @@ export default function CompetitionLookupPage() {
           </button>
         </form>
 
-        {reg && <RegistrationCard reg={reg} />}
+        {confirming && (
+          <p role="status" className="bg-superficie rounded-2xl border border-zinc-800/60 p-4 text-texto-principal text-sm font-semibold flex items-center gap-3">
+            <span className="w-4 h-4 rounded-full border-2 border-primario border-t-transparent animate-spin shrink-0" />
+            Estamos confirmando tu pago...
+          </p>
+        )}
+        {returnedFrom === 'error' && reg?.status === 'pending_payment' && (
+          <p role="alert" className="bg-superficie rounded-2xl border border-alerta/60 p-4 text-texto-principal text-sm font-semibold">
+            El pago no se completó. No se te cobró; puedes intentarlo de nuevo.
+          </p>
+        )}
+        {reg && <RegistrationCard reg={reg} email={email} />}
       </div>
     </div>
   )
 }
 
-function RegistrationCard({ reg }: { reg: RegistrationLookup }) {
+function RegistrationCard({ reg, email }: { reg: RegistrationLookup; email: string }) {
   const unpaid = reg.status === 'pending_payment'
 
   const headline =
@@ -122,12 +169,8 @@ function RegistrationCard({ reg }: { reg: RegistrationLookup }) {
             </p>
           )}
           {reg.payment_instructions && <p className="text-zinc-300 text-sm whitespace-pre-line">{reg.payment_instructions}</p>}
-          {reg.payment_link_url && (
-            <a href={reg.payment_link_url} target="_blank" rel="noopener noreferrer"
-              className="block w-full py-4 rounded-2xl bg-primario hover:bg-primario-hover text-texto-en-acento font-black text-base text-center transition-all active:scale-95">
-              Pagar {formatPrice(reg.price_cents)}
-            </a>
-          )}
+          <CompetitionPayButton folio={reg.folio} email={email}
+            priceCents={reg.price_cents} manualLinkUrl={reg.payment_link_url} />
         </div>
       )}
 

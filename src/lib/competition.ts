@@ -1,5 +1,8 @@
-// Inscripciones a la competencia (Etapa 1: registro + pago por link
-// confirmado a mano). Tablas y RPCs en src/supabase/competencia.sql.
+// Inscripciones a la competencia. Tablas y RPCs en
+// src/supabase/competencia.sql; cobro en línea con Clip en
+// src/supabase/competencia_pagos.sql + supabase/functions/competition-payments.
+
+import { supabase } from './supabase'
 
 // Slug de la competencia vigente — coincide con el seed de competencia.sql.
 export const COMPETITION_SLUG = 'competencia-2026'
@@ -109,4 +112,38 @@ export const STATUS_LABELS: Record<RegistrationStatus, string> = {
   cancelled: 'Cancelado',
   refunded: 'Reembolsado',
   needs_attention: 'Por atender',
+}
+
+// ---- Cobro en línea (Clip) ----
+// El navegador solo PIDE el link o PIDE que se revise el estado; quien
+// confirma un pago es siempre el servidor consultando a Clip.
+
+export const PAYMENT_ERRORS: Record<string, string> = {
+  not_found: 'No encontramos tu inscripción. Revisa tu folio y correo.',
+  already_paid: 'Esta inscripción ya está pagada.',
+  not_payable: 'Esta inscripción ya no se puede pagar. Escríbenos si crees que es un error.',
+  full: 'Tu reserva venció y ya no quedan lugares, por eso no generamos el cobro.',
+  busy: 'Ya estamos generando tu pago. Espera unos segundos e intenta de nuevo.',
+  not_configured: 'El pago en línea aún no está disponible. Te contactaremos con los datos para pagar.',
+}
+
+const PAYMENT_ERROR_DEFAULT = 'No pudimos generar tu pago. Intenta de nuevo en un momento.'
+
+// Pide el link de pago de Clip para una inscripción. Devuelve la URL a la
+// que hay que mandar a la persona, o el mensaje de error a mostrar.
+export async function startOnlinePayment(folio: string, email: string): Promise<{ url: string } | { message: string }> {
+  const { data, error } = await supabase.functions.invoke('competition-payments', {
+    body: { action: 'pay', folio, email },
+  })
+  if (error || !data) return { message: PAYMENT_ERROR_DEFAULT }
+  if (typeof data.payment_url === 'string') return { url: data.payment_url }
+  return { message: PAYMENT_ERRORS[data.error] ?? PAYMENT_ERROR_DEFAULT }
+}
+
+// Pide al servidor que consulte en Clip los links abiertos de esta
+// inscripción (por si el aviso automático de Clip no llegó).
+export async function refreshOnlinePayment(folio: string, email: string): Promise<void> {
+  try {
+    await supabase.functions.invoke('competition-payments', { body: { action: 'check', folio, email } })
+  } catch { /* la consulta de estado sigue funcionando sin esto */ }
 }

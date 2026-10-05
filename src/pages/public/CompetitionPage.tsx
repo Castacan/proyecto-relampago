@@ -6,6 +6,7 @@ import {
   COMPETITION_SLUG, LAST_REGISTRATION_KEY, SHIRT_SIZES, MINOR_NOTICE, REGISTER_ERRORS, formatPrice, formatDeadline,
   type PublicCompetition, type RegistrationResult, type ShirtSize,
 } from '../../lib/competition'
+import CompetitionPayButton from '../../components/CompetitionPayButton'
 import logoHorizontal from '../../assets/logo-horizontal.png'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -27,6 +28,7 @@ export default function CompetitionPage() {
   const [comp, setComp] = useState<PublicCompetition | null>(null)
   const [loadError, setLoadError] = useState(false)
   const [result, setResult] = useState<RegistrationResult | null>(null)
+  const [resultEmail, setResultEmail] = useState('')
 
   const [fullName, setFullName] = useState('')
   const [birthDate, setBirthDate] = useState('')
@@ -114,6 +116,7 @@ export default function CompetitionPage() {
       localStorage.setItem(LAST_REGISTRATION_KEY, JSON.stringify({ folio: data.folio, email: emailNorm }))
     } catch { /* almacenamiento bloqueado: el folio igual se muestra en pantalla */ }
     setResult(data as RegistrationResult)
+    setResultEmail(emailNorm)
     window.scrollTo(0, 0)
   }
 
@@ -128,7 +131,7 @@ export default function CompetitionPage() {
 
       <div className="max-w-md mx-auto w-full px-5 py-6 space-y-6">
         {result ? (
-          <RegistrationDone result={result} />
+          <RegistrationDone result={result} email={resultEmail} />
         ) : (
           <>
             <div>
@@ -291,7 +294,7 @@ function ConsentBox({ title, text, label, checked, onChange }: {
   )
 }
 
-function RegistrationDone({ result }: { result: RegistrationResult }) {
+function RegistrationDone({ result, email }: { result: RegistrationResult; email: string }) {
   return (
     <div className="space-y-5">
       <div>
@@ -315,14 +318,8 @@ function RegistrationDone({ result }: { result: RegistrationResult }) {
         {result.payment_instructions && (
           <p className="text-zinc-300 text-sm whitespace-pre-line">{result.payment_instructions}</p>
         )}
-        {result.payment_link_url ? (
-          <a href={result.payment_link_url} target="_blank" rel="noopener noreferrer"
-            className="block w-full py-4 rounded-2xl bg-primario hover:bg-primario-hover text-texto-en-acento font-black text-base text-center transition-all active:scale-95">
-            Pagar {formatPrice(result.price_cents)}
-          </a>
-        ) : (
-          <p className="text-amarillo-suave text-sm font-semibold">Te contactaremos con los datos para pagar.</p>
-        )}
+        <CompetitionPayButton folio={result.folio} email={email}
+          priceCents={result.price_cents} manualLinkUrl={result.payment_link_url} />
       </div>
 
       {result.is_minor && (
