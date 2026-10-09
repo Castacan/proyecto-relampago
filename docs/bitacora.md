@@ -307,3 +307,12 @@ lista baje sola para que el último lugar (ej. el #100) también vea su nombre.
 - Aparte: se confirmó en Resend (resend.com/emails) que el correo de
   confirmación de un participante sí se entregó; ahí se ven todos los
   envíos con su estado.
+- Mismo día, más tarde: el usuario desplegó la función y corrió el SQL
+  (el trabajo de cron quedó con id 1). Llamada directa a `remind` en
+  producción: responde `{"sent":0,"skipped":0,"errors":0}`, o sea función
+  y SQL funcionan, pero no había nadie a quien le tocara. El primer envío
+  real sigue sin verse: revisar en resend.com/emails cuando haya un
+  inscrito sin pagar con más de 42 horas.
+- También borró de la base, con SQL que le dejé, sus dos inscripciones de
+  prueba (JM-5G36F y JM-6EQTQ) y sus pagos. La auditoría y los eventos de
+  esos folios se conservan.
