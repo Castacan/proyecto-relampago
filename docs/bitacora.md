@@ -279,3 +279,31 @@ lista baje sola para que el último lugar (ej. el #100) también vea su nombre.
 - 2026-10-05: el usuario confirmó que corrió el SQL del método `card`
   ("success"). No verificado por Claude en producción (requiere sesión de
   admin y crear una inscripción real).
+
+## 2026-10-08 — Recordatorio de pago por correo
+
+- Pedido del usuario: correo a quien se inscribió y no ha pagado, 6 horas
+  antes de que venza su plazo, recordando que falta el pago para completar
+  la inscripción.
+- `src/supabase/competencia_recordatorios.sql` (nuevo): columna
+  `payment_reminder_at`, funciones `competition_claim_payment_reminders`
+  y `competition_release_payment_reminder` (solo `service_role`), y un
+  trabajo de `pg_cron` cada 15 minutos que llama a la Edge Function con
+  `{action:'remind'}` usando `pg_net`.
+- Edge Function `competition-payments`: acción `remind`. Antes de mandar
+  cada correo consulta en Clip los links abiertos de esa inscripción, por
+  si ya pagó. Asunto: "Falta tu pago · <competencia> · Folio <folio>". El
+  correo no menciona fecha límite (con cupo ilimitado las pantallas
+  tampoco). Envíos y fallos quedan en `competition_payment_events`
+  (`reminder_sent` / `reminder_error`).
+- Decisiones mías: un solo recordatorio por inscripción; la primera
+  corrida también le escribe a quien ya tenía el plazo vencido sin pagar;
+  solo mientras la competencia esté abierta y no haya pasado; `remind` no
+  pide credencial (no devuelve datos y no puede mandar de más).
+- Probado: el SQL en PGlite (a quién le toca, no repite, soltar y
+  reintentar, competencia cerrada). La función solo se revisó de sintaxis:
+  el envío real no se ha probado.
+- Falta que el usuario despliegue la función y corra el SQL.
+- Aparte: se confirmó en Resend (resend.com/emails) que el correo de
+  confirmación de un participante sí se entregó; ahí se ven todos los
+  envíos con su estado.

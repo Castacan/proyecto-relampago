@@ -1,8 +1,9 @@
 // Cobro en línea de inscripciones a la competencia con Clip.
-// Una sola función con cuatro entradas:
+// Una sola función con cinco entradas:
 //   POST {action:'pay', folio, email}       → link de pago de Clip para esa inscripción
 //   POST {action:'check', folio, email}     → consulta en Clip los links abiertos de esa inscripción
 //   POST {action:'reconcile'}               → (solo admin) consulta TODOS los links abiertos
+//   POST {action:'remind'}                  → manda los recordatorios de pago que toquen (lo llama pg_cron)
 //   POST ?wh=<payment_id>&s=<firma>         → webhook de Clip
 //
 // Reglas (ver src/supabase/competencia_pagos.sql):
@@ -156,6 +157,69 @@ ${isMinor ? `<p style="margin:18px 0 0;padding:12px 14px;border:1px solid #ffd26
   }
 }
 
+// Correo de "falta tu pago". Devuelve 'sent', 'retry' (falla pasajera: se
+// reintenta en la siguiente corrida) o 'failed' (Resend lo rechazó: no se
+// insiste). Todo queda en competition_payment_events.
+type Reminder = {
+  registration_id: string; folio: string; full_name: string; email: string; category_name: string | null
+  competition_name: string; event_date: string; event_time_text: string | null; price_cents: number
+}
+async function sendReminderEmail(r: Reminder): Promise<'sent' | 'retry' | 'failed'> {
+  const log = (kind: string, payload: Record<string, unknown>) => db.rpc('competition_record_payment_event', {
+    p_provider_payment_id: null, p_source: 'email', p_kind: kind, p_payload: { folio: r.folio, to: r.email, ...payload },
+  })
+  try {
+    const [ey, em, ed] = String(r.event_date).split('-').map(Number)
+    const fecha = `${ed} de ${MESES[em - 1]} de ${ey}` + (r.event_time_text ? ` · ${r.event_time_text}` : '')
+    const monto = `$${(r.price_cents / 100).toLocaleString('es-MX')} MXN`
+    const row = (k: string, v: string) =>
+      `<tr><td style="padding:6px 0;color:#9fc3cf;font-size:14px;width:110px;vertical-align:top">${k}</td><td style="padding:6px 0;color:#f4f4f3;font-size:14px;font-weight:600">${v}</td></tr>`
+
+    const html = `<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"></head><body style="margin:0;padding:0;background:#013a4b;font-family:Inter,Arial,Helvetica,sans-serif">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#013a4b;padding:32px 16px"><tr><td align="center">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:480px">
+<tr><td align="center" style="padding-bottom:24px"><img src="https://jaibamuro.com/logo-email.png" alt="Jaibamuro" height="36" style="height:36px;width:auto"></td></tr>
+<tr><td style="background:#015169;border-radius:16px;padding:28px 24px">
+<p style="margin:0 0 6px;color:#ffd260;font-size:14px;font-weight:700">Falta tu pago</p>
+<h1 style="margin:0 0 14px;color:#f4f4f3;font-size:22px;line-height:1.25">${esc(String(r.full_name).split(' ')[0])}, tu inscripción a ${esc(r.competition_name)} aún no está completa.</h1>
+<p style="margin:0 0 18px;color:#cfe3ea;font-size:14px;line-height:1.5">Ya tenemos tus datos; solo falta el pago de ${esc(monto)} para que tu inscripción quede completa.</p>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#013a4b;border-radius:12px;margin-bottom:18px"><tr><td align="center" style="padding:16px">
+<p style="margin:0 0 4px;color:#9fc3cf;font-size:11px;font-weight:700;letter-spacing:2px">TU FOLIO</p>
+<p style="margin:0;color:#ff4d15;font-size:30px;font-weight:800;letter-spacing:3px;font-family:'JetBrains Mono',Consolas,monospace">${esc(r.folio)}</p>
+</td></tr></table>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+${row('Nombre', esc(r.full_name))}
+${r.category_name ? row('Categoría', esc(r.category_name)) : ''}
+${row('Cuándo', esc(fecha))}
+${row('Por pagar', esc(monto))}
+</table>
+<p style="margin:18px 0 0;color:#cfe3ea;font-size:14px;line-height:1.5">Para pagar, entra con tu folio y este correo:</p>
+<p style="margin:14px 0 0"><a href="${APP_URL}/competencia/consulta" style="display:inline-block;background:#ff4d15;color:#1a1a1a;font-weight:800;font-size:14px;text-decoration:none;padding:12px 20px;border-radius:12px">Pagar mi inscripción</a></p>
+<p style="margin:18px 0 0;color:#9fc3cf;font-size:13px;line-height:1.5">Si ya pagaste, no hagas caso a este correo.</p>
+</td></tr>
+<tr><td align="center" style="padding-top:18px;color:#7fa9b7;font-size:12px">Jaibamuro · Instagram @jaibamuro</td></tr>
+</table></td></tr></table></body></html>`
+
+    const res = await fetch(RESEND_API, {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${RESEND_API_KEY}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        from: EMAIL_FROM, to: [r.email],
+        subject: `Falta tu pago · ${r.competition_name} · Folio ${r.folio}`,
+        html,
+      }),
+      signal: AbortSignal.timeout(10_000),
+    })
+    const text = await res.text()
+    await log(res.ok ? 'reminder_sent' : 'reminder_error', { http: res.status, body: text.slice(0, 500) })
+    if (res.ok) return 'sent'
+    return res.status === 429 || res.status >= 500 ? 'retry' : 'failed'
+  } catch (e) {
+    await log('reminder_error', { message: String((e as Error)?.message ?? e) })
+    return 'retry'
+  }
+}
+
 // Consulta el estado real de un link en Clip y lo aplica. Devuelve lo que
 // decidió la base (o el error de comunicación, que también queda guardado).
 async function checkWithClip(providerPaymentId: string, source: string): Promise<Record<string, unknown>> {
@@ -287,6 +351,30 @@ async function handleReconcile(req: Request): Promise<Response> {
   return json({ checked: Math.min(rows.length, 150), pending_more: Math.max(rows.length - 150, 0), completed, errors })
 }
 
+// Recordatorios de pago. No pide credencial: no devuelve datos de nadie y
+// llamarlo de más no manda nada de más (cada inscripción se aparta una vez).
+async function handleRemind(): Promise<Response> {
+  if (!RESEND_API_KEY) return json({ error: 'not_configured' })
+  const { data, error } = await db.rpc('competition_claim_payment_reminders', { p_limit: 20 })
+  if (error) return json({ error: 'server_error' })
+  let sent = 0, skipped = 0, errors = 0
+  for (const r of (data ?? []) as Reminder[]) {
+    // Antes de escribirle: ¿ya pagó y Clip todavía no nos avisaba?
+    const { data: open } = await db.rpc('competition_payments_to_check', { p_folio: r.folio, p_email: r.email })
+    for (const row of ((open ?? []) as { provider_payment_id: string }[]).slice(0, 5)) await checkWithClip(row.provider_payment_id, 'check')
+    const { data: now } = await db.from('competition_registrations').select('status').eq('id', r.registration_id).maybeSingle()
+    if (now?.status !== 'pending_payment') { skipped++; continue }
+
+    const result = await sendReminderEmail(r)
+    if (result === 'sent') sent++
+    else {
+      errors++
+      if (result === 'retry') await db.rpc('competition_release_payment_reminder', { p_registration_id: r.registration_id })
+    }
+  }
+  return json({ sent, skipped, errors })
+}
+
 async function handleWebhook(req: Request, url: URL): Promise<Response> {
   const paymentId = url.searchParams.get('wh') ?? ''
   const sig = url.searchParams.get('s') ?? ''
@@ -334,6 +422,8 @@ Deno.serve(async (req) => {
       return handleCheck(folio, email)
     case 'reconcile':
       return handleReconcile(req)
+    case 'remind':
+      return handleRemind()
     default:
       return json({ error: 'bad_request' }, 400)
   }
