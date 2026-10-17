@@ -316,3 +316,32 @@ lista baje sola para que el último lugar (ej. el #100) también vea su nombre.
 - También borró de la base, con SQL que le dejé, sus dos inscripciones de
   prueba (JM-5G36F y JM-6EQTQ) y sus pagos. La auditoría y los eventos de
   esos folios se conservan.
+
+## 2026-10-17 — Cortesías con código
+- El usuario pidió una forma de dar cortesías y eligió **códigos**: staff
+  crea un código en el panel (botón "Cortesías" en `/staff/competencia`)
+  y se lo manda a la persona; ella se inscribe sola en `/competencia`,
+  abre "¿Tienes un código de cortesía?", lo escribe y queda inscrita ya
+  confirmada, sin pasar por Clip. Recibe el correo "Inscripción
+  confirmada" (sin la fila de pago).
+- SQL nuevo `src/supabase/competencia_cortesias.sql`: tabla
+  `competition_courtesy_codes`, columna `courtesy_code_id` en
+  inscripciones, `payment_method = 'courtesy'`. La RPC
+  `competition_register_courtesy` (solo service_role) valida el código y
+  llama a `register_for_competition` en la misma transacción: si algo
+  falla no se crea nada y el código no se gasta. Un uso = inscripción
+  activa con ese código; "Quitar cortesía" (el reembolso, renombrado para
+  cortesías) libera el uso. Admin: crear (código propio opcional o
+  `JMC-XXXXXX` al azar, usos 1–500), revocar (no cancela a quien ya se
+  inscribió) y lista con quién lo usó.
+- Edge Function: acción `courtesy`; `sendConfirmationEmail` sirve para
+  los dos casos. El correo queda en `competition_payment_events` con
+  `source = 'courtesy'` y el folio en `payload`.
+- Panel: "Pagados" ya no suma las cortesías al dinero y dice cuántas hay.
+- Probado: SQL en PGlite (23 casos: permisos, agotado, revocado,
+  duplicado/cerrada no gastan el código, quitar libera el uso, correr el
+  archivo dos veces) y la función transpilada con Resend falso (8 casos).
+  Las pantallas no se probaron en el navegador.
+- Pendiente menor: en `/competencia/consulta` una cortesía sale como "Pago
+  confirmado".
+- Falta que el usuario corra el SQL y despliegue la función.

@@ -68,6 +68,31 @@ const PAYMENT_METHODS: Record<string, string> = {
   link: 'Link de pago',
   transfer: 'Transferencia',
   other: 'Otro',
+  courtesy: 'Cortesía',
+}
+
+// "Registrar reembolso" en una cortesía no devuelve dinero: la quita y
+// libera el uso del código.
+const actionLabel = (a: Action, r: AdminRegistration) =>
+  a === 'mark_refunded' && r.payment_method === 'courtesy' ? 'Quitar cortesía' : ACTION_LABELS[a]
+
+interface CourtesyCode {
+  id: string
+  code: string
+  label: string | null
+  max_uses: number
+  uses: number
+  revoked_at: string | null
+  created_at: string
+  registrations: { folio: string; full_name: string; status: RegistrationStatus }[]
+}
+
+const COURTESY_ERRORS: Record<string, string> = {
+  forbidden: 'No tienes permiso.',
+  invalid_max_uses: 'Los usos deben ser entre 1 y 500.',
+  invalid_label: 'El nombre es demasiado largo.',
+  invalid_code: 'El código solo puede llevar letras, números y guiones (4 a 30).',
+  code_taken: 'Ese código ya existe. Elige otro.',
 }
 
 const MANUAL_METHODS = ['cash', 'card', 'transfer', 'link', 'other']
@@ -165,6 +190,7 @@ export default function CompetitionAdminPage() {
   const [openId, setOpenId] = useState<string | null>(null)
   const [showSettings, setShowSettings] = useState(false)
   const [showManual, setShowManual] = useState(false)
+  const [showCourtesy, setShowCourtesy] = useState(false)
   const [payments, setPayments] = useState<PaymentsSummary | null>(null)
   const [reconciling, setReconciling] = useState(false)
   const [reconcileMsg, setReconcileMsg] = useState<string | null>(null)
@@ -225,11 +251,12 @@ export default function CompetitionAdminPage() {
   const counts = useMemo(() => {
     const by = (s: RegistrationStatus) => regs.filter(r => displayStatus(r) === s).length
     const paid = by('paid')
+    const courtesy = regs.filter(r => r.status === 'paid' && r.payment_method === 'courtesy').length
     const pending = by('pending_payment')
     const attention = by('needs_attention')
     const sizes = Object.fromEntries(SHIRT_SIZES.map(s => [s, regs.filter(r => r.status === 'paid' && r.shirt_size === s).length]))
     return {
-      paid, pending, attention, expired: by('expired'),
+      paid, courtesy, pending, attention, expired: by('expired'),
       checkedIn: regs.filter(r => r.status === 'paid' && r.checked_in_at).length,
       taken: paid + pending + attention,
       sizes,
@@ -284,6 +311,9 @@ export default function CompetitionAdminPage() {
           <p className="text-zinc-400 text-xs truncate">{comp?.name ?? 'Inscripciones'}</p>
         </div>
         <div className="flex gap-2 shrink-0">
+          <button onClick={() => setShowCourtesy(v => !v)} className={smallBtn}>
+            {showCourtesy ? 'Cerrar' : 'Cortesías'}
+          </button>
           <button onClick={() => setShowManual(v => !v)}
             className="text-xs font-bold px-3 py-2 rounded-xl bg-primario hover:bg-primario-hover text-texto-en-acento transition-all">
             {showManual ? 'Cerrar' : '+ Inscribir aquí'}
@@ -302,9 +332,11 @@ export default function CompetitionAdminPage() {
       ) : comp && (
         <>
           {showManual && <ManualRegistrationForm categories={categories} onDone={fetchAll} />}
+          {showCourtesy && <CourtesyCodesPanel competitionName={comp.name} />}
 
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-3">
-            <Counter label="Pagados" value={counts.paid} sub={formatPrice(counts.paid * comp.price_cents)} accent />
+            <Counter label="Pagados" value={counts.paid} accent
+              sub={formatPrice((counts.paid - counts.courtesy) * comp.price_cents) + (counts.courtesy > 0 ? ` · ${counts.courtesy} ${counts.courtesy === 1 ? 'cortesía' : 'cortesías'}` : '')} />
             <Counter label="Pendientes" value={counts.pending} sub="con lugar apartado" />
             <Counter label="Por atender" value={counts.attention} sub={counts.attention > 0 ? 'requieren decisión' : 'todo en orden'} alert={counts.attention > 0} />
             {comp.capacity_total >= UNLIMITED_CAPACITY
@@ -578,7 +610,7 @@ function ActionPanel({ reg, categories, onDone }: { reg: AdminRegistration; cate
             className={`text-xs font-semibold px-3 py-2 rounded-xl border transition-all disabled:opacity-50 ${
               action === a ? 'bg-primario text-texto-en-acento border-primario'
                 : 'text-zinc-200 bg-superficie-alta/80 hover:bg-superficie-alta-hover border-zinc-700/50'}`}>
-            {ACTION_LABELS[a]}
+            {actionLabel(a, reg)}
           </button>
         ))}
       </div>
@@ -619,7 +651,7 @@ function ActionPanel({ reg, categories, onDone }: { reg: AdminRegistration; cate
             <button onClick={() => run(action)} disabled={busy}
               className={`text-xs font-bold px-4 py-2 rounded-xl disabled:opacity-50 ${
                 action === 'cancel' || action === 'mark_refunded' ? 'bg-alerta text-white' : 'bg-primario hover:bg-primario-hover text-texto-en-acento'}`}>
-              {busy ? '...' : `Confirmar: ${ACTION_LABELS[action].toLowerCase()}`}
+              {busy ? '...' : `Confirmar: ${actionLabel(action, reg).toLowerCase()}`}
             </button>
             <button onClick={() => { setAction(null); setError(null) }} className="text-zinc-400 hover:text-zinc-200 text-xs">Volver</button>
           </div>
@@ -774,5 +806,142 @@ function ManualRegistrationForm({ categories, onDone }: { categories: AdminCateg
         {busy ? 'Inscribiendo...' : 'Inscribir como pagado'}
       </button>
     </form>
+  )
+}
+
+// Códigos de cortesía: staff genera uno y se lo manda a la persona; ella se
+// inscribe sola en /competencia, escribe el código y queda inscrita sin
+// pagar (y recibe su correo de confirmación).
+function CourtesyCodesPanel({ competitionName }: { competitionName: string }) {
+  const [codes, setCodes] = useState<CourtesyCode[] | null>(null)
+  const [loadError, setLoadError] = useState(false)
+  const [label, setLabel] = useState('')
+  const [maxUses, setMaxUses] = useState('1')
+  const [customCode, setCustomCode] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [copiedId, setCopiedId] = useState<string | null>(null)
+  const [revokingId, setRevokingId] = useState<string | null>(null)
+
+  const load = () => {
+    db.rpc('get_competition_courtesy_codes_admin', { p_slug: COMPETITION_SLUG })
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      .then(({ data, error }: { data: any; error: unknown }) => {
+        if (error || !data || data.error) { setLoadError(true); return }
+        setLoadError(false)
+        setCodes(data.codes)
+      })
+  }
+
+  useEffect(load, [])
+
+  const create = async (e: React.FormEvent) => {
+    e.preventDefault()
+    const uses = Number(maxUses)
+    if (!Number.isInteger(uses) || uses < 1 || uses > 500) { setError(COURTESY_ERRORS.invalid_max_uses); return }
+    setBusy(true)
+    setError(null)
+    const { data, error } = await db.rpc('admin_create_courtesy_code', {
+      p_slug: COMPETITION_SLUG, p_label: label.trim() || null, p_max_uses: uses, p_code: customCode.trim() || null,
+    })
+    setBusy(false)
+    if (error || !data || data.error) {
+      setError(COURTESY_ERRORS[data?.error] ?? 'No se pudo crear el código.')
+      return
+    }
+    setLabel('')
+    setMaxUses('1')
+    setCustomCode('')
+    load()
+  }
+
+  const revoke = async (id: string) => {
+    setRevokingId(null)
+    const { data, error } = await db.rpc('admin_revoke_courtesy_code', { p_id: id })
+    if (error || !data || data.error) { setError('No se pudo revocar el código.'); return }
+    load()
+  }
+
+  const copyMessage = async (c: CourtesyCode) => {
+    const text = `Tu código de cortesía para ${competitionName} es ${c.code}. Inscríbete en https://app.jaibamuro.com/competencia y escríbelo al final del formulario.`
+    try {
+      await navigator.clipboard.writeText(text)
+      setCopiedId(c.id)
+      setTimeout(() => setCopiedId(v => (v === c.id ? null : v)), 2000)
+    } catch {
+      setError('No se pudo copiar. Copia el código a mano.')
+    }
+  }
+
+  const fieldLabel = 'block text-zinc-300 text-xs font-bold mb-1'
+
+  return (
+    <div className="bg-superficie rounded-2xl border border-primario/40 px-4 py-4 mb-4 space-y-4">
+      <div>
+        <p className="text-texto-principal text-sm font-bold">Cortesías</p>
+        <p className="text-zinc-400 text-xs">Crea un código y mándaselo a la persona. Se inscribe sola en /competencia, escribe el código y queda inscrita sin pagar.</p>
+      </div>
+
+      <form onSubmit={create} noValidate className="space-y-3">
+        <div className="grid grid-cols-1 sm:grid-cols-[1fr_90px_1fr] gap-3">
+          <div>
+            <label htmlFor="cc-label" className={fieldLabel}>Para quién</label>
+            <input id="cc-label" value={label} onChange={e => { setLabel(e.target.value); setError(null) }} maxLength={120}
+              placeholder="Ej. Patrocinador Café Rex" className={inputClass} />
+          </div>
+          <div>
+            <label htmlFor="cc-uses" className={fieldLabel}>Usos</label>
+            <input id="cc-uses" type="number" min={1} max={500} value={maxUses} onChange={e => { setMaxUses(e.target.value); setError(null) }} className={inputClass} />
+          </div>
+          <div>
+            <label htmlFor="cc-code" className={fieldLabel}>Código (opcional)</label>
+            <input id="cc-code" value={customCode} onChange={e => { setCustomCode(e.target.value.toUpperCase()); setError(null) }} maxLength={30}
+              placeholder="Se genera solo" className={`${inputClass} font-mono uppercase`} />
+          </div>
+        </div>
+        {error && <p role="alert" className="text-alerta text-xs font-semibold">{error}</p>}
+        <button type="submit" disabled={busy}
+          className="text-sm font-bold px-4 py-2.5 rounded-xl bg-primario hover:bg-primario-hover text-texto-en-acento disabled:opacity-50">
+          {busy ? 'Creando...' : 'Crear código'}
+        </button>
+      </form>
+
+      {loadError && <p className="text-alerta text-xs">No se pudieron cargar los códigos.</p>}
+      {codes && codes.length === 0 && <p className="text-zinc-400 text-xs">Todavía no hay códigos.</p>}
+      {codes && codes.length > 0 && (
+        <div className="space-y-2">
+          {codes.map(c => {
+            const usedUp = c.uses >= c.max_uses
+            return (
+              <div key={c.id} className="rounded-xl bg-fondo/60 border border-zinc-800/80 px-3 py-2.5">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className={`font-mono font-black text-sm select-all ${c.revoked_at ? 'text-zinc-500 line-through' : 'text-primario'}`}>{c.code}</span>
+                  <span className={`text-[9px] font-bold uppercase px-1.5 py-0.5 rounded ${
+                    c.revoked_at || usedUp ? 'text-zinc-300 bg-superficie-alta' : 'text-exito bg-exito/10'}`}>
+                    {c.revoked_at ? 'Revocado' : `${c.uses}/${c.max_uses} usados`}
+                  </span>
+                  {c.label && <span className="text-zinc-300 text-xs truncate">{c.label}</span>}
+                  {!c.revoked_at && (
+                    <span className="ml-auto flex gap-2">
+                      <button onClick={() => copyMessage(c)} className={smallBtn}>{copiedId === c.id ? 'Copiado' : 'Copiar mensaje'}</button>
+                      {revokingId === c.id ? (
+                        <button onClick={() => revoke(c.id)} className="text-xs font-bold px-3 py-2 rounded-xl bg-alerta text-white">Confirmar</button>
+                      ) : (
+                        <button onClick={() => setRevokingId(c.id)} className={smallBtn}>Revocar</button>
+                      )}
+                    </span>
+                  )}
+                </div>
+                {c.registrations.length > 0 && (
+                  <p className="text-zinc-400 text-xs mt-1">
+                    {c.registrations.map(r => `${r.full_name} (${r.folio}${r.status === 'paid' ? '' : ` · ${STATUS_LABELS[r.status].toLowerCase()}`})`).join(', ')}
+                  </p>
+                )}
+              </div>
+            )
+          })}
+        </div>
+      )}
+    </div>
   )
 }

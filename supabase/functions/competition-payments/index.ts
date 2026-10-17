@@ -1,9 +1,10 @@
 // Cobro en línea de inscripciones a la competencia con Clip.
-// Una sola función con cinco entradas:
+// Una sola función con seis entradas:
 //   POST {action:'pay', folio, email}       → link de pago de Clip para esa inscripción
 //   POST {action:'check', folio, email}     → consulta en Clip los links abiertos de esa inscripción
 //   POST {action:'reconcile'}               → (solo admin) consulta TODOS los links abiertos
 //   POST {action:'remind'}                  → manda los recordatorios de pago que toquen (lo llama pg_cron)
+//   POST {action:'courtesy', ...formulario, code} → inscripción con código de cortesía (sin Clip)
 //   POST ?wh=<payment_id>&s=<firma>         → webhook de Clip
 //
 // Reglas (ver src/supabase/competencia_pagos.sql):
@@ -81,19 +82,30 @@ function esc(v: unknown): string {
   return String(v ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c] as string))
 }
 
-// Correo de "pago confirmado". Se llama UNA vez: solo cuando un pago pasa
-// a completado y la inscripción queda pagada (no en reprocesos). Si falla,
-// el pago sigue confirmado; el fallo queda en competition_payment_events.
-async function sendConfirmationEmail(providerPaymentId: string): Promise<void> {
+// Correo de "pago confirmado" (o "inscripción confirmada" si es cortesía).
+// Se llama UNA vez: cuando un pago pasa a completado y la inscripción queda
+// pagada (no en reprocesos), o al inscribirse con código de cortesía. Si
+// falla, la inscripción sigue confirmada; el fallo queda en
+// competition_payment_events.
+async function sendConfirmationEmail(source: { providerPaymentId: string } | { courtesyFolio: string }): Promise<void> {
   if (!RESEND_API_KEY) return
+  const providerPaymentId = 'providerPaymentId' in source ? source.providerPaymentId : null
+  const courtesy = !providerPaymentId
   let to = ''
   try {
-    const { data: pay } = await db.from('competition_payments')
-      .select('registration_id, amount_cents, receipt_no').eq('provider_payment_id', providerPaymentId).maybeSingle()
-    if (!pay) return
-    const { data: reg } = await db.from('competition_registrations')
-      .select('folio, full_name, email, shirt_size, birth_date, category_id, competition_id').eq('id', pay.registration_id).maybeSingle()
-    if (!reg) return
+    let pay: { registration_id: string; amount_cents: number; receipt_no: string | null } | null = null
+    if (providerPaymentId) {
+      const { data } = await db.from('competition_payments')
+        .select('registration_id, amount_cents, receipt_no').eq('provider_payment_id', providerPaymentId).maybeSingle()
+      if (!data) return
+      pay = data
+    }
+    const regQuery = db.from('competition_registrations')
+      .select('folio, full_name, email, shirt_size, birth_date, category_id, competition_id')
+    const { data: reg } = pay
+      ? await regQuery.eq('id', pay.registration_id).maybeSingle()
+      : await regQuery.eq('folio', (source as { courtesyFolio: string }).courtesyFolio).maybeSingle()
+    if (!reg || !reg.email) return
     const { data: cat } = await db.from('competition_categories').select('name').eq('id', reg.category_id).maybeSingle()
     const { data: comp } = await db.from('competitions')
       .select('name, event_date, event_time_text, place').eq('id', reg.competition_id).maybeSingle()
@@ -104,7 +116,7 @@ async function sendConfirmationEmail(providerPaymentId: string): Promise<void> {
     const [by, bm, bd] = String(reg.birth_date).split('-').map(Number)
     const isMinor = ey - by - (em < bm || (em === bm && ed < bd) ? 1 : 0) < 18
     const fecha = `${ed} de ${MESES[em - 1]} de ${ey}` + (comp.event_time_text ? ` · ${comp.event_time_text}` : '')
-    const monto = `$${(pay.amount_cents / 100).toLocaleString('es-MX')} MXN`
+    const monto = pay ? `$${(pay.amount_cents / 100).toLocaleString('es-MX')} MXN` : ''
     const row = (k: string, v: string) =>
       `<tr><td style="padding:6px 0;color:#9fc3cf;font-size:14px;width:110px;vertical-align:top">${k}</td><td style="padding:6px 0;color:#f4f4f3;font-size:14px;font-weight:600">${v}</td></tr>`
 
@@ -113,7 +125,7 @@ async function sendConfirmationEmail(providerPaymentId: string): Promise<void> {
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:480px">
 <tr><td align="center" style="padding-bottom:24px"><img src="https://jaibamuro.com/logo-email.png" alt="Jaibamuro" height="36" style="height:36px;width:auto"></td></tr>
 <tr><td style="background:#015169;border-radius:16px;padding:28px 24px">
-<p style="margin:0 0 6px;color:#22c55e;font-size:14px;font-weight:700">Pago confirmado</p>
+<p style="margin:0 0 6px;color:#22c55e;font-size:14px;font-weight:700">${courtesy ? 'Inscripción confirmada' : 'Pago confirmado'}</p>
 <h1 style="margin:0 0 18px;color:#f4f4f3;font-size:22px;line-height:1.25">Ya estás dentro de ${esc(comp.name)}, ${esc(String(reg.full_name).split(' ')[0])}.</h1>
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#013a4b;border-radius:12px;margin-bottom:18px"><tr><td align="center" style="padding:16px">
 <p style="margin:0 0 4px;color:#9fc3cf;font-size:11px;font-weight:700;letter-spacing:2px">TU FOLIO</p>
@@ -125,7 +137,7 @@ ${row('Categoría', esc(cat?.name ?? ''))}
 ${row('Talla', esc(reg.shirt_size))}
 ${row('Cuándo', esc(fecha))}
 ${comp.place ? row('Dónde', esc(comp.place)) : ''}
-${row('Pagaste', esc(monto) + (pay.receipt_no ? ` · recibo Clip ${esc(pay.receipt_no)}` : ''))}
+${pay ? row('Pagaste', esc(monto) + (pay.receipt_no ? ` · recibo Clip ${esc(pay.receipt_no)}` : '')) : row('Inscripción', 'Cortesía')}
 </table>
 ${isMinor ? `<p style="margin:18px 0 0;padding:12px 14px;border:1px solid #ffd260;border-radius:12px;color:#ffd260;font-size:14px;font-weight:600">Eres menor de edad: el día del evento debes llegar con un mayor de edad para firmar tu registro.</p>` : ''}
 <p style="margin:18px 0 0;color:#cfe3ea;font-size:14px;line-height:1.5">El día del evento da tu nombre o tu folio en el registro. Puedes revisar tu inscripción cuando quieras:</p>
@@ -139,20 +151,20 @@ ${isMinor ? `<p style="margin:18px 0 0;padding:12px 14px;border:1px solid #ffd26
       headers: { 'Authorization': `Bearer ${RESEND_API_KEY}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({
         from: EMAIL_FROM, to: [reg.email],
-        subject: `Pago confirmado · ${comp.name} · Folio ${reg.folio}`,
+        subject: `${courtesy ? 'Inscripción confirmada' : 'Pago confirmado'} · ${comp.name} · Folio ${reg.folio}`,
         html,
       }),
       signal: AbortSignal.timeout(10_000),
     })
     const text = await res.text()
     await db.rpc('competition_record_payment_event', {
-      p_provider_payment_id: providerPaymentId, p_source: 'email', p_kind: res.ok ? 'email_sent' : 'email_error',
-      p_payload: { to: reg.email, http: res.status, body: text.slice(0, 500) },
+      p_provider_payment_id: providerPaymentId, p_source: courtesy ? 'courtesy' : 'email', p_kind: res.ok ? 'email_sent' : 'email_error',
+      p_payload: { to: reg.email, folio: reg.folio, http: res.status, body: text.slice(0, 500) },
     })
   } catch (e) {
     await db.rpc('competition_record_payment_event', {
-      p_provider_payment_id: providerPaymentId, p_source: 'email', p_kind: 'email_error',
-      p_payload: { to, message: String((e as Error)?.message ?? e) },
+      p_provider_payment_id: providerPaymentId, p_source: courtesy ? 'courtesy' : 'email', p_kind: 'email_error',
+      p_payload: { to, folio: courtesy ? (source as { courtesyFolio: string }).courtesyFolio : undefined, message: String((e as Error)?.message ?? e) },
     })
   }
 }
@@ -243,7 +255,7 @@ async function checkWithClip(providerPaymentId: string, source: string): Promise
     if (error) throw new Error(error.message)
     const result = data as Record<string, unknown>
     if (result.status === 'completed' && !result.noop && result.registration_status === 'paid') {
-      await sendConfirmationEmail(providerPaymentId)
+      await sendConfirmationEmail({ providerPaymentId })
     }
     return result
   } catch (e) {
@@ -320,6 +332,30 @@ async function handlePay(folio: string, email: string): Promise<Response> {
     })
     return json({ error: 'clip_error' })
   }
+}
+
+// Inscripción con código de cortesía: se inscribe y queda confirmada en un
+// solo paso (sin Clip). Pasa por aquí y no directo desde el navegador para
+// que la RPC sea solo de service_role y el correo salga del servidor.
+async function handleCourtesy(body: Record<string, unknown>): Promise<Response> {
+  const code = String(body.code ?? '').trim()
+  if (!code) return json({ error: 'invalid_code' })
+  const { data, error } = await db.rpc('competition_register_courtesy', {
+    p_slug: String(body.slug ?? ''),
+    p_full_name: String(body.full_name ?? ''),
+    p_birth_date: body.birth_date ? String(body.birth_date) : null,
+    p_email: String(body.email ?? ''),
+    p_phone: String(body.phone ?? ''),
+    p_category_id: body.category_id ? String(body.category_id) : null,
+    p_shirt_size: String(body.shirt_size ?? ''),
+    p_accept_privacy: body.accept_privacy === true,
+    p_accept_waiver: body.accept_waiver === true,
+    p_code: code,
+  })
+  if (error || !data) return json({ error: 'server_error' })
+  if (data.error) return json({ error: data.error })
+  await sendConfirmationEmail({ courtesyFolio: data.folio })
+  return json(data)
 }
 
 async function handleCheck(folio: string, email: string): Promise<Response> {
@@ -408,8 +444,9 @@ Deno.serve(async (req) => {
   const url = new URL(req.url)
   if (url.searchParams.has('wh')) return handleWebhook(req, url)
 
-  let body: { action?: string; folio?: string; email?: string }
+  let body: { action?: string; folio?: string; email?: string; [k: string]: unknown }
   try { body = await req.json() } catch { return json({ error: 'bad_request' }, 400) }
+  if (!body || typeof body !== 'object') return json({ error: 'bad_request' }, 400)
 
   const folio = String(body.folio ?? '').trim()
   const email = String(body.email ?? '').trim()
@@ -424,6 +461,8 @@ Deno.serve(async (req) => {
       return handleReconcile(req)
     case 'remind':
       return handleRemind()
+    case 'courtesy':
+      return handleCourtesy(body)
     default:
       return json({ error: 'bad_request' }, 400)
   }

@@ -39,6 +39,8 @@ export default function CompetitionPage() {
   const [shirtSize, setShirtSize] = useState<ShirtSize | ''>('')
   const [acceptPrivacy, setAcceptPrivacy] = useState(false)
   const [acceptWaiver, setAcceptWaiver] = useState(false)
+  const [showCode, setShowCode] = useState(false)
+  const [courtesyCode, setCourtesyCode] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [formError, setFormError] = useState<string | null>(null)
 
@@ -93,17 +95,28 @@ export default function CompetitionPage() {
     if (problem) { setFormError(problem); return }
     setSubmitting(true)
     setFormError(null)
-    const { data, error } = await db.rpc('register_for_competition', {
-      p_slug: COMPETITION_SLUG,
-      p_full_name: fullName,
-      p_birth_date: birthDate,
-      p_email: emailNorm,
-      p_phone: phoneDigits,
-      p_category_id: categoryId,
-      p_shirt_size: shirtSize,
-      p_accept_privacy: acceptPrivacy,
-      p_accept_waiver: acceptWaiver,
-    })
+    const code = courtesyCode.replace(/\s/g, '').toUpperCase()
+    // Con código de cortesía la inscripción pasa por la Edge Function: queda
+    // confirmada sin pago y el correo sale del servidor.
+    const { data, error } = code
+      ? await supabase.functions.invoke('competition-payments', {
+          body: {
+            action: 'courtesy', code, slug: COMPETITION_SLUG, full_name: fullName, birth_date: birthDate,
+            email: emailNorm, phone: phoneDigits, category_id: categoryId, shirt_size: shirtSize,
+            accept_privacy: acceptPrivacy, accept_waiver: acceptWaiver,
+          },
+        })
+      : await db.rpc('register_for_competition', {
+          p_slug: COMPETITION_SLUG,
+          p_full_name: fullName,
+          p_birth_date: birthDate,
+          p_email: emailNorm,
+          p_phone: phoneDigits,
+          p_category_id: categoryId,
+          p_shirt_size: shirtSize,
+          p_accept_privacy: acceptPrivacy,
+          p_accept_waiver: acceptWaiver,
+        })
     setSubmitting(false)
     if (error || !data) { setFormError('No se pudo completar la inscripción. Intenta de nuevo.'); return }
     if (data.error) {
@@ -257,6 +270,20 @@ export default function CompetitionPage() {
                   )}
                 </div>
 
+                {showCode ? (
+                  <div>
+                    <label htmlFor="comp-code" className={labelClass}>Código de cortesía</label>
+                    <input id="comp-code" type="text" value={courtesyCode} onChange={e => setCourtesyCode(e.target.value)}
+                      autoCapitalize="characters" autoComplete="off" spellCheck={false}
+                      placeholder="Déjalo vacío si vas a pagar" className={`${inputClass} font-mono uppercase`} />
+                  </div>
+                ) : (
+                  <button type="button" onClick={() => setShowCode(true)}
+                    className="text-zinc-400 text-xs font-semibold underline hover:text-texto-principal transition-colors">
+                    ¿Tienes un código de cortesía?
+                  </button>
+                )}
+
                 {formError && (
                   <p role="alert" className="text-alerta text-sm font-semibold">
                     {formError}
@@ -268,7 +295,7 @@ export default function CompetitionPage() {
 
                 <button type="submit" disabled={submitting}
                   className="w-full py-4 rounded-2xl bg-primario hover:bg-primario-hover text-texto-en-acento font-black text-base transition-all disabled:opacity-50 active:scale-95">
-                  {submitting ? 'Inscribiendo...' : 'Inscribirme'}
+                  {submitting ? 'Inscribiendo...' : courtesyCode.trim() ? 'Inscribirme con cortesía' : 'Inscribirme'}
                 </button>
                 <p className="text-zinc-400 text-xs text-center">
                   {isUnlimitedCapacity(comp.spots_left)
@@ -300,6 +327,7 @@ function ConsentBox({ title, text, label, checked, onChange }: {
 }
 
 function RegistrationDone({ result, email, unlimited }: { result: RegistrationResult; email: string; unlimited: boolean }) {
+  if (result.courtesy) return <CourtesyDone result={result} email={email} />
   return (
     <div className="space-y-5">
       <div>
@@ -337,6 +365,39 @@ function RegistrationDone({ result, email, unlimited }: { result: RegistrationRe
 
       <p className="text-zinc-400 text-sm text-center">
         Revisa el estado de tu pago en{' '}
+        <Link to="/competencia/consulta" className="text-primario font-bold hover:text-primario-hover">Consulta tu inscripción</Link>.
+      </p>
+    </div>
+  )
+}
+
+function CourtesyDone({ result, email }: { result: RegistrationResult; email: string }) {
+  return (
+    <div className="space-y-5">
+      <div>
+        <h1 className="text-texto-principal font-black text-2xl tracking-tight">¡Ya estás inscrito!</h1>
+        <p className="text-zinc-300 text-sm mt-1">
+          {result.full_name} · {result.category_name} · talla {result.shirt_size}
+        </p>
+      </div>
+
+      <div className="bg-superficie rounded-2xl border border-primario/30 p-5 text-center">
+        <p className="text-zinc-400 text-xs font-bold uppercase tracking-widest mb-1">Tu folio</p>
+        <p className="text-primario font-black font-mono text-4xl tracking-wider select-all">{result.folio}</p>
+        <p className="text-zinc-400 text-xs mt-2">Guárdalo: tómale captura de pantalla.</p>
+      </div>
+
+      <div className="bg-superficie rounded-2xl border border-zinc-800/60 p-5 space-y-2">
+        <p className="text-texto-principal font-bold">Inscripción confirmada (cortesía)</p>
+        <p className="text-zinc-300 text-sm">No tienes nada que pagar. Te mandamos la confirmación a <span className="font-bold text-texto-principal">{email}</span>.</p>
+      </div>
+
+      {result.is_minor && (
+        <p className="bg-superficie rounded-2xl border border-amarillo-suave/40 p-4 text-amarillo-suave text-sm font-semibold">{MINOR_NOTICE}</p>
+      )}
+
+      <p className="text-zinc-400 text-sm text-center">
+        Puedes revisar tu inscripción en{' '}
         <Link to="/competencia/consulta" className="text-primario font-bold hover:text-primario-hover">Consulta tu inscripción</Link>.
       </p>
     </div>

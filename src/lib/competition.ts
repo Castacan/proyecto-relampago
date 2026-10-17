@@ -67,6 +67,7 @@ export interface RegistrationResult {
   payment_link_url: string | null
   payment_instructions: string | null
   is_minor: boolean
+  courtesy?: boolean        // inscrita con código de cortesía: ya confirmada, sin pago
 }
 
 export interface RegistrationLookup {
@@ -121,6 +122,8 @@ export const REGISTER_ERRORS: Record<string, string> = {
   category_full: 'Esa categoría ya está llena. Elige otra.',
   duplicate: 'Ya existe una inscripción activa con ese nombre y fecha de nacimiento. Consulta tu inscripción con tu folio.',
   too_many_pending: 'Ya hay varias inscripciones pendientes de pago con este correo. Paga alguna antes de crear otra.',
+  invalid_code: 'Ese código de cortesía no es válido. Revísalo o déjalo vacío para pagar.',
+  code_used_up: 'Ese código de cortesía ya se usó.',
 }
 
 export const STATUS_LABELS: Record<RegistrationStatus, string> = {
