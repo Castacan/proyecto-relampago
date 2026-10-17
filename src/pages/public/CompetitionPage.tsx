@@ -298,7 +298,9 @@ export default function CompetitionPage() {
                   {submitting ? 'Inscribiendo...' : courtesyCode.trim() ? 'Inscribirme con cortesía' : 'Inscribirme'}
                 </button>
                 <p className="text-zinc-400 text-xs text-center">
-                  {isUnlimitedCapacity(comp.spots_left)
+                  {courtesyCode.trim()
+                    ? 'Con código de cortesía tu inscripción queda confirmada al instante, sin pago.'
+                    : isUnlimitedCapacity(comp.spots_left)
                     ? 'Tu inscripción queda confirmada en cuanto se aprueba tu pago.'
                     : `Al inscribirte apartamos tu lugar por ${comp.hold_hours} horas mientras pagas.`}
                 </p>

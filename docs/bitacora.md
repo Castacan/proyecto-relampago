@@ -344,4 +344,12 @@ lista baje sola para que el último lugar (ej. el #100) también vea su nombre.
   Las pantallas no se probaron en el navegador.
 - Pendiente menor: en `/competencia/consulta` una cortesía sale como "Pago
   confirmado".
-- Falta que el usuario corra el SQL y despliegue la función.
+- Mismo día: el usuario corrió el SQL y desplegó la función. Prueba en
+  producción: creé el código JMC-K5HCSW ("PRUEBA Claude (borrar)") y me
+  inscribí con él (folio JM-K5DUJ, correo del usuario). Quedó Pagado
+  (Cortesía) y salió la pantalla de confirmación. Después le di "Quitar
+  cortesía": quedó Reembolsado, los contadores regresaron a 13 / $6,500 y
+  el código volvió a 0/1 usados; luego lo revoqué. El correo no lo pude
+  ver (no hay sesión de Resend en su Chrome): falta que el usuario
+  confirme que le llegó. JM-K5DUJ sigue en la lista como Reembolsado.
+- Arreglado: con código, el texto bajo el botón ya no habla de pago.
