@@ -372,3 +372,7 @@ lista baje sola para que el último lugar (ej. el #100) también vea su nombre.
   pertenecen: "(Cortesía · JMC-XXXXXX · para quién)". También en el CSV,
   columna "Método de pago". Sale de `get_competition_courtesy_codes_admin`
   (sin SQL nuevo).
+- Mismo día: en `/competencia` el enlace ahora es un botón grande
+  (borde punteado) "¿Tienes un código promocional?", y todo lo que ve el
+  público dice "código promocional" en vez de "cortesía". En el panel y en
+  el correo ("Inscripción: Cortesía") sigue diciendo cortesía.

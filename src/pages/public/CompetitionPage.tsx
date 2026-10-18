@@ -272,15 +272,15 @@ export default function CompetitionPage() {
 
                 {showCode ? (
                   <div>
-                    <label htmlFor="comp-code" className={labelClass}>Código de cortesía</label>
+                    <label htmlFor="comp-code" className={labelClass}>Código promocional</label>
                     <input id="comp-code" type="text" value={courtesyCode} onChange={e => setCourtesyCode(e.target.value)}
                       autoCapitalize="characters" autoComplete="off" spellCheck={false}
                       placeholder="Déjalo vacío si vas a pagar" className={`${inputClass} font-mono uppercase`} />
                   </div>
                 ) : (
                   <button type="button" onClick={() => setShowCode(true)}
-                    className="text-zinc-400 text-xs font-semibold underline hover:text-texto-principal transition-colors">
-                    ¿Tienes un código de cortesía?
+                    className="w-full py-3 rounded-xl border border-dashed border-primario/60 text-primario text-sm font-bold hover:bg-primario/10 transition-colors">
+                    ¿Tienes un código promocional?
                   </button>
                 )}
 
@@ -295,11 +295,11 @@ export default function CompetitionPage() {
 
                 <button type="submit" disabled={submitting}
                   className="w-full py-4 rounded-2xl bg-primario hover:bg-primario-hover text-texto-en-acento font-black text-base transition-all disabled:opacity-50 active:scale-95">
-                  {submitting ? 'Inscribiendo...' : courtesyCode.trim() ? 'Inscribirme con cortesía' : 'Inscribirme'}
+                  {submitting ? 'Inscribiendo...' : courtesyCode.trim() ? 'Inscribirme con mi código' : 'Inscribirme'}
                 </button>
                 <p className="text-zinc-400 text-xs text-center">
                   {courtesyCode.trim()
-                    ? 'Con código de cortesía tu inscripción queda confirmada al instante, sin pago.'
+                    ? 'Con código promocional tu inscripción queda confirmada al instante, sin pago.'
                     : isUnlimitedCapacity(comp.spots_left)
                     ? 'Tu inscripción queda confirmada en cuanto se aprueba tu pago.'
                     : `Al inscribirte apartamos tu lugar por ${comp.hold_hours} horas mientras pagas.`}
@@ -390,7 +390,7 @@ function CourtesyDone({ result, email }: { result: RegistrationResult; email: st
       </div>
 
       <div className="bg-superficie rounded-2xl border border-zinc-800/60 p-5 space-y-2">
-        <p className="text-texto-principal font-bold">Inscripción confirmada (cortesía)</p>
+        <p className="text-texto-principal font-bold">Inscripción confirmada con código promocional</p>
         <p className="text-zinc-300 text-sm">No tienes nada que pagar. Te mandamos la confirmación a <span className="font-bold text-texto-principal">{email}</span>.</p>
       </div>
 
