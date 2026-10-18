@@ -176,6 +176,72 @@ BEGIN
 END;
 $function$;
 
+-- Staff aplica un código a alguien que ya se inscribió y no ha pagado
+-- (pendiente o vencido): p. ej. se ganó la cortesía pero no vio dónde
+-- ponerla. La Edge Function (acción 'courtesy_apply') la llama con la
+-- sesión del admin y luego manda el correo. (2026-10-18)
+CREATE OR REPLACE FUNCTION public.admin_apply_courtesy(p_id UUID, p_code TEXT)
+RETURNS JSONB
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public
+AS $function$
+DECLARE
+  v_comp competitions%ROWTYPE;
+  v_reg  competition_registrations%ROWTYPE;
+  v_new  competition_registrations%ROWTYPE;
+  v_cat  competition_categories%ROWTYPE;
+  v_code competition_courtesy_codes%ROWTYPE;
+BEGIN
+  IF NOT competition_is_admin() THEN RETURN jsonb_build_object('error', 'forbidden'); END IF;
+
+  -- Mismo orden de bloqueo que admin_update_registration.
+  SELECT c.* INTO v_comp FROM competitions c
+  WHERE c.id = (SELECT r.competition_id FROM competition_registrations r WHERE r.id = p_id)
+  FOR UPDATE;
+  IF NOT FOUND THEN RETURN jsonb_build_object('error', 'not_found'); END IF;
+  SELECT r.* INTO v_reg FROM competition_registrations r WHERE r.id = p_id FOR UPDATE;
+
+  IF v_reg.status NOT IN ('pending_payment','expired') THEN RETURN jsonb_build_object('error', 'invalid_state'); END IF;
+
+  SELECT k.* INTO v_code FROM competition_courtesy_codes k
+  WHERE k.code = upper(regexp_replace(coalesce(p_code, ''), '\s', '', 'g')) AND k.competition_id = v_comp.id
+  FOR UPDATE;
+  IF NOT FOUND OR v_code.revoked_at IS NOT NULL THEN RETURN jsonb_build_object('error', 'invalid_code'); END IF;
+  IF competition_courtesy_uses(v_code.id) >= v_code.max_uses THEN RETURN jsonb_build_object('error', 'code_used_up'); END IF;
+
+  -- Si ya no ocupaba lugar (reserva vencida), tiene que haber cupo y no
+  -- debe tener otra inscripción activa.
+  IF NOT (v_reg.status = 'pending_payment' AND v_reg.hold_expires_at > now()) THEN
+    IF EXISTS (
+      SELECT 1 FROM competition_registrations r
+      WHERE r.competition_id = v_reg.competition_id AND r.id <> v_reg.id
+        AND lower(r.full_name) = lower(v_reg.full_name) AND r.birth_date = v_reg.birth_date
+        AND r.status IN ('pending_payment','paid','needs_attention')) THEN
+      RETURN jsonb_build_object('error', 'has_other_active');
+    END IF;
+    SELECT cc.* INTO v_cat FROM competition_categories cc WHERE cc.id = v_reg.category_id;
+    IF competition_spots_taken(v_comp.id) >= v_comp.capacity_total
+       OR (v_cat.capacity IS NOT NULL AND competition_spots_taken(v_comp.id, v_cat.id) >= v_cat.capacity) THEN
+      RETURN jsonb_build_object('error', 'full');
+    END IF;
+  END IF;
+
+  UPDATE competition_registrations r SET
+    status = 'paid', paid_at = now(), payment_method = 'courtesy', hold_expires_at = NULL,
+    courtesy_code_id = v_code.id, checked_in_at = NULL, updated_at = now()
+  WHERE r.id = v_reg.id
+  RETURNING * INTO v_new;
+
+  INSERT INTO competition_audit_log (actor_id, action, competition_id, registration_id, before, after, reason)
+  VALUES (auth.uid(), 'courtesy_apply', v_comp.id, v_new.id, to_jsonb(v_reg), to_jsonb(v_new),
+          'Cortesía aplicada por staff con código ' || v_code.code);
+
+  RETURN jsonb_build_object('success', true, 'folio', v_new.folio, 'has_email', v_new.email IS NOT NULL);
+END;
+$function$;
+
+REVOKE ALL ON FUNCTION public.admin_apply_courtesy(UUID, TEXT) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.admin_apply_courtesy(UUID, TEXT) TO authenticated;
+
 REVOKE ALL ON FUNCTION public.competition_courtesy_uses(UUID) FROM PUBLIC, anon, authenticated;
 REVOKE ALL ON FUNCTION public.competition_register_courtesy(TEXT, TEXT, DATE, TEXT, TEXT, UUID, TEXT, BOOLEAN, BOOLEAN, TEXT) FROM PUBLIC, anon, authenticated;
 REVOKE ALL ON FUNCTION public.admin_create_courtesy_code(TEXT, TEXT, INT, TEXT) FROM PUBLIC, anon;

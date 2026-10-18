@@ -353,3 +353,18 @@ lista baje sola para que el último lugar (ej. el #100) también vea su nombre.
   ver (no hay sesión de Resend en su Chrome): falta que el usuario
   confirme que le llegó. JM-K5DUJ sigue en la lista como Reembolsado.
 - Arreglado: con código, el texto bajo el botón ya no habla de pago.
+
+## 2026-10-18 — Aplicar cortesía desde el panel
+- Pedido del usuario: poder darle la cortesía a alguien que ya se inscribió
+  y no vio dónde poner el código. Botón "Aplicar cortesía" en las
+  inscripciones Pendientes y Vencidas del panel (junto a "Editar datos";
+  no dentro, porque Editar no existe para vencidas). Pide el código.
+- SQL: `admin_apply_courtesy(p_id, p_code)` en `competencia_cortesias.sql`
+  (solo admin). Valida código (existe, no revocado, con usos), y si la
+  reserva ya venció exige cupo y que no tenga otra inscripción activa.
+  Queda paid/courtesy; auditoría `courtesy_apply` con antes/después.
+- Edge Function: acción `courtesy_apply`, llama la RPC con la sesión del
+  admin y manda el correo "Inscripción confirmada" si tiene correo.
+- Si esa persona tenía un link de Clip abierto y paga después, el pago cae
+  en "duplicado" para revisión (la red de seguridad que ya existía).
+- Probado: PGlite (14 casos nuevos) y función con arnés falso (5 casos).

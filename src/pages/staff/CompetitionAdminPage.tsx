@@ -46,7 +46,7 @@ interface AdminRegistration {
   is_minor: boolean
 }
 
-type Action = 'mark_paid' | 'resolve_attention' | 'cancel' | 'mark_refunded' | 'edit' | 'extend_hold' | 'check_in' | 'undo_check_in'
+type Action = 'mark_paid' | 'resolve_attention' | 'cancel' | 'mark_refunded' | 'edit' | 'extend_hold' | 'check_in' | 'undo_check_in' | 'apply_courtesy'
 
 const ACTION_LABELS: Record<Action, string> = {
   mark_paid: 'Marcar pagado',
@@ -57,6 +57,7 @@ const ACTION_LABELS: Record<Action, string> = {
   extend_hold: 'Re-apartar lugar',
   check_in: 'Check-in',
   undo_check_in: 'Quitar check-in',
+  apply_courtesy: 'Aplicar cortesía',
 }
 
 // 'clip' lo pone el sistema cuando el pago en línea se confirma; no es
@@ -93,6 +94,10 @@ const COURTESY_ERRORS: Record<string, string> = {
   invalid_label: 'El nombre es demasiado largo.',
   invalid_code: 'El código solo puede llevar letras, números y guiones (4 a 30).',
   code_taken: 'Ese código ya existe. Elige otro.',
+  code_used_up: 'Ese código ya se usó todas las veces que permite.',
+  invalid_state: 'La inscripción ya cambió de estado. Actualiza la lista.',
+  has_other_active: 'Esta persona ya tiene otra inscripción activa.',
+  full: 'Ya no hay cupo.',
 }
 
 const MANUAL_METHODS = ['cash', 'card', 'transfer', 'link', 'other']
@@ -159,8 +164,8 @@ const STATUS_STYLE: Record<RegistrationStatus, string> = {
 
 function actionsFor(r: AdminRegistration): Action[] {
   switch (r.status) {
-    case 'pending_payment': return ['mark_paid', 'extend_hold', 'edit', 'cancel']
-    case 'expired': return ['mark_paid', 'extend_hold', 'cancel']
+    case 'pending_payment': return ['mark_paid', 'extend_hold', 'edit', 'apply_courtesy', 'cancel']
+    case 'expired': return ['mark_paid', 'extend_hold', 'apply_courtesy', 'cancel']
     case 'paid': return [r.checked_in_at ? 'undo_check_in' : 'check_in', 'edit', 'mark_refunded']
     case 'needs_attention': return ['resolve_attention', 'mark_refunded', 'edit']
     default: return []
@@ -549,6 +554,7 @@ function ActionPanel({ reg, categories, onDone }: { reg: AdminRegistration; cate
   const [action, setAction] = useState<Action | null>(null)
   const [reason, setReason] = useState('')
   const [method, setMethod] = useState('cash')
+  const [courtesyCode, setCourtesyCode] = useState('')
   const [edit, setEdit] = useState({
     full_name: reg.full_name, email: reg.email ?? '', phone: reg.phone ?? '',
     category_id: reg.category_id, shirt_size: reg.shirt_size,
@@ -558,7 +564,25 @@ function ActionPanel({ reg, categories, onDone }: { reg: AdminRegistration; cate
   const [notice, setNotice] = useState<string | null>(null)
 
   const available = actionsFor(reg)
-  const needsReason = action !== null && action !== 'check_in' && action !== 'undo_check_in'
+  const needsReason = action !== null && action !== 'check_in' && action !== 'undo_check_in' && action !== 'apply_courtesy'
+
+  // Pasa por la Edge Function para que, además, le llegue el correo de
+  // confirmación (si la inscripción tiene correo).
+  const applyCourtesy = async () => {
+    if (!courtesyCode.trim()) { setError('Escribe el código de cortesía.'); return }
+    setBusy(true)
+    setError(null)
+    const { data, error } = await supabase.functions.invoke('competition-payments', {
+      body: { action: 'courtesy_apply', registration_id: reg.id, code: courtesyCode },
+    })
+    setBusy(false)
+    if (error || !data || data.error) {
+      setError(data?.error === 'invalid_code' ? 'Ese código no existe o está revocado.'
+        : COURTESY_ERRORS[data?.error] ?? 'No se pudo aplicar la cortesía.')
+      return
+    }
+    onDone()
+  }
 
   const run = async (act: Action) => {
     if (act !== 'check_in' && act !== 'undo_check_in' && reason.trim().length < 3) { setError('Escribe el motivo.'); return }
@@ -621,6 +645,22 @@ function ActionPanel({ reg, categories, onDone }: { reg: AdminRegistration; cate
           <select id={`method-${reg.id}`} value={method} onChange={e => setMethod(e.target.value)} className={inputClass}>
             {MANUAL_METHODS.map(k => <option key={k} value={k}>{PAYMENT_METHODS[k]}</option>)}
           </select>
+        </div>
+      )}
+
+      {action === 'apply_courtesy' && (
+        <div className="space-y-2">
+          <label htmlFor={`courtesy-${reg.id}`} className="block text-zinc-300 text-xs font-bold">Código de cortesía</label>
+          <input id={`courtesy-${reg.id}`} value={courtesyCode} onChange={e => { setCourtesyCode(e.target.value.toUpperCase()); setError(null) }}
+            autoComplete="off" spellCheck={false} placeholder="Ej. JMC-AB12CD" className={`${inputClass} font-mono uppercase`} />
+          <p className="text-zinc-400 text-xs">Queda inscrita sin pagar{reg.email ? ' y le llega el correo de confirmación' : ''}. El código gasta un uso.</p>
+          <div className="flex items-center gap-3">
+            <button onClick={applyCourtesy} disabled={busy}
+              className="text-xs font-bold px-4 py-2 rounded-xl bg-primario hover:bg-primario-hover text-texto-en-acento disabled:opacity-50">
+              {busy ? '...' : 'Confirmar: aplicar cortesía'}
+            </button>
+            <button onClick={() => { setAction(null); setError(null) }} className="text-zinc-400 hover:text-zinc-200 text-xs">Volver</button>
+          </div>
         </div>
       )}
 

@@ -1,10 +1,11 @@
 // Cobro en línea de inscripciones a la competencia con Clip.
-// Una sola función con seis entradas:
+// Una sola función con siete entradas:
 //   POST {action:'pay', folio, email}       → link de pago de Clip para esa inscripción
 //   POST {action:'check', folio, email}     → consulta en Clip los links abiertos de esa inscripción
 //   POST {action:'reconcile'}               → (solo admin) consulta TODOS los links abiertos
 //   POST {action:'remind'}                  → manda los recordatorios de pago que toquen (lo llama pg_cron)
 //   POST {action:'courtesy', ...formulario, code} → inscripción con código de cortesía (sin Clip)
+//   POST {action:'courtesy_apply', registration_id, code} → (solo admin) aplica cortesía a una inscripción ya hecha
 //   POST ?wh=<payment_id>&s=<firma>         → webhook de Clip
 //
 // Reglas (ver src/supabase/competencia_pagos.sql):
@@ -358,6 +359,23 @@ async function handleCourtesy(body: Record<string, unknown>): Promise<Response> 
   return json(data)
 }
 
+// Staff aplica un código de cortesía a una inscripción ya hecha (pendiente
+// o vencida). La RPC corre con la sesión del admin (ella valida el rol);
+// aquí solo se agrega el correo de confirmación.
+async function handleCourtesyApply(req: Request, body: Record<string, unknown>): Promise<Response> {
+  const caller = createClient(SUPABASE_URL, ANON_KEY, {
+    auth: { persistSession: false },
+    global: { headers: { Authorization: req.headers.get('Authorization') ?? '' } },
+  })
+  const { data, error } = await caller.rpc('admin_apply_courtesy', {
+    p_id: String(body.registration_id ?? ''), p_code: String(body.code ?? ''),
+  })
+  if (error || !data) return json({ error: 'server_error' })
+  if (data.error) return json({ error: data.error })
+  if (data.has_email) await sendConfirmationEmail({ courtesyFolio: data.folio })
+  return json(data)
+}
+
 async function handleCheck(folio: string, email: string): Promise<Response> {
   const { data, error } = await db.rpc('competition_payments_to_check', { p_folio: folio, p_email: email })
   if (error) return json({ error: 'server_error' })
@@ -463,6 +481,8 @@ Deno.serve(async (req) => {
       return handleRemind()
     case 'courtesy':
       return handleCourtesy(body)
+    case 'courtesy_apply':
+      return handleCourtesyApply(req, body)
     default:
       return json({ error: 'bad_request' }, 400)
   }
