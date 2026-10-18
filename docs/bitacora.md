@@ -368,3 +368,7 @@ lista baje sola para que el último lugar (ej. el #100) también vea su nombre.
 - Si esa persona tenía un link de Clip abierto y paga después, el pago cae
   en "duplicado" para revisión (la red de seguridad que ya existía).
 - Probado: PGlite (14 casos nuevos) y función con arnés falso (5 casos).
+- Mismo día: en la lista del panel, las cortesías muestran a qué código
+  pertenecen: "(Cortesía · JMC-XXXXXX · para quién)". También en el CSV,
+  columna "Método de pago". Sale de `get_competition_courtesy_codes_admin`
+  (sin SQL nuevo).

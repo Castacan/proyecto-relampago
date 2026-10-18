@@ -197,6 +197,8 @@ export default function CompetitionAdminPage() {
   const [showManual, setShowManual] = useState(false)
   const [showCourtesy, setShowCourtesy] = useState(false)
   const [payments, setPayments] = useState<PaymentsSummary | null>(null)
+  // folio → código de cortesía con el que se inscribió (para mostrarlo en la lista).
+  const [courtesyByFolio, setCourtesyByFolio] = useState<Map<string, { code: string; label: string | null }>>(new Map())
   const [reconciling, setReconciling] = useState(false)
   const [reconcileMsg, setReconcileMsg] = useState<string | null>(null)
 
@@ -221,6 +223,13 @@ export default function CompetitionAdminPage() {
       .then(({ data, error }: { data: any; error: unknown }) => {
         // Si el SQL de pagos aún no se corre, el panel sigue funcionando sin esta sección.
         setPayments(!error && data && !data.error ? data : null)
+      })
+    db.rpc('get_competition_courtesy_codes_admin', { p_slug: COMPETITION_SLUG })
+      .then(({ data, error }: { data: { codes?: CourtesyCode[]; error?: string } | null; error: unknown }) => {
+        if (error || !data || data.error || !data.codes) return
+        const map = new Map<string, { code: string; label: string | null }>()
+        for (const c of data.codes) for (const r of c.registrations) map.set(r.folio, { code: c.code, label: c.label })
+        setCourtesyByFolio(map)
       })
   }
 
@@ -287,13 +296,21 @@ export default function CompetitionAdminPage() {
   )
   if (!isAdmin) return <Navigate to="/staff" replace />
 
+  // "Cortesía · JMC-AB12CD · Ganador rifa" para las cortesías; el método de pago para lo demás.
+  const paymentText = (r: AdminRegistration) => {
+    if (!r.payment_method) return ''
+    const base = PAYMENT_METHODS[r.payment_method] ?? r.payment_method
+    const c = r.payment_method === 'courtesy' ? courtesyByFolio.get(r.folio) : undefined
+    return c ? [base, c.code, c.label].filter(Boolean).join(' · ') : base
+  }
+
   const exportCsv = () => {
     const esc = (v: string | null) => `"${(v ?? '').replace(/"/g, '""')}"`
     const header = 'Folio,Nombre,Fecha de nacimiento,Menor,Correo,Celular,Categoría,Talla,Estado,Método de pago,Fecha de pago,Check-in,Inscrito el\n'
     const rows = regs.map(r => [
       r.folio, r.full_name, r.birth_date, r.is_minor ? 'Sí' : 'No', r.email, r.phone,
       categoryName(r.category_id), r.shirt_size, STATUS_LABELS[displayStatus(r)],
-      r.payment_method ? PAYMENT_METHODS[r.payment_method] ?? r.payment_method : '',
+      paymentText(r),
       r.paid_at ? fmtDateTime(r.paid_at) : '', r.checked_in_at ? fmtDateTime(r.checked_in_at) : '',
       fmtDateTime(r.created_at),
     ].map(esc).join(','))
@@ -447,7 +464,7 @@ export default function CompetitionAdminPage() {
                         <div className="text-zinc-400 text-xs truncate">{[r.email, r.phone].filter(Boolean).join(' · ') || 'Sin correo ni celular'}</div>
                         <div className="text-zinc-400 text-[10px] mt-0.5">
                           Inscrito {fmtDateTime(r.created_at)}
-                          {r.paid_at && ` · pagado ${fmtDateTime(r.paid_at)}${r.payment_method ? ` (${PAYMENT_METHODS[r.payment_method] ?? r.payment_method})` : ''}`}
+                          {r.paid_at && ` · pagado ${fmtDateTime(r.paid_at)}${r.payment_method ? ` (${paymentText(r)})` : ''}`}
                           {r.status === 'pending_payment' && r.hold_expires_at && ` · reserva ${r.hold_expired ? 'venció' : 'vence'} ${formatDeadline(r.hold_expires_at)}`}
                         </div>
                       </button>
