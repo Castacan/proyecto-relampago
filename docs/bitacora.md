@@ -376,3 +376,19 @@ lista baje sola para que el último lugar (ej. el #100) también vea su nombre.
   (borde punteado) "¿Tienes un código promocional?", y todo lo que ve el
   público dice "código promocional" en vez de "cortesía". En el panel y en
   el correo ("Inscripción: Cortesía") sigue diciendo cortesía.
+
+## 2026-10-21 — TV: columna temporal 21–31 de octubre
+- Pedido del usuario, **temporal**: en `/leaderboard/display` las columnas
+  HOY y SEMANA se reemplazan por una sola, "21 AL 31 OCT" (miércoles 21 a
+  sábado 31), con el acumulado de ese rango. MES (Octubre) sigue igual.
+- Regresa sola: `src/lib/specialPeriod.ts` revisa la fecha de México en
+  cada minuto; desde el 1 de noviembre 00:00 la TV vuelve a HOY / SEMANA
+  / MES sin desplegar nada. Después se puede borrar ese archivo y su uso
+  en `useLeaderboard` y `LeaderboardDisplay`.
+- Cálculo: `get_leaderboard_for_range` (ya existía) con el mismo criterio
+  que Semana (cada ruta cuenta una vez por persona en el rango). Diferencia:
+  esa función oculta a quien esté excluido solo de Ganadores; el
+  2026-10-21 no afectaba a nadie (mes con y sin filtro = mismas 12
+  personas). Sin patrocinador propio: pie "Jaibamuro".
+- La página del celular (`/leaderboard`) no cambia.
+- Probado en local contra producción (solo lectura).

@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../lib/supabase'
 import type { LeaderboardEntry, RecentEvent } from '../types'
+import { SPECIAL_PERIOD, isSpecialPeriodActive } from '../lib/specialPeriod'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const db = supabase as unknown as any
@@ -10,20 +11,31 @@ export function useLeaderboard() {
   const [weekly, setWeekly] = useState<LeaderboardEntry[]>([])
   const [monthly, setMonthly] = useState<LeaderboardEntry[]>([])
   const [events, setEvents] = useState<RecentEvent[]>([])
+  const [special, setSpecial] = useState<LeaderboardEntry[]>([])
   const [loading, setLoading] = useState(true)
   const [connected, setConnected] = useState(true)
 
   const fetchAll = useCallback(async () => {
-    const [d, w, m, e] = await Promise.all([
+    // TEMPORAL (ver lib/specialPeriod.ts): mismo cálculo que Semana
+    // (cada ruta cuenta una vez por persona dentro del rango).
+    const specialActive = isSpecialPeriodActive()
+    const [d, w, m, e, sp] = await Promise.all([
       db.rpc('get_daily_leaderboard'),
       db.rpc('get_weekly_leaderboard'),
       db.rpc('get_monthly_leaderboard'),
       db.rpc('get_recent_events', { lim: 8 }),
+      specialActive
+        ? db.rpc('get_leaderboard_for_range', {
+            p_start: SPECIAL_PERIOD.startISO, p_end: SPECIAL_PERIOD.endISO,
+            p_monthly: false, p_limit: 200, p_weekly_dedup: true,
+          })
+        : Promise.resolve({ data: [] }),
     ])
     setDaily(d.data ?? [])
     setWeekly(w.data ?? [])
     setMonthly(m.data ?? [])
     setEvents(e.data ?? [])
+    setSpecial(sp.data ?? [])
     setLoading(false)
   }, [])
 
@@ -59,5 +71,5 @@ export function useLeaderboard() {
     return () => { supabase.removeChannel(channel) }
   }, [fetchAll])
 
-  return { daily, weekly, monthly, events, loading, connected }
+  return { daily, weekly, monthly, special, events, loading, connected }
 }

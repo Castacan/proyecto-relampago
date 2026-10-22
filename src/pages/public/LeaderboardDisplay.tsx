@@ -7,12 +7,13 @@ import { useSlideCarousel } from '../../hooks/useSlideCarousel'
 import { getColorHex } from '../../lib/colors'
 import { nowMX } from '../../lib/timezone'
 import { MONTHS_ES, DAYS_ES } from '../../lib/dates'
+import { SPECIAL_PERIOD, isSpecialPeriodActive } from '../../lib/specialPeriod'
 import SponsorBanner from '../../components/SponsorBanner'
 import DisplaySlide from '../../components/DisplaySlide'
 import type { LeaderboardEntry, Sponsorship, SponsorPeriod } from '../../types'
 
 export default function LeaderboardDisplay() {
-  const { daily, weekly, monthly, events, loading, connected } = useLeaderboard()
+  const { daily, weekly, monthly, special, events, loading, connected } = useLeaderboard()
   const { sponsorships } = useSponsorships()
   const { slides } = useDisplaySlides()
   const { settings } = useDisplaySettings()
@@ -64,6 +65,9 @@ export default function LeaderboardDisplay() {
     : `${DAYS_ES[monday.getDay()]} ${monday.getDate()} de ${MONTHS_ES[monday.getMonth()]} a ${DAYS_ES[sunday.getDay()]} ${sunday.getDate()} de ${MONTHS_ES[sunday.getMonth()]}`
 
   const currentEvent = events[tickerIdx]
+  // TEMPORAL: se reevalúa con el reloj de cada minuto, así que el 1 de
+  // noviembre a las 00:00 regresa solo a HOY / SEMANA / MES.
+  const specialActive = isSpecialPeriodActive()
 
   if (loading) {
     return (
@@ -118,16 +122,29 @@ export default function LeaderboardDisplay() {
           abajo (commit 2026-08-23, antes era Diario 65% + Mensual 35% con
           un solo banner global de pie de página) */}
       <div className="flex-1 flex overflow-hidden">
-        <LeaderboardColumn
-          title="HOY" titleAccent subtitle={dayLabel}
-          entries={daily} emptyTitle="Nadie ha marcado un send hoy" emptySubtitle="¡Sé el primero!"
-          period="top_1_daily" sponsorships={sponsorships} borderRight
-        />
-        <LeaderboardColumn
-          title="SEMANA" subtitle={weekRange}
-          entries={weekly} emptyTitle="Sin actividad esta semana"
-          period="top_1_weekly" sponsorships={sponsorships} borderRight tinted
-        />
+        {specialActive ? (
+          // TEMPORAL (lib/specialPeriod.ts): una columna 21–31 oct en lugar
+          // de HOY y SEMANA. Sin patrocinador propio (lista vacía → pie de
+          // respaldo "Jaibamuro").
+          <LeaderboardColumn
+            title={SPECIAL_PERIOD.title} titleAccent subtitle={SPECIAL_PERIOD.subtitle}
+            entries={special} emptyTitle="Sin actividad todavía" emptySubtitle="¡Sé el primero!"
+            period="top_1_weekly" sponsorships={[]} borderRight
+          />
+        ) : (
+          <>
+            <LeaderboardColumn
+              title="HOY" titleAccent subtitle={dayLabel}
+              entries={daily} emptyTitle="Nadie ha marcado un send hoy" emptySubtitle="¡Sé el primero!"
+              period="top_1_daily" sponsorships={sponsorships} borderRight
+            />
+            <LeaderboardColumn
+              title="SEMANA" subtitle={weekRange}
+              entries={weekly} emptyTitle="Sin actividad esta semana"
+              period="top_1_weekly" sponsorships={sponsorships} borderRight tinted
+            />
+          </>
+        )}
         <LeaderboardColumn
           title={monthLabel.toUpperCase()} subtitle={monthRange}
           entries={monthly} emptyTitle="Sin actividad este mes"
