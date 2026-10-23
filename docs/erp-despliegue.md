@@ -16,6 +16,8 @@
 | Ventas → Caja | `/staff/caja` | Abrir con fondo, retiros/gastos, **corte contando el efectivo** (guarda diferencia), historial |
 | Ventas → Historial | `/staff/ventas` | Ventas por fechas, detalle, anular (admin), CSV |
 | Ventas → Reporte del mes | `/staff/reportes` | Por forma de pago, concepto, día y cortes; CSV para la contadora |
+| Ventas → Inventario | `/staff/inventario` | Existencias, entradas (con egreso opcional), conteos, salidas por consumo/merma, movimientos, valor a costo |
+| Finanzas → Egresos | `/staff/egresos` | (admin) Cuentas a pagar: egresos pagados/por pagar, recurrentes, a quién se paga, centros de costos, utilidad del mes, CSV |
 | Clases | `/staff/clases` | (Fase 1a) asistencia, cobros, walk-ins, configuración de clases |
 | Configuración → Productos y planes | `/staff/config/productos` | Catálogo; promo de domiciliación (meses + precio, prender/apagar) |
 | Configuración → Integraciones y pagos | `/staff/config/integraciones` | Elegir Openpay/Stripe, llaves públicas, sandbox, estado de secretos, probar conexión, webhooks |
@@ -57,6 +59,7 @@ Membresía Parejas **no** se creó (ya no se vende).
 1. **SQL Editor → Run**, en este orden (cada uno es idempotente):
    1. `src/supabase/clases.sql` (si aún no se corrió)
    2. `src/supabase/erp.sql`
+   3. `src/supabase/erp_finanzas.sql` (egresos + inventario; **siempre después de erp.sql**, también si se vuelve a correr erp.sql)
 2. **Edge Functions → crear y desplegar** (Verify JWT **apagado** en las dos):
    - `class-emails` (código en `supabase/functions/class-emails/index.ts`)
    - `billing` (código en `supabase/functions/billing/index.ts`)

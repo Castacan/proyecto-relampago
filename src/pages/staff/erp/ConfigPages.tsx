@@ -54,6 +54,7 @@ function ProductForm({ p, onSaved }: { p?: Product; onSaved: () => void }) {
     grants_membership: p?.grants_membership ?? true, duration_unit: p?.duration_unit ?? 'month', duration_value: String(p?.duration_value ?? 1),
     is_recurring: p?.is_recurring ?? false, promo_active: p?.promo_active ?? false, promo_cycles: String(p?.promo_cycles ?? ''),
     promo_price: toPesos(p?.promo_price_cents ?? null), track_stock: p?.track_stock ?? false, stock: String(p?.stock ?? ''),
+    cost: toPesos(p?.cost_cents ?? null), stock_min: String(p?.stock_min ?? ''), allow_negative_stock: p?.allow_negative_stock ?? false, sku: p?.sku ?? '',
     is_active: p?.is_active ?? true, sort_order: String(p?.sort_order ?? 0),
   })
   const [busy, setBusy] = useState(false)
@@ -68,7 +69,8 @@ function ProductForm({ p, onSaved }: { p?: Product; onSaved: () => void }) {
       grants_membership: isPlan && f.grants_membership, duration_unit: f.is_recurring ? 'month' : f.duration_unit,
       duration_value: f.is_recurring ? 1 : Number(f.duration_value), is_recurring: f.kind === 'plan' && f.is_recurring,
       promo_active: f.is_recurring && f.promo_active, promo_cycles: f.promo_cycles || '', promo_price_cents: f.promo_price === '' ? '' : toCents(f.promo_price),
-      track_stock: f.track_stock, stock: f.stock, is_active: f.is_active, sort_order: Number(f.sort_order), class_type_id: p?.class_type_id ?? null,
+      track_stock: f.track_stock, stock: p ? '' : f.stock, cost_cents: f.cost === '' ? '' : toCents(f.cost), stock_min: f.stock_min,
+      allow_negative_stock: f.allow_negative_stock, sku: f.sku, is_active: f.is_active, sort_order: Number(f.sort_order), class_type_id: p?.class_type_id ?? null,
     } })
     setBusy(false)
     if (error) { setError(erpError(error)); return }
@@ -128,12 +130,29 @@ function ProductForm({ p, onSaved }: { p?: Product; onSaved: () => void }) {
         </div>
       )}
       {(f.kind === 'product') && (
-        <div className="flex flex-wrap items-end gap-3">
+        <div className="rounded-xl bg-fondo/60 p-3 space-y-3">
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+            <MoneyField id={`pf-cost-${p?.id ?? 'new'}`} label="Costo por pieza (para margen)" value={f.cost} onChange={v => set({ cost: v })} />
+            <div><label className={label}>Clave / código (opcional)</label><input value={f.sku} onChange={e => set({ sku: e.target.value })} className={input} /></div>
+          </div>
           <label className="flex items-center gap-2 text-sm text-zinc-200">
             <input type="checkbox" checked={f.track_stock} onChange={e => set({ track_stock: e.target.checked })} className="accent-primario w-4 h-4" />
-            Llevar inventario
+            Llevar inventario (se descuenta al vender)
           </label>
-          {f.track_stock && <div className="w-28"><label className={label}>En existencia</label><input type="number" value={f.stock} onChange={e => set({ stock: e.target.value })} className={input} /></div>}
+          {f.track_stock && (
+            <div className="flex flex-wrap items-end gap-3">
+              {p ? (
+                <p className="text-zinc-400 text-sm">Existencia: <span className="text-texto-principal font-bold">{p.stock ?? 0}</span> · se cambia en <a href="/staff/inventario" className="text-primario font-bold">Inventario</a> (entradas, conteos, salidas).</p>
+              ) : (
+                <div className="w-32"><label className={label}>Existencia inicial</label><input type="number" min={0} value={f.stock} onChange={e => set({ stock: e.target.value })} className={input} /></div>
+              )}
+              <div className="w-32"><label className={label}>Mínimo (avisar)</label><input type="number" min={0} value={f.stock_min} onChange={e => set({ stock_min: e.target.value })} className={input} /></div>
+              <label className="flex items-center gap-2 text-sm text-zinc-200">
+                <input type="checkbox" checked={f.allow_negative_stock} onChange={e => set({ allow_negative_stock: e.target.checked })} className="accent-primario w-4 h-4" />
+                Permitir vender sin existencia
+              </label>
+            </div>
+          )}
         </div>
       )}
       <label className="flex items-center gap-2 text-sm text-zinc-200">

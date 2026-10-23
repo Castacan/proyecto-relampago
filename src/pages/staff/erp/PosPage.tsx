@@ -71,7 +71,7 @@ export default function PosPage() {
     if (needsPerson && !person) { setError('Elige a la persona: el plan le da membresía.'); return }
     if (paid !== total) { setError(`Los pagos suman ${money(paid)} y el total es ${money(total)}.`); return }
     setBusy(true)
-    const { data, error } = await call<{ folio: number; total_cents: number }>('create_sale', { p_sale: {
+    const { data, error } = await call<{ folio: number; total_cents: number; product?: string; stock?: number }>('create_sale', { p_sale: {
       person_id: person?.id ?? null,
       items: lines.map(l => ({ product_id: l.product.id, quantity: l.qty, discount_cents: toCents(l.discount), starts_on: l.startsOn || null })),
       discount_cents: toCents(discount),
@@ -79,6 +79,7 @@ export default function PosPage() {
       note: note || null,
     } })
     setBusy(false)
+    if (error === 'out_of_stock' && data?.product) { setError(`No hay suficiente ${data.product}: quedan ${data.stock ?? 0}.`); return }
     if (error || !data) { setError(erpError(error ?? undefined)); return }
     setDone({ folio: data.folio, total: data.total_cents, change })
     setLines([]); setDiscount(''); setPayments([{ method: 'cash', amount: '', reference: '' }]); setCashGiven(''); setNote('')
@@ -116,7 +117,7 @@ export default function PosPage() {
                     <p className="text-zinc-500 text-[11px] font-bold uppercase tracking-widest mb-2">{KIND_LABELS[kind]}</p>
                     <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                       {items.map(p => (
-                        <button key={p.id} onClick={() => add(p)} disabled={p.track_stock && (p.stock ?? 0) <= 0}
+                        <button key={p.id} onClick={() => add(p)} disabled={p.track_stock && !p.allow_negative_stock && (p.stock ?? 0) <= 0}
                           className="text-left rounded-xl border border-zinc-700/50 bg-fondo/60 hover:bg-superficie-alta hover:border-primario/50 p-3 transition-all disabled:opacity-40">
                           <p className="text-texto-principal text-sm font-bold leading-tight">{p.name}</p>
                           <p className="text-primario text-sm font-black mt-1">{money(p.price_cents)}</p>

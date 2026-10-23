@@ -28,6 +28,8 @@
 --   * La promoción se congela al crear la domiciliación: si luego se apaga
 --     la promo del producto, quien ya la tenía la conserva.
 -- Idempotente: se puede correr más de una vez.
+-- Después de este archivo SIEMPRE correr erp_finanzas.sql (ahí viven ventas,
+-- inventario, egresos, reporte e inicio).
 -- ============================================================
 
 -- ------------------------------------------------------------
@@ -375,72 +377,7 @@ RETURNS DATE LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $f
   SELECT max(valid_until) FROM chain;
 $function$;
 
--- Registra una venta ya validada. p_items: [{product_id?, description, quantity,
--- unit_price_cents, discount_cents, starts_on?}], p_payments: [{method, amount_cents, reference?}].
-CREATE OR REPLACE FUNCTION public.erp_insert_sale(p_person_id UUID, p_source TEXT, p_items JSONB, p_payments JSONB,
-                                                  p_discount_cents INT, p_note TEXT, p_booking_id UUID, p_subscription_id UUID,
-                                                  p_session_id UUID)
-RETURNS JSONB LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $function$
-DECLARE
-  v_sale_id  UUID;
-  v_item     JSONB;
-  v_pay      JSONB;
-  v_subtotal INT := 0;
-  v_total    INT;
-  v_paid     INT := 0;
-  v_line     INT;
-  v_prod     products%ROWTYPE;
-  v_mid      UUID;
-  v_item_id  UUID;
-BEGIN
-  FOR v_item IN SELECT * FROM jsonb_array_elements(p_items) LOOP
-    v_line := (v_item->>'unit_price_cents')::int * coalesce((v_item->>'quantity')::int, 1) - coalesce((v_item->>'discount_cents')::int, 0);
-    IF v_line < 0 THEN RAISE EXCEPTION 'erp: descuento mayor que el precio'; END IF;
-    v_subtotal := v_subtotal + v_line;
-  END LOOP;
-  v_total := v_subtotal - coalesce(p_discount_cents, 0);
-  IF v_total < 0 THEN RAISE EXCEPTION 'erp: descuento mayor que el total'; END IF;
-  FOR v_pay IN SELECT * FROM jsonb_array_elements(coalesce(p_payments, '[]'::jsonb)) LOOP
-    v_paid := v_paid + (v_pay->>'amount_cents')::int;
-  END LOOP;
-  IF v_paid <> v_total THEN RAISE EXCEPTION 'erp: pagos (%) no cuadran con el total (%)', v_paid, v_total; END IF;
-
-  INSERT INTO sales (person_id, session_id, source, subtotal_cents, discount_cents, total_cents, note, booking_id, subscription_id, created_by)
-  VALUES (p_person_id, p_session_id, p_source, v_subtotal, coalesce(p_discount_cents, 0), v_total,
-          nullif(btrim(coalesce(p_note, '')), ''), p_booking_id, p_subscription_id, auth.uid())
-  RETURNING id INTO v_sale_id;
-
-  FOR v_item IN SELECT * FROM jsonb_array_elements(p_items) LOOP
-    v_line := (v_item->>'unit_price_cents')::int * coalesce((v_item->>'quantity')::int, 1) - coalesce((v_item->>'discount_cents')::int, 0);
-    INSERT INTO sale_items (sale_id, product_id, description, quantity, unit_price_cents, discount_cents, total_cents)
-    VALUES (v_sale_id, nullif(v_item->>'product_id', '')::uuid, v_item->>'description', coalesce((v_item->>'quantity')::int, 1),
-            (v_item->>'unit_price_cents')::int, coalesce((v_item->>'discount_cents')::int, 0), v_line)
-    RETURNING id INTO v_item_id;
-
-    IF nullif(v_item->>'product_id', '') IS NOT NULL THEN
-      SELECT * INTO v_prod FROM products WHERE id = (v_item->>'product_id')::uuid;
-      IF v_prod.grants_membership AND p_person_id IS NOT NULL AND p_subscription_id IS NULL THEN
-        FOR i IN 1 .. coalesce((v_item->>'quantity')::int, 1) LOOP
-          v_mid := erp_grant_membership(p_person_id, v_prod.id, CASE WHEN i = 1 THEN nullif(v_item->>'starts_on', '')::date END, v_sale_id, NULL);
-        END LOOP;
-        UPDATE sale_items SET membership_id = v_mid WHERE id = v_item_id;
-      END IF;
-      IF v_prod.track_stock THEN
-        UPDATE products SET stock = coalesce(stock, 0) - coalesce((v_item->>'quantity')::int, 1), updated_at = now() WHERE id = v_prod.id;
-      END IF;
-    END IF;
-  END LOOP;
-
-  FOR v_pay IN SELECT * FROM jsonb_array_elements(coalesce(p_payments, '[]'::jsonb)) LOOP
-    IF (v_pay->>'amount_cents')::int > 0 THEN
-      INSERT INTO sale_payments (sale_id, method, amount_cents, reference)
-      VALUES (v_sale_id, v_pay->>'method', (v_pay->>'amount_cents')::int, nullif(btrim(coalesce(v_pay->>'reference', '')), ''));
-    END IF;
-  END LOOP;
-
-  RETURN jsonb_build_object('sale_id', v_sale_id, 'folio', (SELECT folio FROM sales WHERE id = v_sale_id), 'total_cents', v_total);
-END;
-$function$;
+-- erp_insert_sale: ver erp_finanzas.sql
 
 -- ------------------------------------------------------------
 -- Ajustes (admin)
@@ -531,73 +468,7 @@ BEGIN
 END;
 $function$;
 
-CREATE OR REPLACE FUNCTION public.admin_save_product(p_product JSONB)
-RETURNS JSONB LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $function$
-DECLARE
-  v_id     UUID := nullif(p_product->>'id', '')::uuid;
-  v_name   TEXT := btrim(coalesce(p_product->>'name', ''));
-  v_kind   TEXT := p_product->>'kind';
-  v_grants BOOLEAN := coalesce((p_product->>'grants_membership')::boolean, false);
-  v_rec    BOOLEAN := coalesce((p_product->>'is_recurring')::boolean, false);
-  v_before products%ROWTYPE;
-BEGIN
-  IF NOT class_is_admin() THEN RETURN jsonb_build_object('error', 'forbidden'); END IF;
-  IF length(v_name) < 2 OR length(v_name) > 80 THEN RETURN jsonb_build_object('error', 'invalid_name'); END IF;
-  IF v_kind NOT IN ('plan','pass','class','product','service') THEN RETURN jsonb_build_object('error', 'invalid_value'); END IF;
-  IF EXISTS (SELECT 1 FROM products p WHERE lower(p.name) = lower(v_name) AND p.id IS DISTINCT FROM v_id) THEN
-    RETURN jsonb_build_object('error', 'name_taken');
-  END IF;
-  IF v_rec AND (p_product->>'duration_unit' IS DISTINCT FROM 'month' OR (p_product->>'duration_value')::int IS DISTINCT FROM 1) THEN
-    RETURN jsonb_build_object('error', 'recurring_must_be_monthly');
-  END IF;
-  IF coalesce((p_product->>'promo_active')::boolean, false)
-     AND (nullif(p_product->>'promo_cycles', '') IS NULL OR nullif(p_product->>'promo_price_cents', '') IS NULL) THEN
-    RETURN jsonb_build_object('error', 'promo_incomplete');
-  END IF;
-  BEGIN
-    IF v_id IS NULL THEN
-      INSERT INTO products (kind, name, description, price_cents, grants_membership, duration_unit, duration_value,
-                            is_recurring, promo_active, promo_cycles, promo_price_cents, class_type_id, track_stock, stock, is_active, sort_order)
-      VALUES (v_kind, v_name, nullif(btrim(coalesce(p_product->>'description', '')), ''), (p_product->>'price_cents')::int,
-              v_grants OR v_rec, CASE WHEN v_grants OR v_rec THEN p_product->>'duration_unit' END,
-              CASE WHEN v_grants OR v_rec THEN (p_product->>'duration_value')::int END,
-              v_rec, coalesce((p_product->>'promo_active')::boolean, false), nullif(p_product->>'promo_cycles', '')::int,
-              nullif(p_product->>'promo_price_cents', '')::int, nullif(p_product->>'class_type_id', '')::uuid,
-              coalesce((p_product->>'track_stock')::boolean, false), nullif(p_product->>'stock', '')::int,
-              coalesce((p_product->>'is_active')::boolean, true), coalesce((p_product->>'sort_order')::int, 0))
-      RETURNING id INTO v_id;
-    ELSE
-      SELECT * INTO v_before FROM products WHERE id = v_id FOR UPDATE;
-      IF NOT FOUND THEN RETURN jsonb_build_object('error', 'not_found'); END IF;
-      -- No se puede cambiar si cobra recurrente un producto que ya tiene domiciliaciones.
-      IF v_before.is_recurring <> v_rec AND EXISTS (SELECT 1 FROM subscriptions s WHERE s.product_id = v_id) THEN
-        RETURN jsonb_build_object('error', 'has_subscriptions');
-      END IF;
-      UPDATE products SET kind = v_kind, name = v_name,
-        description = nullif(btrim(coalesce(p_product->>'description', '')), ''),
-        price_cents = (p_product->>'price_cents')::int,
-        grants_membership = v_grants OR v_rec,
-        duration_unit = CASE WHEN v_grants OR v_rec THEN p_product->>'duration_unit' END,
-        duration_value = CASE WHEN v_grants OR v_rec THEN (p_product->>'duration_value')::int END,
-        is_recurring = v_rec,
-        promo_active = coalesce((p_product->>'promo_active')::boolean, false),
-        promo_cycles = nullif(p_product->>'promo_cycles', '')::int,
-        promo_price_cents = nullif(p_product->>'promo_price_cents', '')::int,
-        class_type_id = nullif(p_product->>'class_type_id', '')::uuid,
-        track_stock = coalesce((p_product->>'track_stock')::boolean, false),
-        stock = nullif(p_product->>'stock', '')::int,
-        is_active = coalesce((p_product->>'is_active')::boolean, true),
-        sort_order = coalesce((p_product->>'sort_order')::int, 0),
-        updated_at = now()
-      WHERE id = v_id;
-    END IF;
-  EXCEPTION WHEN check_violation OR invalid_text_representation OR not_null_violation THEN
-    RETURN jsonb_build_object('error', 'invalid_value');
-  END;
-  PERFORM erp_audit('product_save', 'product', v_id, to_jsonb(v_before), p_product);
-  RETURN jsonb_build_object('success', true, 'id', v_id);
-END;
-$function$;
+-- admin_save_product: ver erp_finanzas.sql
 
 -- ------------------------------------------------------------
 -- Personas (ficha) — redefine admin_save_person de clases.sql con más campos
@@ -827,20 +698,7 @@ EXCEPTION WHEN unique_violation THEN
 END;
 $function$;
 
-CREATE OR REPLACE FUNCTION public.add_cash_movement(p_kind TEXT, p_amount_cents INT, p_note TEXT)
-RETURNS JSONB LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $function$
-DECLARE
-  v_sid UUID := erp_open_session_id();
-BEGIN
-  IF NOT class_is_staff() THEN RETURN jsonb_build_object('error', 'forbidden'); END IF;
-  IF v_sid IS NULL THEN RETURN jsonb_build_object('error', 'cash_closed'); END IF;
-  IF p_kind NOT IN ('withdrawal','expense','deposit') THEN RETURN jsonb_build_object('error', 'invalid_value'); END IF;
-  IF p_amount_cents IS NULL OR p_amount_cents <= 0 THEN RETURN jsonb_build_object('error', 'invalid_amount'); END IF;
-  IF length(btrim(coalesce(p_note, ''))) < 3 THEN RETURN jsonb_build_object('error', 'reason_required'); END IF;
-  INSERT INTO cash_movements (session_id, kind, amount_cents, note, created_by) VALUES (v_sid, p_kind, p_amount_cents, btrim(p_note), auth.uid());
-  RETURN jsonb_build_object('success', true);
-END;
-$function$;
+-- add_cash_movement: ver erp_finanzas.sql
 
 -- Cierre: el staff cuenta el efectivo; se guarda lo esperado y la diferencia.
 CREATE OR REPLACE FUNCTION public.close_cash(p_counted_cents INT, p_note TEXT DEFAULT NULL)
@@ -869,90 +727,9 @@ $function$;
 -- ------------------------------------------------------------
 -- Ventas (mostrador)
 -- ------------------------------------------------------------
--- p_sale: {person_id?, items:[{product_id, quantity?, discount_cents?, starts_on?, unit_price_cents? (solo si el producto vale $0 o admin)}],
---          discount_cents?, payments:[{method, amount_cents, reference?}], note?}
-CREATE OR REPLACE FUNCTION public.create_sale(p_sale JSONB)
-RETURNS JSONB LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $function$
-DECLARE
-  v_set     erp_settings%ROWTYPE;
-  v_sid     UUID := erp_open_session_id();
-  v_person  UUID := nullif(p_sale->>'person_id', '')::uuid;
-  v_items   JSONB := '[]'::jsonb;
-  v_it      JSONB;
-  v_p       products%ROWTYPE;
-  v_price   INT;
-  v_qty     INT;
-  v_pay     JSONB;
-  v_result  JSONB;
-BEGIN
-  IF NOT class_is_staff() THEN RETURN jsonb_build_object('error', 'forbidden'); END IF;
-  SELECT * INTO v_set FROM erp_settings WHERE id = 1;
-  IF v_set.require_open_cash AND v_sid IS NULL THEN RETURN jsonb_build_object('error', 'cash_closed'); END IF;
-  IF jsonb_typeof(p_sale->'items') <> 'array' OR jsonb_array_length(p_sale->'items') = 0 THEN
-    RETURN jsonb_build_object('error', 'empty_sale');
-  END IF;
-  IF v_person IS NOT NULL AND NOT EXISTS (SELECT 1 FROM people WHERE id = v_person) THEN
-    RETURN jsonb_build_object('error', 'person_not_found');
-  END IF;
+-- create_sale: ver erp_finanzas.sql
 
-  FOR v_it IN SELECT * FROM jsonb_array_elements(p_sale->'items') LOOP
-    SELECT * INTO v_p FROM products WHERE id = nullif(v_it->>'product_id', '')::uuid;
-    IF NOT FOUND OR NOT v_p.is_active THEN RETURN jsonb_build_object('error', 'invalid_product'); END IF;
-    IF v_p.is_recurring THEN RETURN jsonb_build_object('error', 'use_subscription'); END IF;
-    IF v_p.grants_membership AND v_person IS NULL THEN RETURN jsonb_build_object('error', 'person_required'); END IF;
-    v_qty := coalesce((v_it->>'quantity')::int, 1);
-    IF v_qty < 1 OR v_qty > 100 THEN RETURN jsonb_build_object('error', 'invalid_value'); END IF;
-    v_price := v_p.price_cents;
-    IF nullif(v_it->>'unit_price_cents', '') IS NOT NULL AND (v_it->>'unit_price_cents')::int <> v_p.price_cents THEN
-      IF v_p.price_cents <> 0 AND NOT class_is_admin() THEN RETURN jsonb_build_object('error', 'price_locked'); END IF;
-      v_price := (v_it->>'unit_price_cents')::int;
-    END IF;
-    IF v_p.track_stock AND coalesce(v_p.stock, 0) < v_qty THEN RETURN jsonb_build_object('error', 'out_of_stock', 'product', v_p.name); END IF;
-    v_items := v_items || jsonb_build_array(jsonb_build_object(
-      'product_id', v_p.id, 'description', v_p.name, 'quantity', v_qty, 'unit_price_cents', v_price,
-      'discount_cents', coalesce((v_it->>'discount_cents')::int, 0), 'starts_on', v_it->>'starts_on'));
-  END LOOP;
-
-  FOR v_pay IN SELECT * FROM jsonb_array_elements(coalesce(p_sale->'payments', '[]'::jsonb)) LOOP
-    IF v_pay->>'method' NOT IN ('cash','card','transfer','clip','other') OR (v_pay->>'amount_cents')::int <= 0 THEN
-      RETURN jsonb_build_object('error', 'invalid_payment');
-    END IF;
-  END LOOP;
-
-  BEGIN
-    v_result := erp_insert_sale(v_person, 'pos', v_items, coalesce(p_sale->'payments', '[]'::jsonb),
-                                coalesce((p_sale->>'discount_cents')::int, 0), p_sale->>'note', NULL, NULL, v_sid);
-  EXCEPTION WHEN raise_exception THEN
-    RETURN jsonb_build_object('error', CASE WHEN SQLERRM LIKE '%no cuadran%' THEN 'payments_mismatch' ELSE 'invalid_discount' END);
-  END;
-  PERFORM erp_audit('sale', 'sale', (v_result->>'sale_id')::uuid, NULL, p_sale);
-  RETURN jsonb_build_object('success', true) || v_result;
-END;
-$function$;
-
-CREATE OR REPLACE FUNCTION public.admin_void_sale(p_sale_id UUID, p_reason TEXT)
-RETURNS JSONB LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $function$
-DECLARE
-  v_s sales%ROWTYPE;
-BEGIN
-  IF NOT class_is_admin() THEN RETURN jsonb_build_object('error', 'forbidden'); END IF;
-  IF length(btrim(coalesce(p_reason, ''))) < 3 THEN RETURN jsonb_build_object('error', 'reason_required'); END IF;
-  SELECT * INTO v_s FROM sales WHERE id = p_sale_id FOR UPDATE;
-  IF NOT FOUND THEN RETURN jsonb_build_object('error', 'not_found'); END IF;
-  IF v_s.status = 'voided' THEN RETURN jsonb_build_object('error', 'invalid_state'); END IF;
-  IF v_s.source = 'subscription' THEN RETURN jsonb_build_object('error', 'subscription_sale'); END IF;
-  UPDATE sales SET status = 'voided', voided_at = now(), voided_by = auth.uid(), void_reason = btrim(p_reason) WHERE id = p_sale_id;
-  UPDATE memberships SET is_void = true, updated_at = now() WHERE sale_id = p_sale_id;
-  UPDATE products p SET stock = coalesce(p.stock, 0) + i.quantity FROM sale_items i
-    WHERE i.sale_id = p_sale_id AND p.id = i.product_id AND p.track_stock;
-  IF v_s.booking_id IS NOT NULL THEN
-    UPDATE class_bookings SET payment_status = 'pending', paid_with = NULL, paid_at = NULL, updated_at = now()
-    WHERE id = v_s.booking_id AND payment_status = 'paid';
-  END IF;
-  PERFORM erp_audit('sale_void', 'sale', p_sale_id, to_jsonb(v_s), jsonb_build_object('reason', p_reason));
-  RETURN jsonb_build_object('success', true);
-END;
-$function$;
+-- admin_void_sale: ver erp_finanzas.sql
 
 CREATE OR REPLACE FUNCTION public.get_sales(p_from DATE, p_to DATE)
 RETURNS JSONB LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = public AS $function$
@@ -972,37 +749,7 @@ BEGIN
 END;
 $function$;
 
--- Reporte del mes (para la contadora): totales por forma de pago, por producto y por día.
-CREATE OR REPLACE FUNCTION public.get_sales_report(p_month DATE)
-RETURNS JSONB LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = public AS $function$
-DECLARE
-  v_from DATE := date_trunc('month', p_month)::date;
-  v_to   DATE := (date_trunc('month', p_month) + INTERVAL '1 month - 1 day')::date;
-BEGIN
-  IF NOT class_is_staff() THEN RETURN jsonb_build_object('error', 'forbidden'); END IF;
-  RETURN jsonb_build_object(
-    'from', v_from, 'to', v_to,
-    'total_cents', coalesce((SELECT sum(total_cents) FROM sales WHERE status = 'completed'
-                    AND (created_at AT TIME ZONE 'America/Mexico_City')::date BETWEEN v_from AND v_to), 0),
-    'count', (SELECT count(*) FROM sales WHERE status = 'completed' AND (created_at AT TIME ZONE 'America/Mexico_City')::date BETWEEN v_from AND v_to),
-    'by_method', coalesce((SELECT jsonb_object_agg(method, cents) FROM (
-        SELECT sp.method, sum(sp.amount_cents)::int AS cents FROM sale_payments sp JOIN sales s ON s.id = sp.sale_id
-        WHERE s.status = 'completed' AND (s.created_at AT TIME ZONE 'America/Mexico_City')::date BETWEEN v_from AND v_to
-        GROUP BY sp.method) x), '{}'::jsonb),
-    'by_product', coalesce((SELECT jsonb_agg(jsonb_build_object('description', description, 'quantity', qty, 'total_cents', cents) ORDER BY cents DESC) FROM (
-        SELECT i.description, sum(i.quantity)::int AS qty, sum(i.total_cents)::int AS cents FROM sale_items i JOIN sales s ON s.id = i.sale_id
-        WHERE s.status = 'completed' AND (s.created_at AT TIME ZONE 'America/Mexico_City')::date BETWEEN v_from AND v_to
-        GROUP BY i.description) x), '[]'::jsonb),
-    'by_day', coalesce((SELECT jsonb_agg(jsonb_build_object('day', d, 'total_cents', cents, 'count', n) ORDER BY d) FROM (
-        SELECT (created_at AT TIME ZONE 'America/Mexico_City')::date AS d, sum(total_cents)::int AS cents, count(*)::int AS n FROM sales
-        WHERE status = 'completed' AND (created_at AT TIME ZONE 'America/Mexico_City')::date BETWEEN v_from AND v_to
-        GROUP BY 1) x), '[]'::jsonb),
-    'cash_sessions', coalesce((SELECT jsonb_agg(jsonb_build_object('business_date', business_date, 'opening', opening_cash_cents,
-        'expected', expected_cash_cents, 'counted', counted_cash_cents, 'difference', difference_cents) ORDER BY opened_at)
-        FROM cash_sessions WHERE business_date BETWEEN v_from AND v_to), '[]'::jsonb)
-  );
-END;
-$function$;
+-- get_sales_report: ver erp_finanzas.sql
 
 -- ------------------------------------------------------------
 -- Cobros de clases → ventas (redefine funciones de clases.sql para que el
@@ -1591,45 +1338,7 @@ $function$;
 -- ------------------------------------------------------------
 -- Inicio (tablero del staff)
 -- ------------------------------------------------------------
-CREATE OR REPLACE FUNCTION public.get_staff_dashboard()
-RETURNS JSONB LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $function$
-DECLARE
-  v_today DATE := erp_today();
-  v_days  INT := (SELECT expiring_notice_days FROM erp_settings WHERE id = 1);
-BEGIN
-  IF NOT class_is_staff() THEN RETURN jsonb_build_object('error', 'forbidden'); END IF;
-  PERFORM class_generate_sessions(class_horizon());
-  RETURN jsonb_build_object(
-    'today', v_today,
-    'is_admin', class_is_admin(),
-    'cash', (SELECT jsonb_build_object('id', id, 'opened_at', opened_at, 'summary', erp_cash_summary(id)) FROM cash_sessions WHERE closed_at IS NULL),
-    'require_open_cash', (SELECT require_open_cash FROM erp_settings WHERE id = 1),
-    'sales_today', jsonb_build_object(
-      'total_cents', coalesce((SELECT sum(total_cents) FROM sales WHERE status = 'completed' AND (created_at AT TIME ZONE 'America/Mexico_City')::date = v_today), 0),
-      'count', (SELECT count(*) FROM sales WHERE status = 'completed' AND (created_at AT TIME ZONE 'America/Mexico_City')::date = v_today)),
-    'classes_today', coalesce((SELECT jsonb_agg(jsonb_build_object('id', v.id, 'name', v.name, 'starts_at', v.starts_at, 'capacity', v.capacity,
-                               'taken', class_taken(v.id), 'status', v.status, 'color', v.color) ORDER BY v.starts_at)
-                               FROM class_sessions_v v WHERE class_mx_date(v.starts_at) = v_today AND v.type_active), '[]'::jsonb),
-    'failed_charges', coalesce((SELECT jsonb_agg(jsonb_build_object('subscription_id', s.id, 'person_id', p.id, 'person_name', p.full_name,
-                               'amount_cents', c.amount_cents, 'status', c.status, 'error', coalesce(c.error_message, c.error_code),
-                               'next_attempt_at', c.next_attempt_at, 'attempt', c.attempt, 'max_attempts', c.max_attempts))
-                               FROM billing_charges c JOIN subscriptions s ON s.id = c.subscription_id JOIN people p ON p.id = s.person_id
-                               WHERE c.status IN ('failed','needs_action') AND s.status <> 'cancelled'), '[]'::jsonb),
-    'pending_cards', coalesce((SELECT jsonb_agg(jsonb_build_object('subscription_id', s.id, 'person_id', p.id, 'person_name', p.full_name, 'created_at', s.created_at))
-                               FROM subscriptions s JOIN people p ON p.id = s.person_id WHERE s.status = 'pending_card'), '[]'::jsonb),
-    'expiring', coalesce((SELECT jsonb_agg(x ORDER BY x->>'until') FROM (
-                  SELECT jsonb_build_object('person_id', p.id, 'person_name', p.full_name, 'phone', p.phone, 'until', u.until) AS x
-                  FROM people p CROSS JOIN LATERAL (SELECT erp_membership_until(p.id) AS until) u
-                  WHERE u.until BETWEEN v_today AND v_today + v_days
-                    AND NOT EXISTS (SELECT 1 FROM subscriptions s WHERE s.person_id = p.id AND s.status IN ('active','past_due') AND NOT s.cancel_at_period_end)
-                ) e), '[]'::jsonb),
-    'birthdays', coalesce((SELECT jsonb_agg(jsonb_build_object('person_id', id, 'person_name', full_name))
-                  FROM people WHERE birth_date IS NOT NULL AND NOT is_archived
-                    AND extract(month FROM birth_date) = extract(month FROM v_today) AND extract(day FROM birth_date) = extract(day FROM v_today)), '[]'::jsonb),
-    'new_people_week', (SELECT count(*) FROM people WHERE created_at >= now() - INTERVAL '7 days')
-  );
-END;
-$function$;
+-- get_staff_dashboard: ver erp_finanzas.sql
 
 -- ------------------------------------------------------------
 -- Permisos
@@ -1642,7 +1351,7 @@ BEGIN
   FOREACH f IN ARRAY ARRAY[
     'erp_today()', 'erp_audit(text,text,uuid,jsonb,jsonb)', 'erp_open_session_id()', 'erp_period_end(date,text,integer)',
     'erp_grant_membership(uuid,uuid,date,uuid,uuid,date)', 'erp_membership_until(uuid)',
-    'erp_insert_sale(uuid,text,jsonb,jsonb,integer,text,uuid,uuid,uuid)', 'erp_cash_summary(uuid)', 'erp_booking_sale(uuid,text)',
+    'erp_cash_summary(uuid)', 'erp_booking_sale(uuid,text)',
     'erp_cycle_amount(subscriptions,integer)', 'erp_new_token()', 'billing_events_immutable()'
   ] LOOP
     EXECUTE format('REVOKE ALL ON FUNCTION public.%s FROM PUBLIC, anon, authenticated', f);
@@ -1650,15 +1359,15 @@ BEGIN
   -- Staff / admin (validan rol por dentro).
   FOREACH f IN ARRAY ARRAY[
     'get_erp_settings()', 'admin_update_erp_settings(jsonb)', 'admin_update_integrations(jsonb)',
-    'get_products(boolean)', 'admin_save_product(jsonb)', 'admin_save_person(jsonb)', 'admin_search_people(text)',
+    'get_products(boolean)', 'admin_save_person(jsonb)', 'admin_search_people(text)',
     'get_person_profile(uuid)', 'admin_add_person_note(uuid,text,text)', 'admin_void_membership(uuid,text)',
-    'get_cash_status()', 'open_cash(integer,text)', 'add_cash_movement(text,integer,text)', 'close_cash(integer,text)',
-    'create_sale(jsonb)', 'admin_void_sale(uuid,text)', 'get_sales(date,date)', 'get_sales_report(date)',
+    'get_cash_status()', 'open_cash(integer,text)', 'close_cash(integer,text)',
+    'get_sales(date,date)',
     'admin_mark_booking_paid(uuid,text)', 'admin_book_person(uuid,uuid,text,text)',
     'admin_register_sale(uuid,uuid,date,integer,text,text)',
     'admin_create_subscription(uuid,uuid,date,boolean)', 'admin_subscription_link(uuid)',
     'admin_cancel_subscription(uuid,boolean,text)', 'admin_resume_subscription(uuid)', 'get_subscriptions_admin()',
-    'get_staff_dashboard()', 'get_my_portal()', 'my_subscription_link(uuid)'
+    'get_my_portal()', 'my_subscription_link(uuid)'
   ] LOOP
     EXECUTE format('REVOKE ALL ON FUNCTION public.%s FROM PUBLIC, anon', f);
     EXECUTE format('GRANT EXECUTE ON FUNCTION public.%s TO authenticated', f);

@@ -474,3 +474,14 @@ lista baje sola para que el último lugar (ej. el #100) también vea su nombre.
 - Después de registrar la tarjeta otra vez: cobro 1 pagado en el intento 2, venta #1 por $600, membresía del 23 oct al 22 nov, próximo cobro el 23 nov. En Openpay sandbox aparece exactamente 1 transacción Visa de $600.
 - La persona de prueba 'Test' usa test@falso.com: el recibo se mandó a un correo falso.
 
+
+## 2026-10-23 — Egresos (cuentas a pagar) e inventario
+
+- Revisé EVO: Financiero → Cuentas a pagar (destino, beneficiario, centro de costos Gastos fijos / Gastos variables / Compra de productos, vencimiento, mes de competencia, replicar N veces) y Administración → Productos (precio de venta y de compra, cantidad actual y mínima, entradas/salidas, 'permite ventas sin stock'). En EVO hay 15 productos (agua, barras Wild, magnesia, cerveza, refresco, gomitas).
+- Nuevo `src/supabase/erp_finanzas.sql` (se corre DESPUÉS de erp.sql). Ahí pasaron erp_insert_sale, create_sale, admin_void_sale, admin_save_product, add_cash_movement, get_sales_report y get_staff_dashboard, que salieron de erp.sql para no tener dos copias.
+- Egresos: proveedores, egresos pendientes/pagados/cancelados, recurrentes que generan solos el pendiente una semana antes, centros de costos editables. Pagar 'de la caja' saca el efectivo de la caja abierta; un 'gasto pagado con caja' en Caja crea su egreso. Reporte del mes con egresos por centro y utilidad (solo admin). CSV.
+- Inventario: cada cambio queda en `stock_movements`. La venta descuenta, la anulación regresa. Hay entradas (con egreso opcional), conteos físicos y salidas por consumo o merma. Opción de vender sin existencia, mínimo con aviso 'Por surtir' en Inicio, costo y margen.
+- Pantallas: /staff/egresos (admin), /staff/inventario, menú 'Finanzas'.
+- Pruebas: finanzas 74, ERP 67, billing 37, clases 51. UI revisada en local con el Supabase falso.
+- Falta: Run de `erp_finanzas.sql` en producción.
+

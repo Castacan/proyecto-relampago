@@ -34,6 +34,8 @@ import PosPage from './pages/staff/erp/PosPage'
 import CashPage from './pages/staff/erp/CashPage'
 import { SalesHistoryPage, ReportPage } from './pages/staff/erp/SalesPage'
 import SubscriptionsPage from './pages/staff/erp/SubscriptionsPage'
+import ExpensesPage from './pages/staff/erp/ExpensesPage'
+import InventoryPage from './pages/staff/erp/InventoryPage'
 import { ProductsConfigPage, IntegrationsPage, GeneralSettingsPage } from './pages/staff/erp/ConfigPages'
 import SubscriptionSetupPage from './pages/public/SubscriptionSetupPage'
 import NotFoundPage from './pages/public/NotFoundPage'
@@ -91,6 +93,8 @@ export default function App() {
           <Route path="caja" element={<ErrorBoundary label="Caja"><CashPage /></ErrorBoundary>} />
           <Route path="ventas" element={<ErrorBoundary label="Ventas"><SalesHistoryPage /></ErrorBoundary>} />
           <Route path="reportes" element={<ErrorBoundary label="Reportes"><ReportPage /></ErrorBoundary>} />
+          <Route path="egresos" element={<ErrorBoundary label="Egresos"><ExpensesPage /></ErrorBoundary>} />
+          <Route path="inventario" element={<ErrorBoundary label="Inventario"><InventoryPage /></ErrorBoundary>} />
           <Route path="domiciliaciones" element={<ErrorBoundary label="Domiciliaciones"><SubscriptionsPage /></ErrorBoundary>} />
           <Route path="config/productos" element={<ErrorBoundary label="Productos"><ProductsConfigPage /></ErrorBoundary>} />
           <Route path="config/integraciones" element={<ErrorBoundary label="Integraciones"><IntegrationsPage /></ErrorBoundary>} />

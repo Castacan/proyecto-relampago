@@ -16,6 +16,8 @@ interface Dashboard {
   expiring: { person_id: string; person_name: string; phone: string | null; until: string }[]
   birthdays: { person_id: string; person_name: string }[]
   new_people_week: number
+  low_stock?: { id: string; name: string; stock: number; stock_min: number | null }[]
+  expenses_due?: { id: string; description: string; payee: string | null; amount_cents: number; due_on: string }[] | null
 }
 
 export default function HomePage() {
@@ -102,6 +104,35 @@ export default function HomePage() {
             </div>
           )}
         </Card>
+
+        {d.expenses_due && d.expenses_due.length > 0 && (
+          <Card title="Pagos por vencer" actions={<Link to="/staff/egresos" className="text-primario text-xs font-bold">Egresos</Link>}>
+            <div className="space-y-1">
+              {d.expenses_due.map(e => (
+                <Link key={e.id} to="/staff/egresos" className="flex items-center justify-between gap-2 rounded-xl px-3 py-2 hover:bg-superficie-alta">
+                  <span className="min-w-0">
+                    <span className="text-texto-principal text-sm font-semibold">{e.description}</span>
+                    <span className={`text-xs ml-2 ${e.due_on < d.today ? 'text-alerta' : 'text-zinc-400'}`}>{e.due_on < d.today ? 'venció' : 'vence'} {fmtDate(e.due_on)}{e.payee ? ` · ${e.payee}` : ''}</span>
+                  </span>
+                  <span className="text-zinc-200 text-sm font-bold tabular-nums">{money(e.amount_cents)}</span>
+                </Link>
+              ))}
+            </div>
+          </Card>
+        )}
+
+        {d.low_stock && d.low_stock.length > 0 && (
+          <Card title="Por surtir" actions={<Link to="/staff/inventario" className="text-primario text-xs font-bold">Inventario</Link>}>
+            <div className="space-y-1">
+              {d.low_stock.map(p => (
+                <Link key={p.id} to="/staff/inventario" className="flex items-center justify-between gap-2 rounded-xl px-3 py-2 hover:bg-superficie-alta">
+                  <span className="text-texto-principal text-sm font-semibold">{p.name}</span>
+                  <span className={`text-xs font-bold ${p.stock <= 0 ? 'text-alerta' : 'text-amarillo-suave'}`}>{p.stock <= 0 ? 'agotado' : `quedan ${p.stock}`}{p.stock_min != null ? ` · mínimo ${p.stock_min}` : ''}</span>
+                </Link>
+              ))}
+            </div>
+          </Card>
+        )}
 
         <Card title="Pendientes">
           {d.pending_cards.length === 0 && d.birthdays.length === 0 ? <Empty>Nada pendiente.</Empty> : (

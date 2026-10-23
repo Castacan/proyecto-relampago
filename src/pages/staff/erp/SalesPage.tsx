@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { call, erpError, money, fmtDate, fmtDateTime, todayMx, METHOD_LABELS, SOURCE_LABELS } from '../../../lib/erp'
+import { call, erpError, money, fmtDate, fmtDateTime, todayMx, csvDownload, METHOD_LABELS, SOURCE_LABELS, EXPENSE_STATUS } from '../../../lib/erp'
 import { Page, Card, Stat, Empty, Spinner, Msg, Badge, input, label, btnGhost, btnSmall, btnDanger } from '../../../components/erp/ui'
 
 interface Sale {
@@ -10,12 +10,6 @@ interface Sale {
   payments: { method: string; amount_cents: number; reference: string | null }[] | null
 }
 
-function csvDownload(name: string, rows: (string | number)[][]) {
-  const esc = (v: string | number) => `"${String(v ?? '').replace(/"/g, '""')}"`
-  const blob = new Blob(['﻿' + rows.map(r => r.map(esc).join(',')).join('\n')], { type: 'text/csv;charset=utf-8' })
-  const url = URL.createObjectURL(blob)
-  const a = document.createElement('a'); a.href = url; a.download = name; a.click(); URL.revokeObjectURL(url)
-}
 
 export function SalesHistoryPage() {
   const [from, setFrom] = useState(todayMx().slice(0, 8) + '01')
@@ -111,6 +105,12 @@ interface Report {
   by_product: { description: string; quantity: number; total_cents: number }[]
   by_day: { day: string; total_cents: number; count: number }[]
   cash_sessions: { business_date: string; opening: number; expected: number | null; counted: number | null; difference: number | null }[]
+  expenses: {
+    total_cents: number; paid_cents: number; pending_cents: number; profit_cents: number
+    by_cost_center: { cost_center: string; cents: number }[]
+    items: { folio: number; due_on: string; paid_on: string | null; payee: string | null; description: string; cost_center: string
+      category: string | null; amount_cents: number; status: string; method: string | null; invoice_ref: string | null }[]
+  } | null
 }
 
 export function ReportPage() {
@@ -127,6 +127,13 @@ export function ReportPage() {
     ['Total', (r.total_cents / 100).toFixed(2)], [], ['Concepto', 'Cantidad', 'Total'],
     ...r.by_product.map(p => [p.description, p.quantity, (p.total_cents / 100).toFixed(2)]), [], ['Día', 'Ventas', 'Total'],
     ...r.by_day.map(d => [d.day, d.count, (d.total_cents / 100).toFixed(2)]),
+    ...(r.expenses ? [
+      [], ['Egresos del mes', (r.expenses.total_cents / 100).toFixed(2)], ['Utilidad (ventas − egresos)', (r.expenses.profit_cents / 100).toFixed(2)],
+      [], ['Centro de costos', 'Total'], ...r.expenses.by_cost_center.map(c => [c.cost_center, (c.cents / 100).toFixed(2)]),
+      [], ['Folio', 'Vence', 'Pagado', 'A quién', 'Concepto', 'Centro de costos', 'Categoría', 'Monto', 'Estado', 'Factura'],
+      ...r.expenses.items.map(e => [e.folio, e.due_on, e.paid_on ?? '', e.payee ?? '', e.description, e.cost_center, e.category ?? '',
+        (e.amount_cents / 100).toFixed(2), EXPENSE_STATUS[e.status]?.label ?? e.status, e.invoice_ref ?? '']),
+    ] : []),
   ])
 
   return (
@@ -139,6 +146,18 @@ export function ReportPage() {
             <Stat label="Total del mes" value={money(r.total_cents)} sub={`${r.count} ventas`} tone="accent" />
             {Object.entries(r.by_method).sort((a, b) => b[1] - a[1]).slice(0, 3).map(([m, c]) => <Stat key={m} label={METHOD_LABELS[m] ?? m} value={money(c)} />)}
           </div>
+          {r.expenses && (
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+              <Stat label="Ventas" value={money(r.total_cents)} tone="accent" />
+              <Stat label="Egresos" value={money(r.expenses.total_cents)} sub={r.expenses.pending_cents ? `${money(r.expenses.pending_cents)} por pagar` : 'todo pagado'} tone="alert" />
+              <Stat label="Utilidad" value={money(r.expenses.profit_cents)} sub="ventas − egresos" tone={r.expenses.profit_cents >= 0 ? 'success' : 'alert'} />
+              <Card title="Egresos por centro">
+                {r.expenses.by_cost_center.length === 0 ? <p className="text-zinc-500 text-xs">Sin egresos.</p> : r.expenses.by_cost_center.map(c => (
+                  <div key={c.cost_center} className="flex justify-between text-xs py-0.5"><span className="text-zinc-400 truncate pr-2">{c.cost_center}</span><span className="text-zinc-200 font-bold tabular-nums">{money(c.cents)}</span></div>
+                ))}
+              </Card>
+            </div>
+          )}
           <div className="grid lg:grid-cols-2 gap-4">
             <Card title="Por concepto">
               {r.by_product.length === 0 ? <Empty>Sin ventas.</Empty> : r.by_product.map(p => (

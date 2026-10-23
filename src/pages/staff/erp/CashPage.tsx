@@ -120,6 +120,7 @@ function OpenCash({ session, onChanged }: { session: OpenSession; onChanged: () 
             <input value={movNote} onChange={e => setMovNote(e.target.value)} placeholder="Motivo (ej. compra de garrafones)" className={input} />
             <button onClick={addMov} disabled={busy} className={btnSmall}>Registrar</button>
           </div>
+          {movKind === 'expense' && <p className="text-zinc-500 text-xs mb-3">El gasto también queda en Egresos (como gasto variable; un admin lo puede reclasificar).</p>}
           {session.movements.length === 0 ? <Empty>Sin retiros ni gastos.</Empty> : (
             <div className="divide-y divide-zinc-800/80">
               {session.movements.map(m => (

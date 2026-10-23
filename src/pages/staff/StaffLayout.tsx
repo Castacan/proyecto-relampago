@@ -34,6 +34,7 @@ const ICONS: Record<string, string> = {
   sliders: 'M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M1 14h6M9 8h6M17 16h6',
   shield: 'M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z',
   eye: 'M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8zM12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z',
+  wallet: 'M20 7H5a2 2 0 0 1 0-4h13v4M3 5v14a2 2 0 0 0 2 2h15V7M16 14h.01',
   chevron: 'M6 9l6 6 6-6',
   menu: 'M3 6h18M3 12h18M3 18h18',
   collapse: 'M15 18l-6-6 6-6',
@@ -61,7 +62,7 @@ export default function StaffLayout() {
   const location = useLocation()
   const [mobileOpen, setMobileOpen] = useState(false)
   const [compact, setCompact] = useState<boolean>(() => readJson(COMPACT_KEY, false))
-  const [open, setOpen] = useState<Record<string, boolean>>(() => readJson(OPEN_KEY, { clientes: true, ventas: true, clases: true, muro: true }))
+  const [open, setOpen] = useState<Record<string, boolean>>(() => readJson(OPEN_KEY, { clientes: true, ventas: true, finanzas: true, clases: true, muro: true }))
 
   useEffect(() => { setMobileOpen(false) }, [location.pathname])
 
@@ -74,6 +75,10 @@ export default function StaffLayout() {
       { to: '/staff/vender', label: 'Vender', icon: 'cart' },
       { to: '/staff/caja', label: 'Caja', icon: 'cash' },
       { to: '/staff/ventas', label: 'Historial de ventas', icon: 'receipt' },
+      { to: '/staff/inventario', label: 'Inventario', icon: 'box' },
+    ] },
+    { id: 'finanzas', label: 'Finanzas', icon: 'chart', items: [
+      { to: '/staff/egresos', label: 'Egresos', icon: 'wallet', show: isAdmin },
       { to: '/staff/reportes', label: 'Reporte del mes', icon: 'chart' },
     ] },
     { id: 'clases', label: 'Clases', icon: 'calendar', items: [
@@ -100,7 +105,7 @@ export default function StaffLayout() {
   ].map(g => ({ ...g, items: g.items.filter(i => i.show !== false) })).filter(g => g.items.length > 0)
 
   const toggleGroup = (id: string) => {
-    const next = { ...open, [id]: !open[id] }
+    const next = { ...open, [id]: open[id] === false }
     setOpen(next); writeJson(OPEN_KEY, next)
   }
   const toggleCompact = () => { setCompact(c => { writeJson(COMPACT_KEY, !c); return !c }) }
@@ -122,10 +127,10 @@ export default function StaffLayout() {
             <button onClick={() => toggleGroup(g.id)}
               className="w-full flex items-center gap-2 px-3 py-1.5 text-[11px] font-bold uppercase tracking-widest text-zinc-500 hover:text-zinc-300">
               <span className="flex-1 text-left">{g.label}</span>
-              <span className={`transition-transform ${open[g.id] ? '' : '-rotate-90'}`}><Icon name="chevron" size={14} /></span>
+              <span className={`transition-transform ${open[g.id] !== false ? '' : '-rotate-90'}`}><Icon name="chevron" size={14} /></span>
             </button>
           )}
-          {(isCompact || open[g.id]) && (
+          {(isCompact || open[g.id] !== false) && (
             <div className="space-y-0.5">
               {g.items.map(i => (
                 <NavLink key={i.to} to={i.to} end={i.end} title={i.label} className={({ isActive }) => linkClass(isActive)}>

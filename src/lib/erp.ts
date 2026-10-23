@@ -21,8 +21,25 @@ export interface Product {
   class_type_id: string | null
   track_stock: boolean
   stock: number | null
+  cost_cents: number | null
+  stock_min: number | null
+  allow_negative_stock: boolean
+  sku: string | null
   is_active: boolean
   sort_order: number
+}
+
+// Egresos (erp_finanzas.sql)
+export const EXPENSE_STATUS: Record<string, { label: string; cls: string }> = {
+  pending: { label: 'Por pagar', cls: 'text-amarillo-suave bg-amarillo-suave/10' },
+  paid: { label: 'Pagado', cls: 'text-exito bg-exito/10' },
+  cancelled: { label: 'Cancelado', cls: 'text-zinc-400 bg-superficie-alta' },
+}
+export const EXPENSE_METHODS: Record<string, string> = { cash: 'Efectivo', card: 'Tarjeta', transfer: 'Transferencia', other: 'Otro' }
+export const PAID_FROM: Record<string, string> = { cash_register: 'De la caja', bank: 'Banco / cuenta', other: 'Otro' }
+export const PAYEE_KINDS: Record<string, string> = { supplier: 'Proveedor', employee: 'Empleado', government: 'Gobierno / impuestos', other: 'Otro' }
+export const STOCK_KINDS: Record<string, string> = {
+  initial: 'Existencia inicial', purchase: 'Entrada', sale: 'Venta', sale_void: 'Venta anulada', adjust: 'Ajuste', consumption: 'Consumo',
 }
 
 export const KIND_LABELS: Record<ProductKind, string> = {
@@ -103,12 +120,18 @@ export const ERP_ERRORS: Record<string, string> = {
   invalid_stripe_key: 'La llave publicable de Stripe empieza con pk_test_ o pk_live_.',
   invalid_openpay_key: 'La llave pública de Openpay empieza con pk_.',
   not_found: 'No se encontró.',
+  not_tracked: 'Ese producto no lleva inventario.',
+  cost_required: 'Escribe el costo por pieza para registrar el egreso.',
+  description_required: 'Escribe el concepto.',
+  cost_center_required: 'Elige el centro de costos.',
+  paid_from_cash_locked: 'El efectivo ya salió de la caja: el monto no se cambia. Cancélalo y captúralo de nuevo.',
+  cash_session_closed: 'Ese gasto salió de una caja que ya se cerró; no se puede cancelar.',
 }
 export const erpError = (code?: string, fallback = 'No se pudo completar. Intenta de nuevo.') => (code && ERP_ERRORS[code]) || fallback
 
 export function money(cents: number | null | undefined): string {
-  const v = (cents ?? 0) / 100
-  return `$${v.toLocaleString('es-MX', { minimumFractionDigits: Number.isInteger(v) ? 0 : 2, maximumFractionDigits: 2 })}`
+  const v = Math.abs((cents ?? 0) / 100)
+  return `${(cents ?? 0) < 0 ? '−' : ''}$${v.toLocaleString('es-MX', { minimumFractionDigits: Number.isInteger(v) ? 0 : 2, maximumFractionDigits: 2 })}`
 }
 export const toCents = (v: string) => Math.round(Number(String(v).replace(/[^0-9.]/g, '') || '0') * 100)
 export const toPesos = (c: number | null | undefined) => (c == null ? '' : String(c / 100))
@@ -136,6 +159,13 @@ export function durationLabel(p: Pick<Product, 'duration_unit' | 'duration_value
 export function scheduleLabel(price: number, promoCycles: number | null | undefined, promoPrice: number | null | undefined): string {
   if (promoCycles && promoPrice != null) return `${promoCycles} ${promoCycles === 1 ? 'mes' : 'meses'} a ${money(promoPrice)}, luego ${money(price)} al mes`
   return `${money(price)} al mes`
+}
+
+export function csvDownload(name: string, rows: (string | number)[][]) {
+  const esc = (v: string | number) => `"${String(v ?? '').replace(/"/g, '""')}"`
+  const blob = new Blob(['﻿' + rows.map(r => r.map(esc).join(',')).join('\n')], { type: 'text/csv;charset=utf-8' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a'); a.href = url; a.download = name; a.click(); URL.revokeObjectURL(url)
 }
 
 export function subscriptionLink(token: string): string {
