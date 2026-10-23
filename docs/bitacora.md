@@ -411,3 +411,29 @@ lista baje sola para que el último lugar (ej. el #100) también vea su nombre.
   con cuenta (tabla `people`, puede existir sin login); acompañantes por
   diseñar; Fase 1 dividida en 1a (arrancar) y 1b (Clip, recordatorios,
   reportes).
+
+## 2026-10-23 — Clases y reservas, Fase 1a (código listo, falta desplegar)
+- Datos del dueño: Escalada Jueves 5 pm (la da él), Calistenia lunes y
+  miércoles 5 pm (coach externo), cupo 6 ambas, 60 min por defecto;
+  Introductoria $200 solo staff. Todo editable desde el panel.
+- SQL `src/supabase/clases.sql`: `people` (persona; puede existir sin
+  login y se liga a su cuenta por correo), `memberships`, `class_settings`,
+  `class_types`, `class_schedules`, `class_sessions` (se generan solas
+  desde los horarios al abrir el calendario; herencia sesión → horario →
+  tipo para cupo/profe/duración/precio), `class_bookings`, `class_sales`,
+  `class_audit_log`. Reglas en SQL: cupo con bloqueo, ventana de 7 días,
+  precio miembro, 1 gratis por mes calendario (no acumulable; la gastan
+  reservada/asistió/faltó/cancelada tarde), cancelar ≥12 h devuelve,
+  sobrecupo solo staff hasta la tolerancia, editar un horario regenera
+  solo las sesiones futuras sin reservas.
+- Edge Function nueva `class-emails` (reserva confirmada / cancelada /
+  clase cancelada por el gym), una sola vez por reserva.
+- Pantallas: `/clases` (calendario, reservar con gratis del mes o pagar
+  en el gym, mis reservas, cancelar con aviso si es tarde, datos la
+  primera vez) y `/staff/clases` (Hoy: asistencia, cobrar, walk-in con
+  persona nueva, cancelar reserva o clase; Personas y membresía;
+  Introductoria: venta suelta; Configuración solo admin).
+- Probado: SQL en PGlite (51 casos) y pantallas en local con un Supabase
+  falso (perfil, reservar, panel, walk-in, asistencia, cobro, config).
+- Falta: Run del SQL y crear/desplegar la función `class-emails`
+  (Verify JWT apagado). Fase 1b pendiente: Clip, recordatorios, reportes.

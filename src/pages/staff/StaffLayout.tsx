@@ -176,6 +176,21 @@ export default function StaffLayout() {
             )}
           </NavLink>
         )}
+        <NavLink to="/staff/clases" className="shrink-0 flex justify-center">
+          {({ isActive }) => (
+            <div className={`flex items-center gap-2 px-6 py-2.5 rounded-2xl transition-all text-sm font-bold whitespace-nowrap ${
+              isActive
+                ? 'bg-primario text-texto-en-acento shadow-lg shadow-primario/25'
+                : 'bg-superficie-alta text-zinc-300 hover:bg-superficie-alta-hover hover:text-texto-principal border border-zinc-700'
+            }`}>
+              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={isActive ? 2.5 : 2} strokeLinecap="round" strokeLinejoin="round">
+                <rect x="3" y="4" width="18" height="18" rx="2" />
+                <path d="M16 2v4M8 2v4M3 10h18" />
+              </svg>
+              <span>Clases</span>
+            </div>
+          )}
+        </NavLink>
         {isAdmin && (
           <NavLink to="/staff/competencia" className="shrink-0 flex justify-center">
             {({ isActive }) => (
