@@ -372,17 +372,67 @@ Caso típico: una mamá con cuenta reserva para sus dos hijos. Preguntas a resol
 
 Estimación gruesa: 1a en ~1 semana; 1b en ~1 semana más. Lo más delicado son los pagos en línea (pero el patrón ya existe).
 
+**Estado (2026-10-23):** Fase 1a programada (commit `d758710`): `src/supabase/clases.sql`, Edge Function `class-emails`, `/clases`, `/staff/clases`. Se eligió la **opción A** (tabla `people`). Escalada Jueves 17:00 (profe: el dueño), Calistenia lunes y miércoles 17:00 (coach externo), cupo 6, 60 min. Falta Run del SQL y desplegar `class-emails`.
+
+---
+
+## 4b. Perfil de cliente, ventas y caja (siguiente paso, pedido 2026-10-23)
+
+El dueño quiere el **perfil de cliente "bien planchado"** para poder **vender desde ahí** (como en EVO). Todo vive dentro de `app.jaibamuro.com` (misma base, mismas cuentas, mismo panel de staff); `jaibamuro.com` sigue siendo la página de presentación con botones hacia la app.
+
+### 4b.1 Cómo lo hace EVO (revisado 2026-10-23 con la ficha del dueño, sin vender nada)
+
+**Ficha del cliente** (encabezado: foto, nombre, código, estado del plan, botón **NUEVA VENTA**). Pestañas: Perfil · Registro · Financiero · Ventas · Seguimiento · Planes · Invitados · Clases · Actividades.
+- **Perfil (resumen):** estado de acceso (bloqueado/permitido), pendientes, planes (nombre, vigencia, estado), cargos próximos, historial de ventas (ID, fecha, qué se vendió, valor), uso de la app, "Acerca de" (nombre, correo, celular, CURP, nacimiento, observaciones, antigüedad), frecuencia de visitas y **riesgo de abandono**, saldo deudor / saldo a favor, historial de contactos (correos/notificaciones enviados).
+- **Registro (datos):** nombre, apellido, apodo, género, país, CURP, RFC, nacimiento, profesión, estado civil, nombre preferido; contactos (celular con lada, correo); dirección completa; vencimiento de exámenes (médico, nutricional, dermatológico, evaluación física); **contactos de emergencia**; preferencias (no correos / no llamadas / no SMS-WhatsApp); acceso con QR; credencial; observaciones. Sub-pestañas: Datos personales, Interacciones, Documentos, **Responsables** (tutores), Formas de cobro.
+
+**Venta (3 pasos):**
+1. **Nueva venta:** pestañas Planes / Productos / Servicios. Al elegir un plan pide fecha de inicio y calcula el vencimiento; campos "Acuerdo" (convenio), **Descuento**, Observaciones; carrito con subtotal, impuesto, descuento y total.
+2. **Cobro:** Tarjetas (crédito/débito, terminal o en línea, operadora, monto, meses, autorización, últimos 4), Efectivo, Transferencia. Se pueden **combinar varios pagos**; si pagan de más genera **crédito** (saldo a favor).
+3. **Resumen de la venta.**
+
+**Caja:** no se puede vender sin **abrir caja** (monto inicial). Es **una caja por empleado**; muestra totales del día por forma de pago (efectivo, cheque, tarjetas, otros), ventas, ingresos y egresos. Acciones: **Retirada** (sacar efectivo), **Pago** (gasto pagado con la caja), Exportar, Imprimir, **Cerrar caja** (confirmación + usuario y contraseña; no pide contar el efectivo).
+
+**Planes que existen hoy en EVO:** Membresía Domiciliación $600/mes (recurrente), Membresía Mensual $1,000 (1 mes), Membresía Trimestral $2,800 (3 meses), Pase Diario $120 (1 día), Membresía Parejas $0 (precio sin configurar o se pone a mano).
+
+### 4b.2 Propuesta para Relámpago (más simple)
+
+**Ficha de persona** (`/staff/personas/:id`), en una sola pantalla con secciones:
+- Encabezado: nombre, "Miembro hasta…" o "Sin membresía", menor de edad, **botón Vender**.
+- **Datos:** nombre, celular, correo, nacimiento, de dónde llegó, contacto de emergencia, tutor (si es menor), preferencias de contacto, nota. (Sin CURP/RFC/exámenes por ahora.)
+- **Membresía:** vigente/vencida, historial de membresías.
+- **Ventas:** historial (fecha, qué, monto, cómo pagó, quién vendió).
+- **Clases:** próximas reservas, asistencias, faltas, clase gratis del mes usada o no.
+- **Saldo a favor** (si se implementa).
+- **Notas / seguimiento:** notas con fecha y autor (semilla del CRM).
+
+**Catálogo de productos** (admin edita): planes (con duración en días/meses → al venderlos crean/extienden la membresía), pases (día), clases sueltas (Introductoria), y productos físicos simples (si los vende: magnesia, renta de zapatos…).
+
+**Venta** (un solo paso, no tres): elegir artículos → descuento opcional → forma de pago (efectivo / tarjeta en terminal / transferencia; combinable) → listo. Al vender un plan, la membresía se crea o se extiende sola desde la fecha elegida (por defecto: hoy, o el día siguiente al vencimiento si sigue vigente).
+
+**Caja simple:** "turno" por persona de staff: abrir con efectivo inicial, ver ventas del turno por forma de pago, registrar **retiros/gastos**, y **cerrar contando el efectivo** (Relámpago compara lo contado con lo esperado y guarda la diferencia — EVO no hace esto). Reporte mensual para la contadora.
+
+### 4b.3 Preguntas para el dueño (antes de programar)
+1. ¿Se deben **migrar** los clientes y prospectos de EVO (22 + 500) a Relámpago, o empezar de cero y ir capturando?
+2. ¿Qué **productos** vende además de planes (magnesia, renta de equipo, bebidas…)?
+3. ¿Quiere **caja por turno** obligatoria para vender, o solo un corte del día?
+4. ¿Qué **datos** del cliente son obligatorios? (Propuesta: nombre y celular; correo para que tenga cuenta.)
+5. ¿Membresía Parejas cómo funciona? (¿dos personas, un pago?)
+6. ¿Descuentos libres o una lista fija (estudiante, convenio…)?
+7. ¿Saldo a favor sí o no?
+
 ---
 
 ## 5. Preguntas abiertas
 
 **Respondidas el 2026-10-23** (ver 4.1 y 4.2): clases iniciales, membresía y gratis mensual, pago en el gym sin castigo, walk-ins con cuenta creada por staff, reembolso = reagendar, mover sesiones solo admin, cancelación tarde, sobrecupo tolerado con plan, EVO se apaga eventualmente.
 
+**Respondidas después:** Escalada Jueves 17:00 la da el dueño; Calistenia lunes y miércoles 17:00 coach externo; cupo 6 ambas; 60 min por defecto (editable). Persona sin login: opción A (`people`). Planes de EVO: ver 4b.1.
+
 **Pendientes:**
-1. **Escalada Jueves**: hora, duración, cupo, profe.
-2. **Calistenia**: horario definitivo (provisional lunes y miércoles 17:00), duración, cupo, profe.
+1. Nombre del coach de Calistenia.
 3. **Acompañantes**: diseño completo (ver 4.10).
-4. ¿Persona sin login (opción A en 4.8) o usuarios de Auth sin confirmar? (decisión técnica para Claude Code).
+4. Perfil de cliente, ventas y caja: preguntas de la sección 4b.3.
 5. ¿Recordatorio 24 h antes, la mañana del día, o ambos?
 6. ¿Las clases deben verse en la TV o en la landing `jaibamuro.com`?
 7. Menores: ¿qué responsiva? (Fase 2).
@@ -410,4 +460,5 @@ Estimación gruesa: 1a en ~1 semana; 1b en ~1 semana más. Lo más delicado son 
 
 ## 7. Historial de este documento
 - **2026-10-23 (v1)**: creado. Investigación de EVO (clases), decisiones de cobro/faltas/cancelación/lista de espera, plan de fases y diseño de la Fase 1.
+- **2026-10-23 (v3)**: Fase 1a programada; sección 4b con la ficha de cliente, venta y caja de EVO y la propuesta para Relámpago; planes reales de EVO.
 - **2026-10-23 (v2)**: catálogo inicial de 3 clases con precios; membresía = precio miembro + 1 clase gratis mensual no acumulable (mes calendario); cancelación tarde gasta la gratis; reembolso = reagendar; sin castigo a pago en el gym; plan de sobrecupo; toda persona con cuenta (personas sin login creadas por staff); acompañantes pendiente; mover sesiones solo admin con aviso; Fase 1 dividida en 1a/1b; reconocimiento facial + torniquete en Fase 6; corregido el índice único parcial.
