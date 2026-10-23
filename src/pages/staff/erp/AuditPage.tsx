@@ -37,7 +37,7 @@ function detail(r: Row): string {
   if (a.amount_cents != null && !isNaN(Number(a.amount_cents))) parts.push(money(Number(a.amount_cents)))
   if (Array.isArray(a.reasons) && a.reasons.length) parts.push((a.reasons as string[]).join(', '))
   if (typeof a.name === 'string') parts.push(a.name)
-  if (typeof a.full_name === 'string') parts.push(a.full_name)
+  if (typeof a.full_name === 'string' && a.full_name !== r.person) parts.push(a.full_name)
   if (typeof a.file === 'string') parts.push(a.file)
   if (a.opening_cents != null) parts.push(`fondo ${money(Number(a.opening_cents))}`)
   if (a.counted != null) parts.push(`contado ${money(Number(a.counted))}, esperado ${money(Number(a.expected))}`)
