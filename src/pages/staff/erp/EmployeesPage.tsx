@@ -58,8 +58,74 @@ export default function EmployeesPage() {
           ))}
         </div>
       )}
-      <p className="text-zinc-500 text-xs">{active.length} activos. Para darle acceso al panel a alguien, primero debe tener su usuario de staff; luego lo ligas aquí.</p>
+      <p className="text-zinc-500 text-xs">{active.length} activos.</p>
+      <StaffAccessCard onChanged={load} />
     </Page>
+  )
+}
+
+// Quién puede entrar al panel (/staff). Solo el admin lo administra.
+interface StaffUser { id: string; name: string; role: 'staff' | 'admin'; email: string | null; last_sign_in_at: string | null }
+const STAFF_ERRORS: Record<string, string> = {
+  account_not_found: 'Ese correo todavía no tiene cuenta. Pídele que entre una vez a app.jaibamuro.com/mi-cuenta con ese correo (le llega un código) y vuelve a intentarlo.',
+  cannot_remove_self: 'No te puedes quitar a ti mismo.',
+  has_history: 'No se puede quitar porque tiene historial (armó rutas, etc.).',
+}
+
+function StaffAccessCard({ onChanged }: { onChanged: () => void }) {
+  const [users, setUsers] = useState<StaffUser[] | null>(null)
+  const [f, setF] = useState({ email: '', name: '', role: 'staff' })
+  const [msg, setMsg] = useState<{ text: string; tone: 'ok' | 'error' } | null>(null)
+  const [busy, setBusy] = useState(false)
+  const load = useCallback(async () => {
+    const { data } = await call<{ staff: StaffUser[] }>('admin_list_staff')
+    setUsers(data?.staff ?? [])
+  }, [])
+  useEffect(() => { load() }, [load])
+
+  const add = async () => {
+    setBusy(true); setMsg(null)
+    const { error } = await call('admin_add_staff', { p_email: f.email, p_name: f.name, p_role: f.role })
+    setBusy(false)
+    if (error) { setMsg({ text: STAFF_ERRORS[error] ?? erpError(error), tone: 'error' }); return }
+    setMsg({ text: `${f.email} ya puede entrar al panel como ${f.role === 'admin' ? 'admin' : 'staff'}.`, tone: 'ok' })
+    setF({ email: '', name: '', role: 'staff' }); load(); onChanged()
+  }
+  const remove = async (u: StaffUser) => {
+    if (!window.confirm(`¿Quitarle el acceso al panel a ${u.name}? Su cuenta de cliente sigue igual.`)) return
+    const { error } = await call('admin_remove_staff', { p_profile_id: u.id })
+    if (error) { setMsg({ text: STAFF_ERRORS[error] ?? erpError(error), tone: 'error' }); return }
+    load(); onChanged()
+  }
+
+  return (
+    <Card title="Acceso al panel (usuarios de staff)">
+      <p className="text-zinc-400 text-sm mb-3">Solo estas cuentas pueden entrar a app.jaibamuro.com/staff. El staff vende, abre caja, ve personas, clases e inventario; el admin además ve egresos, empleados, bitácora, estados y configuración.</p>
+      {users === null ? <Spinner /> : (
+        <div className="divide-y divide-zinc-800/80 mb-4">
+          {users.map(u => (
+            <div key={u.id} className="py-2 flex items-center justify-between gap-3 text-sm">
+              <div className="min-w-0">
+                <p className="text-texto-principal font-semibold">{u.name} <Badge cls={u.role === 'admin' ? 'text-primario bg-primario/10' : undefined}>{u.role}</Badge></p>
+                <p className="text-zinc-500 text-xs">{u.email ?? '—'} · último acceso {u.last_sign_in_at ? fmtDate(u.last_sign_in_at.slice(0, 10)) : 'nunca'}</p>
+              </div>
+              <button onClick={() => remove(u)} className="text-zinc-500 hover:text-alerta text-xs font-bold">Quitar acceso</button>
+            </div>
+          ))}
+        </div>
+      )}
+      <div className="grid sm:grid-cols-4 gap-2 items-end">
+        <div className="sm:col-span-2"><label className={label}>Correo</label><input type="email" value={f.email} onChange={e => setF({ ...f, email: e.target.value })} placeholder="correo@ejemplo.com" className={input} /></div>
+        <div><label className={label}>Nombre</label><input value={f.name} onChange={e => setF({ ...f, name: e.target.value })} className={input} /></div>
+        <div><label className={label}>Rol</label>
+          <select value={f.role} onChange={e => setF({ ...f, role: e.target.value })} className={input}>
+            <option value="staff">Staff</option><option value="admin">Admin (ve todo)</option>
+          </select></div>
+      </div>
+      <button onClick={add} disabled={busy || !f.email.includes('@')} className={`${btnPrimary} mt-3`}>{busy ? 'Guardando…' : 'Dar acceso al panel'}</button>
+      <p className="text-zinc-500 text-xs mt-2">La persona primero entra una vez a app.jaibamuro.com/mi-cuenta con su correo (le llega un código). Después la das de alta aquí y ya puede abrir el panel.</p>
+      {msg && <div className="mt-2"><Msg text={msg.text} tone={msg.tone} /></div>}
+    </Card>
   )
 }
 
