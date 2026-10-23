@@ -1,0 +1,200 @@
+import { useCallback, useEffect, useState } from 'react'
+import { call, erpError, money, toCents, toPesos, fmtDate, todayMx, EXPENSE_METHODS, PAID_FROM } from '../../../lib/erp'
+import { Page, Card, Badge, Empty, Spinner, Msg, input, label, btnPrimary, btnGhost, MoneyField } from '../../../components/erp/ui'
+import { FilesBox } from './PersonExtras'
+
+// Empleados (admin): datos, contrato/pago, documentos y nómina (cae en Egresos).
+
+interface Employee {
+  id: string; full_name: string; position: string | null; profile_id: string | null; phone: string | null; email: string | null
+  birth_date: string | null; address: string | null; curp: string | null; rfc: string | null; nss: string | null
+  hire_date: string | null; end_date: string | null; status: 'active' | 'inactive'; pay_scheme: string | null; pay_rate_cents: number | null
+  bank_name: string | null; bank_account: string | null; emergency_name: string | null; emergency_phone: string | null; notes: string | null
+  login_name?: string | null; login_role?: string | null; paid_this_month?: number
+}
+interface List { employees: Employee[]; staff_logins: { id: string; name: string; role: string }[] }
+interface Detail {
+  employee: Employee
+  payments: { id: string; folio: number; description: string; amount_cents: number; status: string; due_on: string; paid_on: string | null; method: string | null; period_month: string }[]
+  files: { id: string; path: string; file_name: string; label: string | null; mime: string | null; size_bytes: number | null; created_at: string; uploaded_by: string | null }[]
+  sales_month: { count: number; total_cents: number } | null
+}
+
+const PAY_SCHEMES: Record<string, string> = { weekly: 'Semanal', biweekly: 'Quincenal', monthly: 'Mensual', per_class: 'Por clase', hourly: 'Por hora', per_job: 'Por trabajo (armado, etc.)' }
+
+export default function EmployeesPage() {
+  const [list, setList] = useState<List | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  const [selected, setSelected] = useState<string | null>(null)
+  const [creating, setCreating] = useState(false)
+  const load = useCallback(async () => {
+    const { data, error } = await call<List>('get_employees')
+    if (error || !data) { setError(error === 'forbidden' ? 'Solo un admin puede ver a los empleados.' : 'No se pudo cargar. ¿Ya se corrió erp_crm.sql?'); return }
+    setList(data)
+  }, [])
+  useEffect(() => { load() }, [load])
+
+  if (error) return <Page title="Empleados"><p className="text-alerta text-sm">{error}</p></Page>
+  if (!list) return <Page title="Empleados"><Spinner /></Page>
+  const active = list.employees.filter(e => e.status === 'active')
+
+  return (
+    <Page title="Empleados" subtitle="Datos de cada persona del equipo, sus documentos y sus pagos (la nómina se registra como egreso)."
+      actions={<button onClick={() => { setCreating(v => !v); setSelected(null) }} className={btnPrimary}>{creating ? 'Cerrar' : '+ Nuevo empleado'}</button>}>
+      {creating && <Card title="Nuevo empleado" tone="accent"><EmployeeForm logins={list.staff_logins} onSaved={id => { setCreating(false); load(); setSelected(id) }} /></Card>}
+      {list.employees.length === 0 ? <Empty>Todavía no hay empleados.</Empty> : (
+        <div className="bg-superficie rounded-2xl border border-zinc-800/80 divide-y divide-zinc-800/80">
+          {list.employees.map(e => (
+            <div key={e.id}>
+              <button onClick={() => setSelected(selected === e.id ? null : e.id)} className="w-full text-left px-4 py-3 hover:bg-superficie-alta flex items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <p className={`font-bold ${e.status === 'active' ? 'text-texto-principal' : 'text-zinc-500'}`}>{e.full_name} {e.status === 'inactive' && <Badge>Baja</Badge>}</p>
+                  <p className="text-zinc-500 text-xs">{e.position ?? 'Sin puesto'}{e.pay_scheme ? ` · ${PAY_SCHEMES[e.pay_scheme]}${e.pay_rate_cents ? ` ${money(e.pay_rate_cents)}` : ''}` : ''}{e.login_name ? ` · usuario del panel: ${e.login_name} (${e.login_role})` : ''}</p>
+                </div>
+                <span className="text-zinc-400 text-xs shrink-0">pagado este mes <span className="text-texto-principal font-bold">{money(e.paid_this_month ?? 0)}</span></span>
+              </button>
+              {selected === e.id && <EmployeeDetail id={e.id} logins={list.staff_logins} onChanged={load} />}
+            </div>
+          ))}
+        </div>
+      )}
+      <p className="text-zinc-500 text-xs">{active.length} activos. Para darle acceso al panel a alguien, primero debe tener su usuario de staff; luego lo ligas aquí.</p>
+    </Page>
+  )
+}
+
+function EmployeeDetail({ id, logins, onChanged }: { id: string; logins: List['staff_logins']; onChanged: () => void }) {
+  const [d, setD] = useState<Detail | null>(null)
+  const [editing, setEditing] = useState(false)
+  const [paying, setPaying] = useState(false)
+  const load = useCallback(async () => { const { data } = await call<Detail>('get_employee', { p_employee_id: id }); setD(data) }, [id])
+  useEffect(() => { load() }, [load])
+  if (!d) return <div className="px-4 pb-4"><Spinner /></div>
+  const e = d.employee
+  const row = (k: string, v: string | null | undefined) => v ? <><dt className="text-zinc-400">{k}</dt><dd className="text-texto-principal break-all">{v}</dd></> : null
+
+  return (
+    <div className="px-4 pb-4 space-y-3">
+      <div className="flex flex-wrap gap-2">
+        <button onClick={() => setPaying(v => !v)} className={btnGhost}>{paying ? 'Cerrar' : 'Registrar pago'}</button>
+        <button onClick={() => setEditing(v => !v)} className={btnGhost}>{editing ? 'Cerrar' : 'Editar datos'}</button>
+      </div>
+      {paying && <Card tone="accent"><PayForm employee={e} onDone={() => { setPaying(false); load(); onChanged() }} /></Card>}
+      {editing ? <Card><EmployeeForm e={e} logins={logins} onSaved={() => { setEditing(false); load(); onChanged() }} /></Card> : (
+        <div className="grid lg:grid-cols-2 gap-3">
+          <Card title="Datos">
+            <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-sm">
+              {row('Puesto', e.position)}{row('Celular', e.phone)}{row('Correo', e.email)}{row('Nacimiento', e.birth_date ? fmtDate(e.birth_date) : null)}
+              {row('Domicilio', e.address)}{row('CURP', e.curp)}{row('RFC', e.rfc)}{row('NSS', e.nss)}
+              {row('Ingreso', e.hire_date ? fmtDate(e.hire_date) : null)}{row('Baja', e.end_date ? fmtDate(e.end_date) : null)}
+              {row('Pago', e.pay_scheme ? `${PAY_SCHEMES[e.pay_scheme]}${e.pay_rate_cents ? ` · ${money(e.pay_rate_cents)}` : ''}` : null)}
+              {row('Banco', e.bank_name ? `${e.bank_name}${e.bank_account ? ` · ${e.bank_account}` : ''}` : e.bank_account)}
+              {row('Emergencia', e.emergency_name ? `${e.emergency_name} · ${e.emergency_phone ?? ''}` : null)}
+              {row('Notas', e.notes)}
+            </dl>
+            {d.sales_month && <p className="text-zinc-400 text-xs mt-2">Ventas este mes: {d.sales_month.count} · {money(d.sales_month.total_cents)}</p>}
+          </Card>
+          <Card title="Pagos">
+            {d.payments.length === 0 ? <Empty>Sin pagos registrados.</Empty> : (
+              <div className="divide-y divide-zinc-800/80 max-h-72 overflow-y-auto">
+                {d.payments.map(p => (
+                  <div key={p.id} className="py-1.5 flex justify-between gap-3 text-sm">
+                    <span className="text-zinc-300 min-w-0 truncate">{p.description} <span className="text-zinc-500 text-xs">· {fmtDate(p.paid_on ?? p.due_on)}{p.status === 'pending' ? ' · por pagar' : ''}</span></span>
+                    <span className="text-texto-principal font-bold tabular-nums">{money(p.amount_cents)}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </Card>
+        </div>
+      )}
+      <Card title="Documentos (contrato, INE, comprobantes…)">
+        <FilesBox ownerKind="employee" ownerId={e.id} files={d.files} canDelete onChanged={load} />
+      </Card>
+    </div>
+  )
+}
+
+function EmployeeForm({ e, logins, onSaved }: { e?: Employee; logins: List['staff_logins']; onSaved: (id: string) => void }) {
+  const [f, setF] = useState({
+    full_name: e?.full_name ?? '', position: e?.position ?? '', profile_id: e?.profile_id ?? '', phone: e?.phone ?? '', email: e?.email ?? '',
+    birth_date: e?.birth_date ?? '', address: e?.address ?? '', curp: e?.curp ?? '', rfc: e?.rfc ?? '', nss: e?.nss ?? '',
+    hire_date: e?.hire_date ?? '', end_date: e?.end_date ?? '', status: e?.status ?? 'active', pay_scheme: e?.pay_scheme ?? '',
+    pay_rate: toPesos(e?.pay_rate_cents ?? null), bank_name: e?.bank_name ?? '', bank_account: e?.bank_account ?? '',
+    emergency_name: e?.emergency_name ?? '', emergency_phone: e?.emergency_phone ?? '', notes: e?.notes ?? '',
+  })
+  const [error, setError] = useState<string | null>(null)
+  const [busy, setBusy] = useState(false)
+  const set = (x: Partial<typeof f>) => { setF(v => ({ ...v, ...x })); setError(null) }
+  const save = async () => {
+    setBusy(true)
+    const { pay_rate, ...rest } = f
+    const { data, error } = await call<{ id: string }>('admin_save_employee', { p: { id: e?.id ?? null, ...rest, pay_rate_cents: pay_rate === '' ? '' : toCents(pay_rate) } })
+    setBusy(false)
+    if (error || !data) { setError(erpError(error ?? undefined)); return }
+    onSaved(data.id)
+  }
+  const txt = (k: keyof typeof f, l: string, type = 'text', ph = '') => (
+    <div><label className={label}>{l}</label><input type={type} value={f[k]} placeholder={ph} onChange={x => set({ [k]: x.target.value } as Partial<typeof f>)} className={input} /></div>
+  )
+  return (
+    <div className="space-y-3">
+      <div className="grid sm:grid-cols-3 gap-3">
+        {txt('full_name', 'Nombre completo')}{txt('position', 'Puesto', 'text', 'Recepción, coach, armador…')}
+        <div><label className={label}>Usuario del panel (opcional)</label>
+          <select value={f.profile_id} onChange={x => set({ profile_id: x.target.value })} className={input}>
+            <option value="">Sin usuario</option>{logins.map(l => <option key={l.id} value={l.id}>{l.name} ({l.role})</option>)}
+          </select></div>
+        {txt('phone', 'Celular')}{txt('email', 'Correo', 'email')}{txt('birth_date', 'Nacimiento', 'date')}
+        <div className="sm:col-span-3">{txt('address', 'Domicilio')}</div>
+        {txt('curp', 'CURP')}{txt('rfc', 'RFC')}{txt('nss', 'NSS (IMSS)')}
+        {txt('hire_date', 'Fecha de ingreso', 'date')}{txt('end_date', 'Fecha de baja', 'date')}
+        <div><label className={label}>Estado</label>
+          <select value={f.status} onChange={x => set({ status: x.target.value as 'active' | 'inactive' })} className={input}>
+            <option value="active">Activo</option><option value="inactive">Baja</option>
+          </select></div>
+        <div><label className={label}>Esquema de pago</label>
+          <select value={f.pay_scheme} onChange={x => set({ pay_scheme: x.target.value })} className={input}>
+            <option value="">—</option>{Object.entries(PAY_SCHEMES).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+          </select></div>
+        <MoneyField id={`emp-rate-${e?.id ?? 'new'}`} label="Monto por periodo / clase / hora" value={f.pay_rate} onChange={v => set({ pay_rate: v })} />
+        {txt('bank_name', 'Banco')}
+        {txt('bank_account', 'CLABE / cuenta')}{txt('emergency_name', 'Contacto de emergencia')}{txt('emergency_phone', 'Tel. de emergencia')}
+      </div>
+      {txt('notes', 'Notas')}
+      <Msg text={error} />
+      <button onClick={save} disabled={busy} className={btnPrimary}>{busy ? 'Guardando…' : 'Guardar'}</button>
+    </div>
+  )
+}
+
+function PayForm({ employee, onDone }: { employee: Employee; onDone: () => void }) {
+  const t = todayMx()
+  const [f, setF] = useState({ amount: toPesos(employee.pay_rate_cents), description: `Nómina ${employee.full_name}`, paid_on: t, period_month: t.slice(0, 7), method: 'transfer', paid_from: 'bank', notes: '' })
+  const [error, setError] = useState<string | null>(null)
+  const save = async () => {
+    const { error } = await call('admin_pay_employee', { p_employee_id: employee.id, p: { amount_cents: toCents(f.amount), description: f.description, paid_on: f.paid_on, period_month: `${f.period_month}-01`, method: f.method, paid_from: f.paid_from, notes: f.notes } })
+    if (error) { setError(erpError(error)); return }
+    onDone()
+  }
+  return (
+    <div className="space-y-3">
+      <div className="grid sm:grid-cols-3 gap-3">
+        <MoneyField id={`pay-${employee.id}`} label="Monto" value={f.amount} onChange={v => setF({ ...f, amount: v })} />
+        <div className="sm:col-span-2"><label className={label}>Concepto</label><input value={f.description} onChange={e => setF({ ...f, description: e.target.value })} className={input} /></div>
+        <div><label className={label}>Fecha de pago</label><input type="date" value={f.paid_on} onChange={e => setF({ ...f, paid_on: e.target.value })} className={input} /></div>
+        <div><label className={label}>Corresponde al mes</label><input type="month" value={f.period_month} onChange={e => setF({ ...f, period_month: e.target.value })} className={input} /></div>
+        <div><label className={label}>Forma</label>
+          <select value={f.method} onChange={e => setF({ ...f, method: e.target.value, paid_from: e.target.value === 'cash' ? f.paid_from : 'bank' })} className={input}>
+            {Object.entries(EXPENSE_METHODS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+          </select></div>
+        <div><label className={label}>Salió de</label>
+          <select value={f.paid_from} onChange={e => setF({ ...f, paid_from: e.target.value })} className={input}>
+            {Object.entries(PAID_FROM).filter(([k]) => k !== 'cash_register' || f.method === 'cash').map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+          </select></div>
+      </div>
+      <Msg text={error} />
+      <button onClick={save} className={btnPrimary}>Registrar pago (queda en Egresos)</button>
+    </div>
+  )
+}

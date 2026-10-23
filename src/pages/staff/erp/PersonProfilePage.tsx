@@ -7,6 +7,7 @@ import {
 import { BOOKING_STATUS_LABELS, PRICE_TIER_LABELS, fmtTime, type BookingInfo } from '../../../lib/classes'
 import { Page, Card, Stat, Badge, Empty, Spinner, Msg, input, label, btnPrimary, btnGhost, btnSmall, btnDanger } from '../../../components/erp/ui'
 import PersonForm, { type PersonData } from '../../../components/erp/PersonForm'
+import { SubscriptionHistory, DocumentsCard, AccessCard } from './PersonExtras'
 
 interface Charge { id: string; cycle: number; period_start: string; period_end: string; amount_cents: number; status: string; attempt: number; max_attempts: number; error_message: string | null; next_attempt_at: string | null; paid_at: string | null }
 interface Subscription {
@@ -37,6 +38,7 @@ export default function PersonProfilePage() {
   const [editing, setEditing] = useState(false)
   const [subscribing, setSubscribing] = useState(false)
   const [isAdmin, setIsAdmin] = useState(false)
+  const [accessKey, setAccessKey] = useState(0)
 
   const load = useCallback(async () => {
     const { data, error } = await call<Profile>('get_person_profile', { p_person_id: id })
@@ -83,6 +85,11 @@ export default function PersonProfilePage() {
       {subscribing && <NewSubscription personId={person.id} phone={person.phone} onDone={() => { setSubscribing(false); load() }} />}
 
       {liveSubs.length > 0 && liveSubs.map(s => <SubscriptionCard key={s.id} s={s} phone={person.phone} firstName={person.full_name.split(' ')[0]} onChanged={load} />)}
+
+      <div className="grid lg:grid-cols-2 gap-4">
+        <DocumentsCard personId={person.id} fullName={person.full_name} isMinor={person.is_minor} guardianName={person.guardian_name ?? null} isAdmin={isAdmin} onSigned={() => setAccessKey(k => k + 1)} />
+        <AccessCard key={accessKey} personId={person.id} isAdmin={isAdmin} />
+      </div>
 
       <div className="grid lg:grid-cols-2 gap-4">
         <Card title="Contacto">
@@ -233,6 +240,7 @@ function SubscriptionCard({ s, phone, firstName, onChanged }: { s: Subscription;
   const [reason, setReason] = useState('')
   const [busy, setBusy] = useState(false)
   const [msg, setMsg] = useState<{ text: string; tone: 'error' | 'ok' } | null>(null)
+  const [showHistory, setShowHistory] = useState(false)
   const st = SUB_STATUS[s.status] ?? SUB_STATUS.active
   const nextCycle = s.cycles_paid + 1
   const nextAmount = s.promo_price_cents != null && nextCycle <= s.promo_cycles ? s.promo_price_cents : s.price_cents
@@ -314,6 +322,8 @@ function SubscriptionCard({ s, phone, firstName, onChanged }: { s: Subscription;
           ))}
         </div>
       )}
+      <button onClick={() => setShowHistory(v => !v)} className="mt-2 text-primario text-xs font-bold">{showHistory ? 'Ocultar' : 'Ver cargos próximos e intentos de cobro'}</button>
+      {showHistory && <SubscriptionHistory subscriptionId={s.id} />}
     </Card>
   )
 }

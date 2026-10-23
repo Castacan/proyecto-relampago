@@ -126,6 +126,13 @@ export const ERP_ERRORS: Record<string, string> = {
   cost_center_required: 'Elige el centro de costos.',
   paid_from_cash_locked: 'El efectivo ya salió de la caja: el monto no se cambia. Cancélalo y captúralo de nuevo.',
   cash_session_closed: 'Ese gasto salió de una caja que ya se cerró; no se puede cancelar.',
+  signature_required: 'Falta la firma.',
+  guardian_required: 'Es menor de edad: escribe el nombre de su madre, padre o tutor.',
+  document_outdated: 'Ese documento ya cambió. Actualiza la página.',
+  profile_required: 'Primero completa tus datos.',
+  text_required: 'Escribe el título y el texto.',
+  code_not_found: 'Código no reconocido.',
+  invalid_url: 'El enlace debe empezar con https://',
 }
 export const erpError = (code?: string, fallback = 'No se pudo completar. Intenta de nuevo.') => (code && ERP_ERRORS[code]) || fallback
 
@@ -159,6 +166,35 @@ export function durationLabel(p: Pick<Product, 'duration_unit' | 'duration_value
 export function scheduleLabel(price: number, promoCycles: number | null | undefined, promoPrice: number | null | undefined): string {
   if (promoCycles && promoPrice != null) return `${promoCycles} ${promoCycles === 1 ? 'mes' : 'meses'} a ${money(promoPrice)}, luego ${money(price)} al mes`
   return `${money(price)} al mes`
+}
+
+// ---------------------------------------------------------------------------
+// CRM / acceso / documentos (erp_crm.sql)
+// ---------------------------------------------------------------------------
+export const ACCESS_REASONS: Record<string, string> = {
+  blocked: 'Acceso bloqueado',
+  no_membership: 'Sin membresía, pase o clase hoy',
+  documents_pending: 'Falta firmar responsiva / reglamento',
+  not_found: 'No encontrado',
+  code_not_found: 'Código no reconocido',
+}
+export const ACCESS_OK_BY: Record<string, string> = { membership: 'Membresía vigente', day_pass: 'Pase del día', class_today: 'Clase hoy' }
+
+// Archivos privados del bucket 'expedientes' (INE, responsivas en papel, fotos…).
+export async function uploadExpedienteFile(ownerKind: 'person' | 'employee', ownerId: string, file: File): Promise<{ path: string | null; error: string | null }> {
+  if (file.size > 10 * 1024 * 1024) return { path: null, error: 'El archivo pesa más de 10 MB.' }
+  const clean = file.name.normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-zA-Z0-9._-]+/g, '_').slice(-80)
+  const path = `${ownerKind}/${ownerId}/${Date.now()}_${clean}`
+  const { error } = await supabase.storage.from('expedientes').upload(path, file, { contentType: file.type || undefined, upsert: false })
+  if (error) return { path: null, error: 'No se pudo subir el archivo. ¿Ya se corrió erp_crm.sql (crea el espacio de archivos)?' }
+  return { path, error: null }
+}
+export async function expedienteUrl(path: string, seconds = 300): Promise<string | null> {
+  const { data } = await supabase.storage.from('expedientes').createSignedUrl(path, seconds)
+  return data?.signedUrl ?? null
+}
+export async function removeExpedienteFile(path: string) {
+  await supabase.storage.from('expedientes').remove([path])
 }
 
 export function csvDownload(name: string, rows: (string | number)[][]) {

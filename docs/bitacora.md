@@ -485,3 +485,18 @@ lista baje sola para que el último lugar (ej. el #100) también vea su nombre.
 - Pruebas: finanzas 74, ERP 67, billing 37, clases 51. UI revisada en local con el Supabase falso.
 - Falta: Run de `erp_finanzas.sql` en producción.
 
+
+## 2026-10-23 — CRM: responsivas, documentos, acceso, empleados, estados financieros, correos automáticos, bitácora
+
+El dueño pidió una lista de funciones al estilo EVO (guardada en la memoria 'pendientes del ERP'). Nuevo `src/supabase/erp_crm.sql` (después de erp_finanzas.sql):
+- **Domiciliación:** en la ficha, 'Cargos próximos' (6 meses con la promo congelada) e historial de cada intento (aprobado / rechazado con código, tarjeta registrada).
+- **Bitácora** (/staff/bitacora, admin): todo lo que registra erp_audit, más movimientos de inventario y entradas; ventas por persona del staff; CSV.
+- **Responsiva y reglamento electrónicos:** versionados e inmutables. Se firma con el dedo en la tablet (ficha → 'Firmar en esta tablet') o desde la cuenta del cliente (/firmar). Si es menor, pide tutor. Hoja imprimible /staff/firma/:id. Los textos iniciales son BORRADOR. Configuración → Responsiva y reglamento.
+- **Archivos en la ficha:** bucket privado 'expedientes' de Supabase Storage (lo crea el SQL), solo staff; INE, papeles, foto.
+- **Acceso** (/staff/acceso): check-in por QR (código JM…) o por nombre. La regla de entrada es membresía, pase o clase hoy + documentos firmados + no bloqueado. Se puede 'dejar pasar' con motivo, bloquear y regenerar el código. QR del cliente en Mi cuenta, foto en la ficha. Tabla access_devices + device_check_in para el torniquete (Edge Function futura).
+- **Empleados** (/staff/empleados, admin): ficha completa, documentos, pagos de nómina que quedan como egreso (categoría Nómina), ventas del mes si tiene usuario.
+- **Estados financieros** (/staff/estados, admin): estado de resultados (ingresos por tipo, costo de lo vendido, gastos por centro, utilidad) y flujo de efectivo por mes, posición actual (inventario, por pagar, caja, socios, MRR). CSV.
+- **Correos automáticos** (Configuración → Correos automáticos): bienvenida, cumpleaños, por vencer, vencida, inactivo. TODOS APAGADOS. Vista previa y 'mandarme una prueba' (solo al admin). Edge Function `crm-emails` + `erp_crm_cron.sql` (diario 10:00, reusa la llave del cron de cobros).
+- Pruebas: CRM 64 + render de correo 6, sin regresiones (finanzas 74, ERP 67, billing 37, clases 51). UI revisada en local: firma de menor con tutor, hoja imprimible, check-in negado por falta de membresía.
+- Pendiente: Run erp_crm.sql, desplegar crm-emails (Verify JWT off), Run erp_crm_cron.sql.
+

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
+import QRCode from 'react-qr-code'
 import { call, money, fmtDate, scheduleLabel, subscriptionLink } from '../lib/erp'
 
 // Portal del cliente dentro de "Mi cuenta": membresía, domiciliación,
@@ -19,7 +20,10 @@ export default function MyMembership() {
   const [p, setP] = useState<Portal | null>(null)
   const [busy, setBusy] = useState<string | null>(null)
 
+  const [access, setAccess] = useState<{ access_code: string; pending_documents: { title: string }[] } | null>(null)
+  const [showQr, setShowQr] = useState(false)
   useEffect(() => { call<Portal>('get_my_portal').then(({ data }) => setP(data ?? null)) }, [])
+  useEffect(() => { call<{ access_code: string; pending_documents: { title: string }[] }>('get_my_access').then(({ data }) => setAccess(data?.access_code ? data : null)) }, [])
 
   const updateCard = async (id: string) => {
     setBusy(id)
@@ -31,6 +35,12 @@ export default function MyMembership() {
   if (!p) return null
   return (
     <div className="space-y-3">
+      {access && access.pending_documents.length > 0 && (
+        <Link to="/firmar" className="block bg-amarillo-suave/10 border border-amarillo-suave/60 rounded-2xl p-4">
+          <p className="text-amarillo-suave font-bold">Firma tu responsiva y el reglamento</p>
+          <p className="text-zinc-300 text-sm">Es necesario para poder escalar. Toma 2 minutos → </p>
+        </Link>
+      )}
       <p className="text-zinc-500 text-[11px] font-bold uppercase tracking-widest">Mi membresía</p>
       <div className="bg-superficie rounded-2xl border border-zinc-800/60 p-4 space-y-1">
         {p.membership_until ? (
@@ -61,6 +71,22 @@ export default function MyMembership() {
           </button>
         </div>
       ))}
+
+      {access && (
+        <div className="bg-superficie rounded-2xl border border-zinc-800/60 p-4">
+          <button onClick={() => setShowQr(v => !v)} className="w-full flex items-center justify-between">
+            <span className="text-texto-principal font-semibold text-sm">Mi código de entrada (QR)</span>
+            <span className="text-zinc-500 text-sm">{showQr ? 'Ocultar' : 'Mostrar'}</span>
+          </button>
+          {showQr && (
+            <div className="mt-3 flex flex-col items-center gap-2">
+              <div className="bg-white p-3 rounded-xl"><QRCode value={access.access_code} size={180} /></div>
+              <p className="text-zinc-400 text-xs font-mono">{access.access_code}</p>
+              <p className="text-zinc-500 text-xs text-center">Muéstralo en recepción al llegar.</p>
+            </div>
+          )}
+        </div>
+      )}
 
       <Link to="/clases" className="flex items-center justify-between px-4 py-3.5 bg-superficie border border-zinc-800/60 rounded-2xl hover:border-zinc-700">
         <span className="text-texto-principal font-semibold text-sm">Mis clases y reservas</span>

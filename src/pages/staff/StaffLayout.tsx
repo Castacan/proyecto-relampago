@@ -35,6 +35,11 @@ const ICONS: Record<string, string> = {
   shield: 'M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z',
   eye: 'M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8zM12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z',
   wallet: 'M20 7H5a2 2 0 0 1 0-4h13v4M3 5v14a2 2 0 0 0 2 2h15V7M16 14h.01',
+  door: 'M3 21h18M6 21V3h12v18M14 12h.01',
+  badge: 'M16 7a4 4 0 1 1-8 0 4 4 0 0 1 8 0zM4 21v-1a6 6 0 0 1 12 0v1M18 8h4M20 6v4',
+  list: 'M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01',
+  file: 'M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8zM14 2v6h6M9 15l2 2 4-4',
+  mail: 'M4 4h16v16H4zM22 6l-10 7L2 6',
   chevron: 'M6 9l6 6 6-6',
   menu: 'M3 6h18M3 12h18M3 18h18',
   collapse: 'M15 18l-6-6 6-6',
@@ -68,6 +73,7 @@ export default function StaffLayout() {
 
   const groups: Group[] = [
     { id: 'clientes', label: 'Clientes', icon: 'users', items: [
+      { to: '/staff/acceso', label: 'Acceso (recepción)', icon: 'door' },
       { to: '/staff/personas', label: 'Personas', icon: 'users' },
       { to: '/staff/domiciliaciones', label: 'Domiciliaciones', icon: 'repeat' },
     ] },
@@ -80,6 +86,11 @@ export default function StaffLayout() {
     { id: 'finanzas', label: 'Finanzas', icon: 'chart', items: [
       { to: '/staff/egresos', label: 'Egresos', icon: 'wallet', show: isAdmin },
       { to: '/staff/reportes', label: 'Reporte del mes', icon: 'chart' },
+      { to: '/staff/estados', label: 'Estados financieros', icon: 'receipt', show: isAdmin },
+    ] },
+    { id: 'equipo', label: 'Equipo', icon: 'users', items: [
+      { to: '/staff/empleados', label: 'Empleados', icon: 'badge', show: isAdmin },
+      { to: '/staff/bitacora', label: 'Bitácora', icon: 'list', show: isAdmin },
     ] },
     { id: 'clases', label: 'Clases', icon: 'calendar', items: [
       { to: '/staff/clases', label: 'Clases y reservas', icon: 'calendar' },
@@ -99,6 +110,8 @@ export default function StaffLayout() {
     { id: 'config', label: 'Configuración', icon: 'settings', items: [
       { to: '/staff/config/productos', label: 'Productos y planes', icon: 'box', show: isAdmin },
       { to: '/staff/config/integraciones', label: 'Integraciones y pagos', icon: 'plug', show: isAdmin },
+      { to: '/staff/config/documentos', label: 'Responsiva y reglamento', icon: 'file', show: isAdmin },
+      { to: '/staff/config/correos', label: 'Correos automáticos', icon: 'mail', show: isAdmin },
       { to: '/staff/config/general', label: 'Ajustes generales', icon: 'sliders', show: isAdmin },
       { to: '/staff/admin', label: 'Admin del muro', icon: 'shield', show: isAdmin },
     ] },

@@ -36,6 +36,13 @@ import { SalesHistoryPage, ReportPage } from './pages/staff/erp/SalesPage'
 import SubscriptionsPage from './pages/staff/erp/SubscriptionsPage'
 import ExpensesPage from './pages/staff/erp/ExpensesPage'
 import InventoryPage from './pages/staff/erp/InventoryPage'
+import AccessPage from './pages/staff/erp/AccessPage'
+import AuditPage from './pages/staff/erp/AuditPage'
+import EmployeesPage from './pages/staff/erp/EmployeesPage'
+import StatementsPage from './pages/staff/erp/StatementsPage'
+import SignaturePage from './pages/staff/erp/SignaturePage'
+import { EmailsConfigPage, LegalDocsConfigPage } from './pages/staff/erp/CrmConfigPages'
+import MyDocumentsPage from './pages/public/MyDocumentsPage'
 import { ProductsConfigPage, IntegrationsPage, GeneralSettingsPage } from './pages/staff/erp/ConfigPages'
 import SubscriptionSetupPage from './pages/public/SubscriptionSetupPage'
 import NotFoundPage from './pages/public/NotFoundPage'
@@ -66,6 +73,8 @@ export default function App() {
         <Route path="/competencia/consulta" element={<CompetitionLookupPage />} />
         <Route path="/clases" element={<ClassesPage />} />
         <Route path="/domiciliacion/:token" element={<SubscriptionSetupPage />} />
+        <Route path="/firmar" element={<MyDocumentsPage />} />
+        <Route path="/staff/firma/:id" element={<ProtectedRoute><SignaturePage /></ProtectedRoute>} />
         <Route
           path="/staff"
           element={
@@ -95,6 +104,12 @@ export default function App() {
           <Route path="reportes" element={<ErrorBoundary label="Reportes"><ReportPage /></ErrorBoundary>} />
           <Route path="egresos" element={<ErrorBoundary label="Egresos"><ExpensesPage /></ErrorBoundary>} />
           <Route path="inventario" element={<ErrorBoundary label="Inventario"><InventoryPage /></ErrorBoundary>} />
+          <Route path="acceso" element={<ErrorBoundary label="Acceso"><AccessPage /></ErrorBoundary>} />
+          <Route path="bitacora" element={<ErrorBoundary label="Bitácora"><AuditPage /></ErrorBoundary>} />
+          <Route path="empleados" element={<ErrorBoundary label="Empleados"><EmployeesPage /></ErrorBoundary>} />
+          <Route path="estados" element={<ErrorBoundary label="Estados financieros"><StatementsPage /></ErrorBoundary>} />
+          <Route path="config/correos" element={<ErrorBoundary label="Correos"><EmailsConfigPage /></ErrorBoundary>} />
+          <Route path="config/documentos" element={<ErrorBoundary label="Documentos"><LegalDocsConfigPage /></ErrorBoundary>} />
           <Route path="domiciliaciones" element={<ErrorBoundary label="Domiciliaciones"><SubscriptionsPage /></ErrorBoundary>} />
           <Route path="config/productos" element={<ErrorBoundary label="Productos"><ProductsConfigPage /></ErrorBoundary>} />
           <Route path="config/integraciones" element={<ErrorBoundary label="Integraciones"><IntegrationsPage /></ErrorBoundary>} />
