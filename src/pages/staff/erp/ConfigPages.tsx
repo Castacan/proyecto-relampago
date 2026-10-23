@@ -191,6 +191,14 @@ export function IntegrationsPage() {
   }
   const runTest = async (provider: string) => {
     setTest(t => ({ ...t, [provider]: 'Probando…' }))
+    // La prueba lee lo guardado: si hay cambios sin guardar, se guardan primero.
+    const saved = { recurring_provider: intg?.recurring_provider ?? '', openpay_merchant_id: intg?.openpay_merchant_id ?? '',
+      openpay_public_key: intg?.openpay_public_key ?? '', openpay_sandbox: intg?.openpay_sandbox ?? true, stripe_publishable_key: intg?.stripe_publishable_key ?? '' }
+    if (JSON.stringify(saved) !== JSON.stringify(f)) {
+      const { error } = await call('admin_update_integrations', { p_patch: f })
+      if (error) { setTest(t => ({ ...t, [provider]: `✗ ${erpError(error)}` })); return }
+      await load()
+    }
     const { data } = await billing<{ ok: boolean; message: string }>({ action: 'test_connection', provider })
     setTest(t => ({ ...t, [provider]: data ? `${data.ok ? '✓' : '✗'} ${data.message}` : 'No se pudo probar (¿función "billing" desplegada?)' }))
   }
