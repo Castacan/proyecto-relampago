@@ -5,6 +5,7 @@ import { useAuth } from '../../lib/auth'
 import { useClimber } from '../../hooks/useClimber'
 import { getColorHex } from '../../lib/colors'
 import ClimberAuthSheet from '../../components/ClimberAuthSheet'
+import MyMembership from '../../components/MyMembership'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const db = supabase as unknown as any
@@ -159,6 +160,8 @@ export default function MyAccountPage() {
       </div>
 
       <div className="flex-1 max-w-md mx-auto w-full px-5 py-6 space-y-6">
+
+        <MyMembership />
 
         <Link
           to="/spraywall"

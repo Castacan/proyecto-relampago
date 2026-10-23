@@ -437,3 +437,23 @@ lista baje sola para que el último lugar (ej. el #100) también vea su nombre.
   falso (perfil, reservar, panel, walk-in, asistencia, cobro, config).
 - Falta: Run del SQL y crear/desplegar la función `class-emails`
   (Verify JWT apagado). Fase 1b pendiente: Clip, recordatorios, reportes.
+
+## 2026-10-23 — ERP completo (ventas, caja, ficha, domiciliación) — código listo, falta desplegar
+- El dueño pidió construir todo sin detenerse y revisar al final. Decisiones
+  suyas: Domiciliación $800/mes con promo 3 meses a $600 (temporal, debe poder
+  apagarse); sin migrar clientes de EVO todavía; sin Membresía Parejas; caja al
+  empezar y terminar el día; menú lateral tipo EVO; cobro recurrente con
+  Openpay **y** Stripe configurables en un área de Integraciones; poder ver la
+  app como cliente.
+- SQL `src/supabase/erp.sql` (+ `erp_cron.sql`), Edge Function `billing`,
+  menú lateral nuevo (`StaffLayout`), pantallas en `src/pages/staff/erp/*`,
+  página pública `/domiciliacion/:token`, portal del cliente en `/mi-cuenta`.
+- Pruebas: PGlite (ERP 67 casos, clases 51) y la función `billing` contra
+  Openpay/Stripe/Resend simulados (36 casos: promo, rechazos, reintentos,
+  timeouts con y sin cargo real, duplicados, corridas simultáneas, webhooks,
+  3DS). UI revisada en local con Supabase falso (caja, venta con cambio,
+  ficha, domiciliar, link de tarjeta, integraciones, productos).
+- Bug arreglado en el camino: el formulario de Openpay fallaba si la página
+  cargaba los scripts dos veces (modo desarrollo); ahora cada script se carga
+  una vez y todos esperan la misma carga.
+- Guía de despliegue y decisiones a revisar: `docs/erp-despliegue.md`.

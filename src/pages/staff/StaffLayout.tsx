@@ -1,215 +1,197 @@
-import { Outlet, NavLink } from 'react-router-dom'
+import { useEffect, useState } from 'react'
+import { Outlet, NavLink, useLocation } from 'react-router-dom'
 import { signOut } from '../../lib/auth'
 import { useProfile } from '../../hooks/useProfile'
 import { isOwner } from '../../lib/owner'
 import logoHorizontal from '../../assets/logo-horizontal.png'
 
+// Menú lateral desplegable por secciones (como el de EVO). En pantallas
+// grandes queda fijo a la izquierda y se puede encoger a solo íconos; en el
+// celular se abre con el botón ☰. Las secciones abiertas se recuerdan.
+
+interface Item { to: string; label: string; icon: string; end?: boolean; show?: boolean; external?: boolean }
+interface Group { id: string; label: string; icon: string; items: Item[] }
+
+const ICONS: Record<string, string> = {
+  home: 'M3 11l9-7 9 7v9a2 2 0 0 1-2 2h-4v-6H9v6H5a2 2 0 0 1-2-2z',
+  users: 'M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75',
+  repeat: 'M17 1l4 4-4 4M3 11V9a4 4 0 0 1 4-4h14M7 23l-4-4 4-4M21 13v2a4 4 0 0 1-4 4H3',
+  cart: 'M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4zM3 6h18M16 10a4 4 0 0 1-8 0',
+  cash: 'M2 7h20v10H2zM12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM6 7v10M18 7v10',
+  receipt: 'M4 2v20l3-2 3 2 3-2 3 2 3-2 1 .7V2l-3 2-3-2-3 2-3-2-3 2zM8 8h8M8 12h8M8 16h5',
+  chart: 'M3 3v18h18M7 15l4-4 3 3 5-6',
+  calendar: 'M3 4h18v18H3zM16 2v4M8 2v4M3 10h18',
+  wall: 'M3 3h7v7H3zM14 3h7v7h-7zM14 14h7v7h-7zM3 14h7v7H3z',
+  qr: 'M3 3h6v6H3zM15 3h6v6h-6zM3 15h6v6H3zM15 15h2v2h-2zM19 19h2v2h-2zM15 19h2v2h-2zM19 15h2v2h-2z',
+  spray: 'M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zM9 9h.01M15 9h.01M8 14s1.5 2 4 2 4-2 4-2',
+  check: 'M9 11l3 3L22 4M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11',
+  bulb: 'M9 18h6M10 22h4M12 2a7 7 0 0 0-4 12.7V17h8v-2.3A7 7 0 0 0 12 2z',
+  tv: 'M2 7h20v13H2zM17 2l-5 5-5-5',
+  trophy: 'M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0V4zM17 5h3v2a3 3 0 0 1-3 3M7 5H4v2a3 3 0 0 0 3 3',
+  settings: 'M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68 1.65 1.65 0 0 0 10 3.17V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z',
+  box: 'M21 16V8l-9-5-9 5v8l9 5 9-5zM3.3 7L12 12l8.7-5M12 22V12',
+  plug: 'M9 2v6M15 2v6M6 8h12v4a6 6 0 0 1-12 0V8zM12 18v4',
+  sliders: 'M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M1 14h6M9 8h6M17 16h6',
+  shield: 'M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z',
+  eye: 'M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8zM12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z',
+  chevron: 'M6 9l6 6 6-6',
+  menu: 'M3 6h18M3 12h18M3 18h18',
+  collapse: 'M15 18l-6-6 6-6',
+}
+
+function Icon({ name, size = 18 }: { name: string; size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="shrink-0">
+      <path d={ICONS[name] ?? ICONS.home} />
+    </svg>
+  )
+}
+
+const OPEN_KEY = 'staff-menu-open'
+const COMPACT_KEY = 'staff-menu-compact'
+function readJson<T>(key: string, fallback: T): T {
+  try { const v = localStorage.getItem(key); return v ? JSON.parse(v) as T : fallback } catch { return fallback }
+}
+function writeJson(key: string, v: unknown) { try { localStorage.setItem(key, JSON.stringify(v)) } catch { /* sin almacenamiento */ } }
+
 export default function StaffLayout() {
   const { profile, email } = useProfile()
   const isAdmin = profile?.role === 'admin'
   const showInsights = isAdmin && isOwner(email)
+  const location = useLocation()
+  const [mobileOpen, setMobileOpen] = useState(false)
+  const [compact, setCompact] = useState<boolean>(() => readJson(COMPACT_KEY, false))
+  const [open, setOpen] = useState<Record<string, boolean>>(() => readJson(OPEN_KEY, { clientes: true, ventas: true, clases: true, muro: true }))
+
+  useEffect(() => { setMobileOpen(false) }, [location.pathname])
+
+  const groups: Group[] = [
+    { id: 'clientes', label: 'Clientes', icon: 'users', items: [
+      { to: '/staff/personas', label: 'Personas', icon: 'users' },
+      { to: '/staff/domiciliaciones', label: 'Domiciliaciones', icon: 'repeat' },
+    ] },
+    { id: 'ventas', label: 'Ventas', icon: 'cart', items: [
+      { to: '/staff/vender', label: 'Vender', icon: 'cart' },
+      { to: '/staff/caja', label: 'Caja', icon: 'cash' },
+      { to: '/staff/ventas', label: 'Historial de ventas', icon: 'receipt' },
+      { to: '/staff/reportes', label: 'Reporte del mes', icon: 'chart' },
+    ] },
+    { id: 'clases', label: 'Clases', icon: 'calendar', items: [
+      { to: '/staff/clases', label: 'Clases y reservas', icon: 'calendar' },
+    ] },
+    { id: 'muro', label: 'Muro', icon: 'wall', items: [
+      { to: '/staff', label: 'Muro', icon: 'wall', end: true },
+      { to: '/staff/qr', label: 'QRs', icon: 'qr' },
+      { to: '/staff/spraywall', label: 'Spraywall', icon: 'spray' },
+      { to: '/staff/sends', label: 'Envíos', icon: 'check', show: isAdmin },
+      { to: '/staff/stats', label: 'Stats', icon: 'chart', show: isAdmin },
+      { to: '/staff/insights', label: 'Insights', icon: 'bulb', show: showInsights },
+    ] },
+    { id: 'eventos', label: 'Pantalla y eventos', icon: 'tv', items: [
+      { to: '/staff/display', label: 'Pantalla (TV)', icon: 'tv', show: isAdmin },
+      { to: '/staff/competencia', label: 'Competencia', icon: 'trophy', show: isAdmin },
+    ] },
+    { id: 'config', label: 'Configuración', icon: 'settings', items: [
+      { to: '/staff/config/productos', label: 'Productos y planes', icon: 'box', show: isAdmin },
+      { to: '/staff/config/integraciones', label: 'Integraciones y pagos', icon: 'plug', show: isAdmin },
+      { to: '/staff/config/general', label: 'Ajustes generales', icon: 'sliders', show: isAdmin },
+      { to: '/staff/admin', label: 'Admin del muro', icon: 'shield', show: isAdmin },
+    ] },
+  ].map(g => ({ ...g, items: g.items.filter(i => i.show !== false) })).filter(g => g.items.length > 0)
+
+  const toggleGroup = (id: string) => {
+    const next = { ...open, [id]: !open[id] }
+    setOpen(next); writeJson(OPEN_KEY, next)
+  }
+  const toggleCompact = () => { setCompact(c => { writeJson(COMPACT_KEY, !c); return !c }) }
+
+  const linkClass = (isActive: boolean) =>
+    `flex items-center gap-3 rounded-xl px-3 py-2 text-sm font-semibold transition-all ${
+      isActive ? 'bg-primario text-texto-en-acento shadow-lg shadow-primario/20' : 'text-zinc-300 hover:bg-superficie-alta hover:text-texto-principal'}`
+
+  const nav = (isCompact: boolean) => (
+    <nav className="flex-1 overflow-y-auto overscroll-contain px-2 py-3 space-y-1">
+      <NavLink to="/staff/inicio" className={({ isActive }) => linkClass(isActive)} title="Inicio">
+        <Icon name="home" />{!isCompact && <span>Inicio</span>}
+      </NavLink>
+      {groups.map(g => (
+        <div key={g.id} className="pt-1">
+          {isCompact ? (
+            <div className="border-t border-zinc-800/80 mx-2 my-1" />
+          ) : (
+            <button onClick={() => toggleGroup(g.id)}
+              className="w-full flex items-center gap-2 px-3 py-1.5 text-[11px] font-bold uppercase tracking-widest text-zinc-500 hover:text-zinc-300">
+              <span className="flex-1 text-left">{g.label}</span>
+              <span className={`transition-transform ${open[g.id] ? '' : '-rotate-90'}`}><Icon name="chevron" size={14} /></span>
+            </button>
+          )}
+          {(isCompact || open[g.id]) && (
+            <div className="space-y-0.5">
+              {g.items.map(i => (
+                <NavLink key={i.to} to={i.to} end={i.end} title={i.label} className={({ isActive }) => linkClass(isActive)}>
+                  <Icon name={i.icon} />{!isCompact && <span className="truncate">{i.label}</span>}
+                </NavLink>
+              ))}
+            </div>
+          )}
+        </div>
+      ))}
+      <div className="pt-3">
+        <a href="/mi-cuenta" target="_blank" rel="noreferrer" title="Ver la app como cliente" className={linkClass(false)}>
+          <Icon name="eye" />{!isCompact && <span>Ver como cliente ↗</span>}
+        </a>
+      </div>
+    </nav>
+  )
 
   return (
-    <div className="h-screen bg-fondo flex flex-col overflow-hidden">
-      {/* Top header */}
-      <header className="shrink-0 flex items-center justify-between px-4 h-12 border-b border-zinc-800/60 bg-fondo/95 backdrop-blur-sm">
-        <div className="flex items-center gap-2">
-          <img src={logoHorizontal} alt="Jaibamuro" className="h-5 w-auto" />
-          <span className="text-zinc-600 text-[11px] font-medium bg-superficie-alta px-1.5 py-0.5 rounded-md ml-0.5">staff</span>
+    <div className="h-screen bg-fondo flex overflow-hidden">
+      {/* Menú fijo (pantallas grandes) */}
+      <aside className={`hidden lg:flex flex-col shrink-0 border-r border-zinc-800/60 bg-fondo transition-all ${compact ? 'w-16' : 'w-60'}`}>
+        <div className="h-12 flex items-center gap-2 px-3 border-b border-zinc-800/60">
+          {!compact && <img src={logoHorizontal} alt="Jaibamuro" className="h-5 w-auto" />}
+          <button onClick={toggleCompact} title={compact ? 'Expandir menú' : 'Encoger menú'}
+            className={`text-zinc-400 hover:text-texto-principal p-1.5 rounded-lg hover:bg-superficie-alta ${compact ? 'mx-auto rotate-180' : 'ml-auto'}`}>
+            <Icon name="collapse" />
+          </button>
         </div>
-        <button
-          onClick={signOut}
-          className="text-zinc-400 hover:text-texto-principal text-xs font-semibold px-3 py-1.5 rounded-lg bg-superficie-alta/80 hover:bg-superficie-alta-hover border border-zinc-700/50 transition-all"
-        >
-          Salir
-        </button>
-      </header>
+        {nav(compact)}
+        <div className="border-t border-zinc-800/60 p-2">
+          <button onClick={signOut} className={`w-full text-zinc-400 hover:text-texto-principal text-xs font-semibold px-3 py-2 rounded-lg hover:bg-superficie-alta ${compact ? 'text-center' : 'text-left'}`}>
+            {compact ? '⏻' : `Salir${profile?.name ? ` · ${profile.name}` : ''}`}
+          </button>
+        </div>
+      </aside>
 
-      {/* Main content */}
-      <main className="flex-1 overflow-hidden min-h-0 pb-16">
-        <Outlet />
-      </main>
-
-      {/* Bottom tab bar */}
-      <nav className="fixed bottom-0 left-0 right-0 h-16 bg-fondo border-t border-zinc-800 flex items-center gap-2 px-4 overflow-x-auto overscroll-x-contain z-40">
-        <NavLink to="/staff" end className="shrink-0 flex justify-center">
-          {({ isActive }) => (
-            <div className={`flex items-center gap-2 px-6 py-2.5 rounded-2xl transition-all text-sm font-bold whitespace-nowrap ${
-              isActive
-                ? 'bg-primario text-texto-en-acento shadow-lg shadow-primario/25'
-                : 'bg-superficie-alta text-zinc-300 hover:bg-superficie-alta-hover hover:text-texto-principal border border-zinc-700'
-            }`}>
-              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={isActive ? 2.5 : 2} strokeLinecap="round" strokeLinejoin="round">
-                <rect x="3" y="3" width="7" height="7" rx="1.5" />
-                <rect x="14" y="3" width="7" height="7" rx="1.5" />
-                <rect x="3" y="14" width="7" height="7" rx="1.5" />
-                <rect x="14" y="14" width="7" height="7" rx="1.5" />
-              </svg>
-              <span>Muro</span>
+      {/* Menú del celular */}
+      {mobileOpen && (
+        <div className="lg:hidden fixed inset-0 z-50 flex">
+          <div className="w-72 max-w-[85vw] bg-fondo border-r border-zinc-800 flex flex-col">
+            <div className="h-12 flex items-center justify-between px-4 border-b border-zinc-800/60">
+              <img src={logoHorizontal} alt="Jaibamuro" className="h-5 w-auto" />
+              <button onClick={() => setMobileOpen(false)} className="text-zinc-400 text-xl px-2">×</button>
             </div>
-          )}
-        </NavLink>
-
-        <NavLink to="/staff/qr" className="shrink-0 flex justify-center">
-          {({ isActive }) => (
-            <div className={`flex items-center gap-2 px-6 py-2.5 rounded-2xl transition-all text-sm font-bold whitespace-nowrap ${
-              isActive
-                ? 'bg-primario text-texto-en-acento shadow-lg shadow-primario/25'
-                : 'bg-superficie-alta text-zinc-300 hover:bg-superficie-alta-hover hover:text-texto-principal border border-zinc-700'
-            }`}>
-              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={isActive ? 2.5 : 2} strokeLinecap="round" strokeLinejoin="round">
-                <path d="M3 7V5a2 2 0 0 1 2-2h2" />
-                <path d="M17 3h2a2 2 0 0 1 2 2v2" />
-                <path d="M21 17v2a2 2 0 0 1-2 2h-2" />
-                <path d="M7 21H5a2 2 0 0 1-2-2v-2" />
-                <rect x="7" y="7" width="3" height="3" />
-                <rect x="14" y="7" width="3" height="3" />
-                <rect x="7" y="14" width="3" height="3" />
-                <path d="M14 14h3v3" />
-              </svg>
-              <span>QRs</span>
+            {nav(false)}
+            <div className="border-t border-zinc-800/60 p-2">
+              <button onClick={signOut} className="w-full text-left text-zinc-400 hover:text-texto-principal text-xs font-semibold px-3 py-2">Salir</button>
             </div>
-          )}
-        </NavLink>
+          </div>
+          <div className="flex-1 bg-black/60" onClick={() => setMobileOpen(false)} />
+        </div>
+      )}
 
-        <NavLink to="/staff/spraywall" className="shrink-0 flex justify-center">
-          {({ isActive }) => (
-            <div className={`flex items-center gap-2 px-6 py-2.5 rounded-2xl transition-all text-sm font-bold whitespace-nowrap ${
-              isActive
-                ? 'bg-primario text-texto-en-acento shadow-lg shadow-primario/25'
-                : 'bg-superficie-alta text-zinc-300 hover:bg-superficie-alta-hover hover:text-texto-principal border border-zinc-700'
-            }`}>
-              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={isActive ? 2.5 : 2} strokeLinecap="round" strokeLinejoin="round">
-                <circle cx="12" cy="12" r="9" />
-                <circle cx="9" cy="10" r="1.3" fill="currentColor" stroke="none" />
-                <circle cx="15" cy="8.5" r="1.3" fill="currentColor" stroke="none" />
-                <circle cx="14" cy="15" r="1.3" fill="currentColor" stroke="none" />
-              </svg>
-              <span>Spraywall</span>
-            </div>
-          )}
-        </NavLink>
-
-        {isAdmin && <NavLink to="/staff/stats" className="shrink-0 flex justify-center">
-          {({ isActive }) => (
-            <div className={`flex items-center gap-2 px-6 py-2.5 rounded-2xl transition-all text-sm font-bold whitespace-nowrap ${
-              isActive
-                ? 'bg-primario text-texto-en-acento shadow-lg shadow-primario/25'
-                : 'bg-superficie-alta text-zinc-300 hover:bg-superficie-alta-hover hover:text-texto-principal border border-zinc-700'
-            }`}>
-              <svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor">
-                <rect x="3" y="12" width="4" height="10" rx="1" />
-                <rect x="10" y="7" width="4" height="15" rx="1" />
-                <rect x="17" y="2" width="4" height="20" rx="1" />
-              </svg>
-              <span>Stats</span>
-            </div>
-          )}
-        </NavLink>}
-
-        {isAdmin && <NavLink to="/staff/sends" className="shrink-0 flex justify-center">
-          {({ isActive }) => (
-            <div className={`flex items-center gap-2 px-6 py-2.5 rounded-2xl transition-all text-sm font-bold whitespace-nowrap ${
-              isActive
-                ? 'bg-primario text-texto-en-acento shadow-lg shadow-primario/25'
-                : 'bg-superficie-alta text-zinc-300 hover:bg-superficie-alta-hover hover:text-texto-principal border border-zinc-700'
-            }`}>
-              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={isActive ? 2.5 : 2} strokeLinecap="round" strokeLinejoin="round">
-                <path d="M9 11l3 3L22 4" />
-                <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" />
-              </svg>
-              <span>Envíos</span>
-            </div>
-          )}
-        </NavLink>}
-
-        {showInsights && <NavLink to="/staff/insights" className="shrink-0 flex justify-center">
-          {({ isActive }) => (
-            <div className={`flex items-center gap-2 px-6 py-2.5 rounded-2xl transition-all text-sm font-bold whitespace-nowrap ${
-              isActive
-                ? 'bg-primario text-texto-en-acento shadow-lg shadow-primario/25'
-                : 'bg-superficie-alta text-zinc-300 hover:bg-superficie-alta-hover hover:text-texto-principal border border-zinc-700'
-            }`}>
-              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={isActive ? 2.5 : 2} strokeLinecap="round" strokeLinejoin="round">
-                <circle cx="12" cy="12" r="10" />
-                <path d="M12 8v4l3 2" />
-              </svg>
-              <span>Insights</span>
-            </div>
-          )}
-        </NavLink>}
-
-        {isAdmin && (
-          <NavLink to="/staff/admin" className="shrink-0 flex justify-center">
-            {({ isActive }) => (
-              <div className={`flex items-center gap-2 px-6 py-2.5 rounded-2xl transition-all text-sm font-bold whitespace-nowrap ${
-                isActive
-                  ? 'bg-primario text-texto-en-acento shadow-lg shadow-primario/25'
-                  : 'bg-superficie-alta text-zinc-300 hover:bg-superficie-alta-hover hover:text-texto-principal border border-zinc-700'
-              }`}>
-                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={isActive ? 2.5 : 2} strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M12 2a5 5 0 1 1 0 10A5 5 0 0 1 12 2z" />
-                  <path d="M12 14c-5.33 0-8 2.67-8 4v2h16v-2c0-1.33-2.67-4-8-4z" />
-                  <circle cx="19" cy="8" r="1.5" />
-                  <path d="M19 6v1.5M19 9.5V11M17.2 7l1.3.75M20.8 9.25l1.3.75M17.2 9.25l1.3-.75M20.8 7l1.3-.75" />
-                </svg>
-                <span>Admin</span>
-              </div>
-            )}
-          </NavLink>
-        )}
-
-        {isAdmin && (
-          <NavLink to="/staff/display" className="shrink-0 flex justify-center">
-            {({ isActive }) => (
-              <div className={`flex items-center gap-2 px-6 py-2.5 rounded-2xl transition-all text-sm font-bold whitespace-nowrap ${
-                isActive
-                  ? 'bg-primario text-texto-en-acento shadow-lg shadow-primario/25'
-                  : 'bg-superficie-alta text-zinc-300 hover:bg-superficie-alta-hover hover:text-texto-principal border border-zinc-700'
-              }`}>
-                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={isActive ? 2.5 : 2} strokeLinecap="round" strokeLinejoin="round">
-                  <rect x="2" y="4" width="20" height="13" rx="1.5" />
-                  <path d="M8 21h8M12 17v4" />
-                </svg>
-                <span>Display</span>
-              </div>
-            )}
-          </NavLink>
-        )}
-        <NavLink to="/staff/clases" className="shrink-0 flex justify-center">
-          {({ isActive }) => (
-            <div className={`flex items-center gap-2 px-6 py-2.5 rounded-2xl transition-all text-sm font-bold whitespace-nowrap ${
-              isActive
-                ? 'bg-primario text-texto-en-acento shadow-lg shadow-primario/25'
-                : 'bg-superficie-alta text-zinc-300 hover:bg-superficie-alta-hover hover:text-texto-principal border border-zinc-700'
-            }`}>
-              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={isActive ? 2.5 : 2} strokeLinecap="round" strokeLinejoin="round">
-                <rect x="3" y="4" width="18" height="18" rx="2" />
-                <path d="M16 2v4M8 2v4M3 10h18" />
-              </svg>
-              <span>Clases</span>
-            </div>
-          )}
-        </NavLink>
-        {isAdmin && (
-          <NavLink to="/staff/competencia" className="shrink-0 flex justify-center">
-            {({ isActive }) => (
-              <div className={`flex items-center gap-2 px-6 py-2.5 rounded-2xl transition-all text-sm font-bold whitespace-nowrap ${
-                isActive
-                  ? 'bg-primario text-texto-en-acento shadow-lg shadow-primario/25'
-                  : 'bg-superficie-alta text-zinc-300 hover:bg-superficie-alta-hover hover:text-texto-principal border border-zinc-700'
-              }`}>
-                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={isActive ? 2.5 : 2} strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M8 21h8M12 17v4" />
-                  <path d="M7 4h10v5a5 5 0 0 1-10 0V4z" />
-                  <path d="M17 5h3v2a3 3 0 0 1-3 3M7 5H4v2a3 3 0 0 0 3 3" />
-                </svg>
-                <span>Competencia</span>
-              </div>
-            )}
-          </NavLink>
-        )}
-      </nav>
+      <div className="flex-1 min-w-0 flex flex-col">
+        <header className="lg:hidden shrink-0 flex items-center gap-3 px-3 h-12 border-b border-zinc-800/60 bg-fondo/95">
+          <button onClick={() => setMobileOpen(true)} className="text-zinc-200 p-1.5 rounded-lg bg-superficie-alta border border-zinc-700/50" aria-label="Abrir menú">
+            <Icon name="menu" />
+          </button>
+          <img src={logoHorizontal} alt="Jaibamuro" className="h-5 w-auto" />
+          <span className="text-zinc-600 text-[11px] font-medium bg-superficie-alta px-1.5 py-0.5 rounded-md">staff</span>
+        </header>
+        <main className="flex-1 overflow-hidden min-h-0">
+          <Outlet />
+        </main>
+      </div>
     </div>
   )
 }

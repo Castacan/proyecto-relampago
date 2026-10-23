@@ -1537,6 +1537,50 @@ RETURNS JSONB LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $
 $function$;
 
 -- ------------------------------------------------------------
+-- Portal del cliente (Mi cuenta)
+-- ------------------------------------------------------------
+CREATE OR REPLACE FUNCTION public.get_my_portal()
+RETURNS JSONB LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = public AS $function$
+DECLARE
+  v_pid UUID := class_my_person_id();
+BEGIN
+  IF auth.uid() IS NULL THEN RETURN jsonb_build_object('error', 'not_logged_in'); END IF;
+  IF v_pid IS NULL THEN RETURN jsonb_build_object('person', NULL); END IF;
+  RETURN jsonb_build_object(
+    'person', (SELECT jsonb_build_object('full_name', full_name, 'phone', phone, 'email', email) FROM people WHERE id = v_pid),
+    'membership_until', erp_membership_until(v_pid),
+    'free_left_this_month', greatest((SELECT free_classes_per_month FROM class_settings WHERE id = 1) - class_free_used(v_pid, erp_today()), 0),
+    'subscriptions', coalesce((
+      SELECT jsonb_agg(jsonb_build_object('id', s.id, 'status', s.status, 'product_name', pr.name, 'price_cents', s.price_cents,
+        'promo_cycles', s.promo_cycles, 'promo_price_cents', s.promo_price_cents, 'cycles_paid', s.cycles_paid,
+        'next_charge_on', s.next_charge_on, 'next_amount_cents', erp_cycle_amount(s, s.cycles_paid + 1),
+        'card_brand', s.card_brand, 'card_last4', s.card_last4, 'cancel_at_period_end', s.cancel_at_period_end,
+        'last_error', CASE WHEN s.status = 'past_due' THEN s.last_error END) ORDER BY s.created_at DESC)
+      FROM subscriptions s JOIN products pr ON pr.id = s.product_id WHERE s.person_id = v_pid AND s.status <> 'cancelled'), '[]'::jsonb),
+    'sales', coalesce((
+      SELECT jsonb_agg(jsonb_build_object('folio', s.folio, 'created_at', s.created_at, 'total_cents', s.total_cents,
+        'items', (SELECT string_agg(i.description, ', ') FROM sale_items i WHERE i.sale_id = s.id)) ORDER BY s.created_at DESC)
+      FROM (SELECT * FROM sales WHERE person_id = v_pid AND status = 'completed' ORDER BY created_at DESC LIMIT 20) s), '[]'::jsonb)
+  );
+END;
+$function$;
+
+-- El cliente pide su propio link para cambiar la tarjeta.
+CREATE OR REPLACE FUNCTION public.my_subscription_link(p_subscription_id UUID)
+RETURNS JSONB LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $function$
+DECLARE
+  v_token TEXT;
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM subscriptions WHERE id = p_subscription_id AND person_id = class_my_person_id()
+                 AND status IN ('pending_card','active','past_due')) THEN
+    RETURN jsonb_build_object('error', 'not_found');
+  END IF;
+  v_token := billing_issue_link(p_subscription_id);
+  RETURN jsonb_build_object('success', true, 'token', v_token);
+END;
+$function$;
+
+-- ------------------------------------------------------------
 -- Inicio (tablero del staff)
 -- ------------------------------------------------------------
 CREATE OR REPLACE FUNCTION public.get_staff_dashboard()
@@ -1606,7 +1650,7 @@ BEGIN
     'admin_register_sale(uuid,uuid,date,integer,text,text)',
     'admin_create_subscription(uuid,uuid,date,boolean)', 'admin_subscription_link(uuid)',
     'admin_cancel_subscription(uuid,boolean,text)', 'admin_resume_subscription(uuid)', 'get_subscriptions_admin()',
-    'get_staff_dashboard()'
+    'get_staff_dashboard()', 'get_my_portal()', 'my_subscription_link(uuid)'
   ] LOOP
     EXECUTE format('REVOKE ALL ON FUNCTION public.%s FROM PUBLIC, anon', f);
     EXECUTE format('GRANT EXECUTE ON FUNCTION public.%s TO authenticated', f);

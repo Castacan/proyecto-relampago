@@ -27,6 +27,15 @@ import CompetitionLookupPage from './pages/public/CompetitionLookupPage'
 import CompetitionAdminPage from './pages/staff/CompetitionAdminPage'
 import ClassesPage from './pages/public/ClassesPage'
 import ClassesAdminPage from './pages/staff/ClassesAdminPage'
+import HomePage from './pages/staff/erp/HomePage'
+import PeoplePage from './pages/staff/erp/PeoplePage'
+import PersonProfilePage from './pages/staff/erp/PersonProfilePage'
+import PosPage from './pages/staff/erp/PosPage'
+import CashPage from './pages/staff/erp/CashPage'
+import { SalesHistoryPage, ReportPage } from './pages/staff/erp/SalesPage'
+import SubscriptionsPage from './pages/staff/erp/SubscriptionsPage'
+import { ProductsConfigPage, IntegrationsPage, GeneralSettingsPage } from './pages/staff/erp/ConfigPages'
+import SubscriptionSetupPage from './pages/public/SubscriptionSetupPage'
 import NotFoundPage from './pages/public/NotFoundPage'
 import { useAuth } from './lib/auth'
 
@@ -54,6 +63,7 @@ export default function App() {
         <Route path="/competencia" element={<CompetitionPage />} />
         <Route path="/competencia/consulta" element={<CompetitionLookupPage />} />
         <Route path="/clases" element={<ClassesPage />} />
+        <Route path="/domiciliacion/:token" element={<SubscriptionSetupPage />} />
         <Route
           path="/staff"
           element={
@@ -74,6 +84,17 @@ export default function App() {
           <Route path="display" element={<ErrorBoundary label="Display"><DisplayAdminPage /></ErrorBoundary>} />
           <Route path="competencia" element={<ErrorBoundary label="Competencia"><CompetitionAdminPage /></ErrorBoundary>} />
           <Route path="clases" element={<ErrorBoundary label="Clases"><ClassesAdminPage /></ErrorBoundary>} />
+          <Route path="inicio" element={<ErrorBoundary label="Inicio"><HomePage /></ErrorBoundary>} />
+          <Route path="personas" element={<ErrorBoundary label="Personas"><PeoplePage /></ErrorBoundary>} />
+          <Route path="personas/:id" element={<ErrorBoundary label="Ficha"><PersonProfilePage /></ErrorBoundary>} />
+          <Route path="vender" element={<ErrorBoundary label="Vender"><PosPage /></ErrorBoundary>} />
+          <Route path="caja" element={<ErrorBoundary label="Caja"><CashPage /></ErrorBoundary>} />
+          <Route path="ventas" element={<ErrorBoundary label="Ventas"><SalesHistoryPage /></ErrorBoundary>} />
+          <Route path="reportes" element={<ErrorBoundary label="Reportes"><ReportPage /></ErrorBoundary>} />
+          <Route path="domiciliaciones" element={<ErrorBoundary label="Domiciliaciones"><SubscriptionsPage /></ErrorBoundary>} />
+          <Route path="config/productos" element={<ErrorBoundary label="Productos"><ProductsConfigPage /></ErrorBoundary>} />
+          <Route path="config/integraciones" element={<ErrorBoundary label="Integraciones"><IntegrationsPage /></ErrorBoundary>} />
+          <Route path="config/general" element={<ErrorBoundary label="Ajustes"><GeneralSettingsPage /></ErrorBoundary>} />
         </Route>
         <Route path="/" element={<HubPage />} />
         <Route path="*" element={<NotFoundPage />} />
