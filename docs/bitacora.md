@@ -466,3 +466,11 @@ lista baje sola para que el último lugar (ej. el #100) también vea su nombre.
 - Quedó una función de ejemplo `rapid-worker` (Deploy antes de pegar el código); hay que borrarla.
 - Pendiente: Integraciones (ID de comercio y llave pública de sandbox), webhook de sandbox, prueba con la tarjeta 4111. Falta confirmar si el comercio de Openpay de EVO es del dueño (dashboard de producción).
 
+
+### Primer cobro real en sandbox (2026-10-23)
+
+- Conectado a Openpay sandbox (Integraciones OK, webhook verificado).
+- Bug real: Openpay exige `device_session_id` también al cobrar (error 1001). El simulador no lo pedía. Arreglo: `subscriptions.provider_device_session` + `billing_save_device_session` (parche `erp_patch_device_session.sql`, ya corrido), y el cobro lo manda. El simulador ahora también lo exige (billing 37 OK).
+- Después de registrar la tarjeta otra vez: cobro 1 pagado en el intento 2, venta #1 por $600, membresía del 23 oct al 22 nov, próximo cobro el 23 nov. En Openpay sandbox aparece exactamente 1 transacción Visa de $600.
+- La persona de prueba 'Test' usa test@falso.com: el recibo se mandó a un correo falso.
+
