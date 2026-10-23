@@ -238,6 +238,9 @@ CREATE TABLE IF NOT EXISTS public.subscriptions (
   created_at           TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at           TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+-- Openpay exige el device_session_id (antifraude) también al cobrar: se guarda
+-- el del registro de la tarjeta y se reusa en los cobros mensuales.
+ALTER TABLE public.subscriptions ADD COLUMN IF NOT EXISTS provider_device_session TEXT;
 CREATE UNIQUE INDEX IF NOT EXISTS subscriptions_one_live
   ON public.subscriptions (person_id, product_id) WHERE status IN ('pending_card','active','past_due');
 
@@ -1348,6 +1351,11 @@ BEGIN
 END;
 $function$;
 
+CREATE OR REPLACE FUNCTION public.billing_save_device_session(p_subscription_id UUID, p_device_session TEXT)
+RETURNS VOID LANGUAGE sql SECURITY DEFINER SET search_path = public AS $function$
+  UPDATE subscriptions SET provider_device_session = NULLIF(p_device_session, ''), updated_at = now() WHERE id = p_subscription_id;
+$function$;
+
 -- Asegura el registro del siguiente ciclo y lo aparta para cobrar.
 -- p_subscription_id NULL = todas las que tocan hoy; con id = "cobrar ahora"
 -- (ignora la espera entre reintentos, nunca la de un cobro en curso).
@@ -1663,7 +1671,7 @@ BEGIN
     'billing_context_by_token(text)', 'billing_save_customer(uuid,text)', 'billing_attach_card(uuid,text,text,text,text)',
     'billing_claim_due(integer,uuid)', 'billing_record_result(uuid,text,text,text,text,text,jsonb)',
     'billing_release_attempt(uuid,text,text)', 'billing_log(text,text,jsonb)', 'billing_charge_by_provider_id(text)',
-    'billing_issue_link(uuid)', 'billing_charge_by_id(uuid)'
+    'billing_issue_link(uuid)', 'billing_charge_by_id(uuid)', 'billing_save_device_session(uuid,text)'
   ] LOOP
     EXECUTE format('REVOKE ALL ON FUNCTION public.%s FROM PUBLIC, anon, authenticated', f);
     EXECUTE format('GRANT EXECUTE ON FUNCTION public.%s TO service_role', f);

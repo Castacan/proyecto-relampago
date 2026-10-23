@@ -162,6 +162,8 @@ async function chargeOpenpay(intg: Integrations, sub: any, charge: any, descript
   const res = await op.post(`/customers/${sub.provider_customer_id}/charges`, {
     source_id: sub.provider_card_id, method: 'card', amount: Number((charge.amount_cents / 100).toFixed(2)),
     currency: 'MXN', description: description.slice(0, 250), order_id: charge.idempotency_key,
+    // Antifraude: el device_session_id del registro de la tarjeta (Openpay lo exige).
+    device_session_id: sub.provider_device_session ?? undefined,
   })
   if (res.network || res.status >= 500) return { kind: 'unknown', raw: res.body }
   if (res.ok) return openpayChargeOutcome(res.body)
@@ -383,6 +385,7 @@ async function handleAttachCard(body: any): Promise<Response> {
       return json({ error: 'card_rejected', message: OPENPAY_ERRORS[code] ?? k.body?.description ?? 'No se pudo registrar la tarjeta.' })
     }
     card = { id: k.body.id, brand: k.body.brand, last4: String(k.body.card_number ?? '').slice(-4), exp: `${k.body.expiration_month}/${k.body.expiration_year}` }
+    await rpc('billing_save_device_session', { p_subscription_id: ctx.id, p_device_session: deviceSession })
     // La tarjeta anterior ya no se usa: se borra (si falla no pasa nada).
     if (ctx.provider_card_id && ctx.provider_card_id !== card.id) await op.del(`/customers/${customer}/cards/${ctx.provider_card_id}`)
   } else {
