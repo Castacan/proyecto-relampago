@@ -60,6 +60,8 @@ Membresía Parejas **no** se creó (ya no se vende).
    1. `src/supabase/clases.sql` (si aún no se corrió)
    2. `src/supabase/erp.sql`
    3. `src/supabase/erp_finanzas.sql` (egresos + inventario; **siempre después de erp.sql**, también si se vuelve a correr erp.sql)
+   4. `src/supabase/erp_crm.sql` (responsivas, archivos, acceso, empleados, estados, correos, bitácora; después de erp_finanzas.sql). Crea el bucket privado `expedientes`.
+   5. Edge Function `crm-emails` (Verify JWT apagado) y luego `src/supabase/erp_crm_cron.sql` (toma solo la llave del cron de cobros).
 2. **Edge Functions → crear y desplegar** (Verify JWT **apagado** en las dos):
    - `class-emails` (código en `supabase/functions/class-emails/index.ts`)
    - `billing` (código en `supabase/functions/billing/index.ts`)
