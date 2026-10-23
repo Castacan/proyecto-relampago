@@ -1,7 +1,7 @@
 # Plan: ERP/CRM propio en Relámpago (empezando por Clases y Reservas)
 
-> Documento vivo. Creado el 2026-10-23 a partir de una conversación entre el dueño de Jaibamuro y Claude (Claude Code).
-> Sirve para dos cosas: retomar el trabajo si se corta la sesión, y dárselo a otro asistente (por ejemplo Claude en el chat) para seguir afinando ideas.
+> Documento vivo. Creado el 2026-10-23 a partir de una conversación entre el dueño de Jaibamuro y Claude (Claude Code), y afinado el mismo día con Claude en el chat (v2).
+> Sirve para dos cosas: retomar el trabajo si se corta la sesión, y dárselo a otro asistente para seguir afinando ideas.
 > **Nada de esto está programado todavía.** Lo único hecho es la investigación y las decisiones de abajo.
 
 ---
@@ -9,8 +9,10 @@
 ## 0. Resumen en 30 segundos
 
 - Jaibamuro (gym de escalada en Veracruz) usa **EVO** (sistema brasileño para gimnasios, 79 USD/mes) para clientes, prospectos, planes, cobros y correos.
-- El dueño quiere ir **dejando EVO por partes** y tener esas funciones dentro de **Relámpago**, su app propia (`app.jaibamuro.com`). El motivo principal no es el dinero: es **control y claridad** (EVO es confuso, no sabe si las cosas están bien, cambiarlas es difícil).
-- **Primera prioridad: Clases y Reservas**, porque va a empezar a dar clases grupales y necesita que la gente reserve.
+- El dueño quiere ir **dejando EVO por partes** hasta **apagarlo por completo**, y tener esas funciones dentro de **Relámpago**, su app propia (`app.jaibamuro.com`). El motivo principal no es el dinero: es **control y claridad**.
+- **Primera prioridad: Clases y Reservas**, porque va a empezar a dar clases grupales. Se entrega en dos partes: **1a** (para arrancar ya) y **1b** (pagos en línea y automatizaciones).
+- **Arranque con 3 clases**: Introductoria ($200), Escalada Jueves y Calistenia ($300 normal / $100 miembros, + 1 clase gratis al mes para miembros). **Todos los parámetros los cambia un admin desde el panel, sin tocar código.**
+- **Toda persona tendrá cuenta en Relámpago** (ahí vivirán responsivas, historial, membresía). Esto es la semilla del CRM.
 - EVO se queda funcionando mientras tanto. Cada parte se apaga en EVO solo cuando la versión de Relámpago esté probada.
 
 ---
@@ -23,6 +25,7 @@
 - Solo **~4 clientes pagan con domiciliación** (cobro automático mensual con tarjeta).
 - **Facturas (CFDI)**: casi nadie las pide. Cuando alguien la pide, la hace la contadora. **No se va a automatizar la facturación.**
 - Tiene staff (por ejemplo Erick y Ximena aparecen como vendedores en EVO).
+- La **clase introductoria** es el gancho del negocio. Hoy el dueño la agenda desde Instagram sin pedir datos.
 
 ### 1.2 Qué es Relámpago hoy (ya en producción)
 App web propia, hecha con Claude Code. Repositorio `proyecto-relampago`.
@@ -63,199 +66,242 @@ Detalles técnicos que vimos de EVO al usarlo (21-oct-2026, envío masivo de la 
 En EVO no había ninguna clase ni actividad configurada todavía (no hay nada que migrar). La información salió de recorrer las pantallas (sin guardar nada) y de preguntarle a **EVA**, el asistente de IA de EVO.
 
 ### 2.1 Las piezas (están repartidas en 5+ pantallas, de ahí lo confuso)
-1. **Actividad** (Administración → Actividades - Horarios → "Nueva actividad"). Campos:
-   - Cómo se definen los horarios: **Previamente** (horario fijo semanal) o **Bajo demanda**.
-   - Imagen (400×225) y color.
-   - Nombre, **Grupo de actividades**, **Grupo de nivel**, **Público**.
-   - **Capacidad estándar** (cupo) y **Duración estándar** (HH:MM).
-   - TAGs, código, metas por cargo (para reportes de desempeño de empleados).
-   - Agenda en línea: categoría, **grado de dificultad** (1 a 5), descripción (hasta 1000 caracteres).
-   - **¿Qué clientes pueden participar?** Todos (actividad gratuita) o solo quien compró un plan/servicio del grupo de la actividad.
-   - **¿Permitir que el cliente reserve?** Sí/No.
-   - Limitar cupos para "agregadores" (plataformas tipo Gympass/TotalPass).
-   - Hasta cuánto tiempo antes del inicio se puede salir de la actividad.
-   - Permitir elegir número de lugar en la clase.
-   - Mostrar en la app del cliente (Fiti), en el autoservicio/sitio web, en "WOD TV".
-   - Finalizar la actividad automáticamente después del horario.
-   - Desactivar lista de notificación (lista de espera).
-2. **Horario semanal** (Actividades → Más opciones → Horarios): día de la semana, hora, duración, capacidad, profesor. Genera las clases que aparecen para reservar.
-3. **Clases** (Administración → Clases): otra vista ("turmas"), con nombre y lista de horarios; columnas: cantidad de programación, plazas disponibles, lista de espera, status.
-4. **Plan** (Administración → Planes → Actividades): si el plan permite clases, cuántas, **máximo por semana**.
-5. **Pantalla "Horarios"** (menú principal): calendario semanal con filtros Mañana/Tarde/Noche, vista día/semana.
-6. **Reserva** desde la app del cliente (Fiti) → Agenda: elige actividad, fecha y hora, confirma.
+1. **Actividad** (Administración → Actividades - Horarios → "Nueva actividad"): forma de horario (fijo semanal o bajo demanda), imagen/color, nombre, grupo, nivel, público, capacidad y duración estándar, dificultad 1–5, descripción, quién puede participar (todos o solo quien tiene plan), si se permite reservar, cupos para agregadores (Gympass/TotalPass), hasta cuándo salir, elegir lugar, dónde mostrarla (app Fiti, web, WOD TV), finalizar automática, lista de espera.
+2. **Horario semanal** (Actividades → Más opciones → Horarios): día, hora, duración, capacidad, profesor.
+3. **Clases** (Administración → Clases): otra vista con horarios, plazas disponibles, lista de espera, status.
+4. **Plan** (Administración → Planes → Actividades): si el plan permite clases, cuántas, máximo por semana.
+5. **Pantalla "Horarios"**: calendario semanal con filtros.
+6. **Reserva** desde la app del cliente (Fiti) → Agenda.
 
 ### 2.2 Reglas que maneja EVO
-- **Ventanas de reserva**: "inicia reserva X tiempo antes", "finaliza reserva X tiempo antes", "cancela reserva X tiempo antes" (hasta cuándo cancelar sin perder). También se pueden definir por plan.
-- **Lista de espera**: si se llena, los clientes entran a lista de espera; si alguien cancela, pasa automático o se les notifica.
-- **Asistencia (check-in)**: manual (profe o recepción marca presente/ausente) o automática con torniquete. Estados: **reservado**, **presente**, **ausente**.
-- **Penalización por falta**: opcional.
-- **Clase suelta sin membresía**: se crea la actividad como "libre" (no requiere plan).
+- Ventanas de reserva (inicia / finaliza / cancela X tiempo antes), también por plan.
+- Lista de espera con paso automático.
+- Asistencia manual o con torniquete. Estados: reservado, presente, ausente.
+- Penalización por falta opcional.
+- Clase suelta sin membresía = actividad "libre".
 
-Resumen del flujo EVO: **Actividad (cupo, quién puede) → Horario semanal → Plan con límite de clases → Reserva en app → Check-in → asistencia + penalizaciones.**
+Resumen: **Actividad → Horario semanal → Plan con límite → Reserva en app → Check-in → asistencia + penalizaciones.** Relámpago lo simplifica (ver sección 4).
 
 ---
 
 ## 3. Visión general del ERP/CRM en Relámpago (fases)
 
-Principio: **cada fase es útil por sí sola** y no rompe nada de lo anterior. EVO sigue mientras tanto.
+Principio: **cada fase es útil por sí sola** y no rompe nada de lo anterior. EVO sigue mientras tanto. **Meta final: apagar EVO por completo**; Relámpago será la única fuente de verdad.
 
 | Fase | Qué | Por qué en este orden | Dificultad |
 |---|---|---|---|
-| **1** | **Clases y Reservas** (este documento lo detalla) | Las clases empiezan pronto | Media |
-| 2 | **CRM**: ficha de cliente y prospecto, notas, quién lo atiende, de dónde llegó, seguimiento | Lo que más le estorba de EVO | Baja |
+| **1a** | **Clases y Reservas básicas** (ver 4.12) | Las clases empiezan pronto | Media |
+| **1b** | Pagos en línea de clases (Clip), recordatorios, faltas automáticas, reportes | Lo delicado (dinero) va después de que lo básico funcione | Media |
+| 2 | **CRM**: ficha de persona (prospecto/cliente), notas, quién lo atiende, de dónde llegó, seguimiento, **responsivas firmadas**, **acompañantes** | Lo que más le estorba de EVO; la base (personas) ya nace en la Fase 1 | Baja-media |
 | 3 | **Correos automáticos claros**: bienvenida, "tu plan vence en X días", "te extrañamos", cumpleaños, cada uno con su texto visible y un interruptor | Dolor de EVO; Resend ya funciona | Baja-media |
 | 4 | **Planes, venta en mostrador, corte de caja** y **reporte mensual para la contadora** | Necesario para dejar EVO de verdad | Media |
-| 5 | **Check-in con QR** y asistencia general (no solo clases) | Barato; los QR ya existen en la app | Media |
-| 6 | Después, si hace falta: **cobro recurrente** (domiciliación) y **torniquete** | Solo 4 domiciliados; el torniquete depende del aparato | Alta |
+| 5 | **Check-in con QR** y asistencia general | Barato; los QR ya existen | Media |
+| 6 | **Reconocimiento facial + torniquete**, **cobro recurrente** (domiciliación) | Resuelve asistencia y faltas de forma automática; solo 4 domiciliados hoy | Alta |
 
 Fuera de alcance por ahora: **facturación CFDI automática** (la hace la contadora), app nativa (todo es web móvil), multi-sucursal.
 
 Puntos difíciles conocidos para fases futuras:
+- **Reconocimiento facial**: en México los datos biométricos son **datos personales sensibles**. Requiere consentimiento expreso y por escrito, y un aviso de privacidad que lo mencione. Encaja en la responsiva (Fase 2). Revisar con abogado antes de implementarlo.
 - **Cobro recurrente**: guardar tarjeta con el procesador, cobrar cada mes, reintentos, cancelación. Clip quizá no lo soporte; Openpay o Stripe sí. Con 4 clientes se puede cobrar a mano con link de Clip mientras tanto.
 - **Migración desde EVO**: exportar clientes/prospectos/planes, limpiar duplicados (hay registros repetidos y uno genérico "VENTAS GENERAL PRODUCTOS"), operar un mes en paralelo.
-- **Correo masivo**: cuidar entregabilidad (no caer en spam) y dar opción de "darse de baja".
+- **Correo masivo**: cuidar entregabilidad y dar opción de "darse de baja".
 
 ---
 
 ## 4. Fase 1 — Clases y Reservas (detalle)
 
-### 4.1 Decisiones ya tomadas por el dueño (2026-10-23)
+### 4.1 Catálogo inicial de clases
+
+| Clase | Precio normal | Precio miembro | ¿Entra en la clase gratis mensual? | Horario | Cómo se reserva |
+|---|---|---|---|---|---|
+| **Introductoria** | $200 | — (mismo) | No | **Variable**: a veces fija, a veces cuando alguien la pide | **Solo staff/admin**. El sistema casi solo **registra la venta** (persona, fecha, monto, método). |
+| **Escalada Jueves** | $300 | $100 | Sí | Jueves (hora por definir) | En línea por el cliente o por staff |
+| **Calistenia** | $300 | $100 | Sí | **Lunes y miércoles 17:00** (provisional) | En línea por el cliente o por staff |
+
+- **Todo esto es editable por un admin** desde el panel: precios, precio miembro, si entra en la gratis mensual, horarios, cupo, duración, profe, si se reserva en línea o solo staff, si está activa. Nada debe estar fijo en el código.
+- Pendiente: duración, cupo y profe de Jueves y Calistenia; hora del jueves.
+
+### 4.2 Decisiones tomadas por el dueño (2026-10-23)
 
 | Tema | Decisión |
 |---|---|
-| **Cómo se paga una clase** | Tres formas: **clase suelta en línea** (Clip, al reservar), **incluida en la membresía** (reserva sin pagar aparte), **pago en el gym** (reserva en línea y paga en mostrador; staff lo marca pagado). **No** paquetes de clases por ahora. |
-| **Si reserva y no llega** | **Pierde la clase.** Si era suelta pagada, no se reembolsa. Si era por membresía, cuenta como usada (si hay límite semanal). |
-| **Cancelación** | Se puede cancelar **hasta 12 horas antes** sin perder la clase. |
-| **Lista de espera** | **No hay.** Si está llena, está llena. |
+| **Formas de pago** | **En línea** (Clip, al reservar), **en el gym** (reserva en línea y paga en mostrador; staff lo marca), o **clase gratis mensual** (miembros). **No** paquetes de clases por ahora. |
+| **Membresía** | **No incluye clases ilimitadas.** Da **precio miembro** ($100) y **1 clase gratis al mes** (de Jueves o Calistenia). |
+| **Clase gratis mensual** | **No acumulable.** Mes **calendario** (1 al último día, hora de México). Se reinicia cada mes. La cantidad (1) es un ajuste editable. |
+| **Si reserva y no llega** | **Pierde la clase.** Si era pagada en línea, no se reembolsa. Si era la gratis del mes, se gasta. |
+| **Cancelación** | Hasta **12 horas antes** sin perder la clase. |
+| **Cancelación tarde (<12 h)** | Cuenta igual que una falta: **gasta la clase gratis** si la usó; no hay reembolso si pagó. |
+| **Lista de espera** | **No hay.** |
+| **Castigo a quien aparta con "pago en el gym" y no llega** | **Ninguno por ahora.** Se observa el comportamiento en el reporte de faltas. A futuro, el torniquete/reconocimiento facial resuelve la asistencia. |
+| **Sobrecupo** | Al principio se tolera un poco (ej. 7 en clase de 6), pero con regla clara (ver 4.7, regla 8). |
+| **Cuentas** | **Toda persona tendrá cuenta.** Los walk-ins llegan, el staff les crea su cuenta ahí mismo y los mete al sistema. Ahí vivirán responsivas firmadas, etc. |
+| **Acompañantes** | Una cuenta podrá reservar para **acompañantes** (ej. papá/mamá con hijos). **Pendiente diseñarlo a fondo** (ver 4.10). |
+| **Mover una sesión que ya tiene reservas** | Solo un **admin** (no staff) y **avisando antes** a los inscritos. |
+| **Reembolsos** | Por defecto **reagendar** (mover la reserva pagada a otra sesión). Reembolso en Clip solo si el gym cancela y el cliente lo pide. |
+| **EVO** | Eventualmente se apaga. Mientras tanto, el staff mantiene la membresía al día en ambos lados. |
 
-### 4.2 Decisiones propuestas por Claude (pendientes de confirmar)
+### 4.3 Decisiones propuestas por Claude (pendientes de confirmar, se pueden ajustar después)
 
-| Tema | Propuesta | Por qué |
-|---|---|---|
-| ¿Cómo sabe Relámpago quién tiene membresía? | El staff marca a mano en el panel: "Membresía vigente hasta el DD/MM" por cliente. | Hoy solo EVO lo sabe; con 22 clientes es rápido. Es el primer paso de la Fase 4 (Planes). |
-| ¿La membresía da clases ilimitadas? | Un número en Ajustes: "máximo de clases por semana con membresía". Vacío = ilimitado. | Flexible sin complicar. |
-| ¿Desde cuándo se puede reservar? | Ajuste global, propuesta: **7 días antes**. | Evita que alguien aparte todo el mes. |
-| ¿Hasta cuándo se puede reservar? | Hasta el inicio de la clase (o X minutos antes, ajuste). | |
-| "Pago en el gym": ¿cuánto tiempo se aparta el lugar? | Se aparta hasta la clase; si no llega, pierde (misma regla de faltas). Staff puede cancelarla. | Simple. Riesgo: gente que aparta y no viene → se verá en el reporte de faltas. |
-| ¿Quién marca asistencia? | El profe o recepción en una pantalla "Clase de hoy". | Igual que EVO manual. |
-| ¿Cuenta obligatoria para reservar? | Sí: login con correo (el mismo de la app). | Ya existe; sirve para "mis reservas" y correos. |
-| ¿Datos extra del cliente? | Nombre completo y celular al primer uso (la tabla `climbers` hoy solo tiene `email` y `display_name`). Fecha de nacimiento opcional (menores). | Para lista del profe y contacto. |
-| ¿Menores? | Pueden reservar; se marca "Menor" en la lista (igual que en la competencia). | Consistente. |
-| Precio de la clase suelta | Por clase (cada clase tiene su precio). | Puede haber clases de distinto costo. |
+| Tema | Propuesta |
+|---|---|
+| ¿Desde cuándo se puede reservar? | **7 días antes** (ajuste). |
+| ¿Hasta cuándo? | Hasta el inicio de la clase (ajuste en minutos). |
+| ¿Quién marca asistencia? | Profe o recepción en "Clase de hoy". |
+| Falta automática | Solo si el profe ya marcó al menos a una persona en esa sesión. Si nadie marcó nada, la sesión queda **"sin pasar lista"** y aparece en un aviso para staff. |
+| Recordatorio | 24 h antes (ajuste). |
+| Menores | Se marca "Menor" en la lista; responsiva de tutor en Fase 2. |
+| ¿Cómo sabe Relámpago quién es miembro? | Staff/admin marca "Membresía vigente hasta DD/MM" por persona. |
 
-### 4.3 Conceptos (modelo mental, más simple que EVO)
-- **Clase (tipo)**: "Iniciación a la escalada", "Técnica intermedia"… Tiene nombre, descripción, nivel, profe por defecto, cupo por defecto, duración, precio suelto, color/imagen, y si está activa.
-- **Horario semanal**: "cada martes 19:00, 60 min, cupo 8, profe X". Una clase puede tener varios horarios.
-- **Sesión**: una clase en una fecha concreta ("martes 4-nov 19:00"). Se generan a partir de los horarios (por ejemplo, las próximas 4 semanas) y se pueden editar o cancelar una por una (feriado, profe enfermo).
-- **Reserva**: una persona en una sesión. Tiene estado y forma de pago.
+### 4.4 Conceptos (modelo mental, más simple que EVO)
+- **Persona**: cualquier cliente o prospecto. **Puede existir sin login** (el staff la crea con nombre y celular, como un "prospecto" de EVO). Cuando da su correo, se le activa el login (OTP) y puede reservar sola. Ahí se guardan membresía, historial, responsivas y acompañantes.
+- **Clase (tipo)**: "Escalada Jueves", "Calistenia"… con sus precios, cupo, duración, profe y reglas.
+- **Horario semanal**: "cada lunes 17:00, 60 min, cupo 8, profe X". Una clase puede tener varios (Calistenia: lunes y miércoles).
+- **Sesión**: una clase en una fecha concreta. Se genera desde los horarios o se crea suelta (útil para la Introductoria cuando se da a demanda).
+- **Reserva**: una persona en una sesión, con su estado, su precio aplicado y su forma de pago.
+- **Venta suelta**: para la Introductoria cuando no hay sesión: solo se registra persona, fecha, monto y método.
 
-### 4.4 Estados de una reserva
+### 4.5 Estados de una reserva
 
 ```
 reservada ──(llega, profe marca)──> asistió
     │
-    ├──(no llega, profe marca o automático al terminar)──> faltó   (pierde la clase)
+    ├──(no llega)──> faltó   (pierde la clase; si usó la gratis, se gasta)
     │
-    ├──(cancela ≥12 h antes)──> cancelada   (si pagó en línea: queda saldo/reembolso, ver 4.9)
+    ├──(cancela ≥12 h antes)──> cancelada   (libera lugar; devuelve gratis; si pagó en línea → reagendar)
     │
-    ├──(cancela <12 h antes)──> cancelada_tarde (cuenta como falta)
+    ├──(cancela <12 h antes)──> cancelada_tarde (libera lugar; cuenta como falta; gasta la gratis)
     │
-    └──(staff cancela la sesión)──> cancelada_por_gym (reembolso/saldo obligatorio)
+    └──(gym cancela la sesión)──> cancelada_por_gym (devuelve gratis; reagendar o reembolso)
 
-pendiente_pago (solo clase suelta en línea, mientras paga en Clip; aparta el lugar unos minutos)
+pendiente_pago (solo pago en línea, mientras paga en Clip; aparta el lugar unos minutos)
 ```
 
-Forma de pago de la reserva: `membresia` | `clip` (en línea) | `en_gym` (pagará en mostrador) | `cortesia`.
-Estado de pago (para `en_gym`): `por_cobrar` → `cobrado` (staff marca, con método efectivo/tarjeta).
+Cada reserva guarda **dos cosas separadas**:
+- **Precio aplicado** (`price_tier`): `regular` ($300) | `member` ($100) | `free_monthly` (gratis del mes) | `courtesy`.
+- **Cómo paga** (`payment_method`): `online` (Clip) | `at_gym` (mostrador) | `none` (gratis o cortesía).
 
-### 4.5 Pantallas
+Estado de pago: `not_needed` | `pending` | `paid` | `refunded`. Si pagó en mostrador se guarda el método (efectivo/tarjeta).
+
+### 4.6 Pantallas
 
 **Públicas (cliente, celular primero):**
-1. **`/clases`**: calendario de la semana (y siguiente). Cada sesión muestra: clase, hora, profe, nivel, lugares libres ("3 lugares" / "Llena"), precio o "Incluida en tu membresía".
-2. **Detalle de sesión → Reservar**: si no hay sesión iniciada, pide correo (OTP). Luego elige cómo pagar (según aplique): "Incluida en mi membresía" / "Pagar en línea" / "Pago en el gym". Aceptar reglas (cancelación 12 h, falta = pierde).
-3. **`/mi-cuenta/clases`** (o dentro de Mi cuenta): mis próximas reservas, botón Cancelar (con aviso si ya es tarde), historial (asistí/falté).
-4. Página de resultado del pago (como `/competencia/consulta`): "Reserva confirmada" o "Falta tu pago".
+1. **`/clases`**: calendario de la semana y la siguiente. Cada sesión muestra clase, hora, profe, lugares libres ("3 lugares" / "Llena") y precio. Si es miembro: "$100 o usa tu clase gratis del mes" (o "Ya usaste tu clase gratis de octubre").
+2. **Detalle de sesión → Reservar**: pide login si no hay. Opciones según aplique: "Usar mi clase gratis del mes" / "Pagar en línea" / "Pagar en el gym". Aceptar reglas (cancelación 12 h, falta = pierde).
+3. **Mi cuenta → Clases**: próximas reservas, Cancelar (con aviso si ya es tarde), historial, y si le queda la clase gratis del mes.
+4. Página de resultado del pago: "Reserva confirmada" o "Falta tu pago".
 
 **Staff (`/staff/clases`):**
-1. **Clases**: lista de tipos de clase; crear/editar; horarios semanales dentro de la misma pantalla (no repartido como en EVO).
-2. **Calendario de sesiones**: ver/generar sesiones de las próximas semanas, cancelar una sesión (avisa por correo a los inscritos), cambiar profe/cupo de una sesión.
-3. **Clase de hoy** (pantalla para el profe, sirve en celular/tablet): lista de inscritos con nombre, "Menor", cómo pagó, si debe pago; botones **Asistió / Faltó**; agregar a alguien que llegó sin reservar (walk-in) si hay cupo; **cobrar** a los de "pago en el gym".
-4. **Membresías (mínimo)**: buscar cliente → "Membresía vigente hasta…" (fecha), nota. (Semilla de la Fase 4.)
-5. **Ajustes de clases**: días de anticipación para reservar, horas para cancelar (12), máximo de clases por semana con membresía, si "pago en el gym" está permitido, textos de reglas.
-6. **Reporte**: asistencia por clase, faltas por persona, ingresos de clases sueltas (en línea vs gym) por mes → exportar CSV (sirve a la contadora).
+1. **Clases** (solo admin edita): tipos de clase con todos sus parámetros y sus horarios semanales en la misma pantalla.
+2. **Calendario de sesiones**: generar sesiones, crear sesión suelta, cancelar una sesión (avisa por correo). **Mover** una sesión con reservas: solo admin, y manda aviso antes.
+3. **Clase de hoy** (celular/tablet del profe): inscritos con nombre, "Menor", precio aplicado y si debe pago; botones **Asistió / Faltó**; **walk-in** (buscar persona o crearla ahí mismo con nombre + celular); **cobrar** a los de pago en el gym; marca "sobrecupo" si aplica.
+4. **Registrar Introductoria**: venta rápida (persona nueva o existente, fecha, monto, método), con o sin sesión.
+5. **Personas / Membresías (mínimo)**: buscar o crear persona; "membresía vigente hasta…"; nota.
+6. **Ajustes de clases** (solo admin): días de anticipación, horas para cancelar (12), clases gratis por mes (1), tolerancia de sobrecupo, si se permite pago en el gym, textos de reglas.
+7. **Reporte**: asistencia por clase, faltas por persona (incluye quién aparta en el gym y no llega), clases gratis usadas, ingresos por clase (en línea vs gym) por mes → CSV para la contadora.
 
-### 4.6 Correos (Resend, remitente `hola@jaibamuro.com`)
-- **Reserva confirmada** (con fecha, hora, profe, reglas de cancelación, botón "Ver mis reservas").
-- **Recordatorio** X horas antes (propuesta: 24 h antes o la mañana del día). Usar `pg_cron` como el recordatorio de la competencia.
-- **Cancelación** (confirmación de que canceló; si fue tarde, aviso de que se pierde).
-- **Sesión cancelada por el gym** (con disculpa y qué pasa con su pago).
-- Sin emojis raros en asunto (por si se reenvían desde EVO o se ven en clientes viejos) — aunque Resend sí los soporta.
-- Todos con texto visible y editable en el código; más adelante, en un panel de "Correos automáticos" (Fase 3).
-
-### 4.7 Reglas de negocio (para implementar en SQL, no en el navegador)
-1. **Cupo**: reservas en estado `reservada`/`asistió`/`pendiente_pago` (no vencida) ≤ cupo de la sesión. Validar con bloqueo de fila (como `competition_spots_taken` + `FOR UPDATE`) para que dos personas no tomen el último lugar.
+### 4.7 Reglas de negocio (en SQL, no en el navegador)
+1. **Cupo**: reservas en `reservada`/`asistió`/`pendiente_pago` (no vencida) ≤ cupo. Validar con bloqueo de fila (`FOR UPDATE`, como en la competencia).
 2. **Una reserva por persona por sesión.**
-3. **Ventana de reserva**: no antes de N días; no después del inicio.
-4. **Membresía**: solo si la membresía está vigente el día de la sesión; si hay máximo semanal, contar reservas no canceladas (incluye faltas) de esa semana (lunes–domingo, hora de México).
-5. **Cancelación**: si faltan ≥12 h → `cancelada` (libera lugar; si pagó en línea, ver 4.9). Si faltan <12 h → `cancelada_tarde` (libera lugar pero cuenta como falta, no reembolso).
-6. **Falta**: al terminar la sesión, las reservas sin marcar pueden quedar como `faltó` automáticamente (o el profe marca). Pierde la clase.
-7. **Pago en línea**: la reserva queda `pendiente_pago` y aparta el lugar unos minutos (p. ej. 15). Si Clip confirma → `reservada`. Si no → se libera. Nunca se confirma un pago desde el navegador: siempre consultando la API de Clip (igual que la competencia).
-8. **Pago en el gym**: reserva `reservada` con `por_cobrar`. Staff la marca cobrada en "Clase de hoy".
-9. **Sesión cancelada por el gym**: todas las reservas → `cancelada_por_gym`, correo a todos.
-10. **Zona horaria**: todo en `America/Mexico_City`.
-11. **Auditoría**: cada cambio de staff deja rastro (como `competition_audit_log`).
+3. **Ventana de reserva**: no antes de N días; no después del inicio. Si la clase es "solo staff", el cliente no puede reservarla.
+4. **Precio miembro**: solo si la membresía está vigente el día de la sesión.
+5. **Clase gratis mensual**: solo miembros vigentes, solo clases marcadas como elegibles. Se cuenta por **mes calendario de la fecha de la sesión** (hora de México). Gastan la gratis: `reservada`, `pendiente_pago` no aplica, `asistió`, `faltó`, `cancelada_tarde`. La devuelven: `cancelada` (≥12 h) y `cancelada_por_gym`. **No se acumula.**
+6. **Cancelación**: ≥12 h → `cancelada`. <12 h → `cancelada_tarde` (cuenta como falta, sin reembolso, gasta la gratis).
+7. **Falta**: el profe marca. Automática al terminar la sesión **solo si ya se pasó lista** (al menos una persona marcada); si no, la sesión queda "sin pasar lista" para revisión.
+8. **Pago en línea y sobrecupo**: la reserva queda `pendiente_pago` y aparta el lugar 15 min (ajuste). Si Clip confirma a tiempo → `reservada`. **Si el pago llega después de vencido el apartado**:
+   - si hay lugar → se confirma;
+   - si no hay lugar pero no se pasa de la **tolerancia de sobrecupo** (ajuste, propuesta 1) → se confirma y se marca "sobrecupo" en Clase de hoy;
+   - si se pasa → queda pagada para **reagendar**, con aviso al cliente y al staff.
+   Nunca se confirma un pago desde el navegador: siempre consultando la API de Clip.
+9. **Pago en el gym**: `reservada` + `pending`; staff marca cobrada en Clase de hoy. Sin castigo por faltar (por ahora).
+10. **Sesión cancelada por el gym**: todas las reservas → `cancelada_por_gym`, correo a todos, se devuelve la gratis.
+11. **Mover sesión con reservas**: solo admin; manda correo a los inscritos con el cambio. Editar un horario semanal **no mueve** sesiones ya generadas que tengan reservas; solo afecta sesiones futuras vacías. Las que tengan gente se mueven una por una con aviso.
+12. **Zona horaria**: `America/Mexico_City`.
+13. **Auditoría**: cada cambio de staff/admin deja rastro.
 
 ### 4.8 Modelo de datos propuesto (Supabase / Postgres)
 
 Nombres tentativos; prefijo `class_` para no chocar con lo existente.
 
+**Decisión de arquitectura para Claude Code**: hoy `climbers.id` = usuario de Supabase Auth, así que no puede haber personas sin login. Opciones:
+- (A) Nueva tabla `people` (persona) con `auth_user_id` opcional; `climbers` se enlaza a ella cuando hay login. Las reservas apuntan a `people`.
+- (B) Crear usuarios de Auth "sin confirmar" para los walk-ins.
+Propuesta: **A**, porque además es la base del CRM, las responsivas y los acompañantes. Revisar el impacto en leaderboard/sends antes de decidir.
+
 ```sql
+-- Persona (cliente o prospecto); puede no tener login
+people (
+  id UUID PK, auth_user_id UUID NULL UNIQUE,   -- = climbers.id cuando tiene cuenta
+  full_name TEXT, phone TEXT, email TEXT NULL, birth_date DATE NULL,
+  source TEXT NULL,                            -- instagram, walk-in, web…
+  created_by UUID NULL, created_at
+)
+-- (Fase 2) people_companions: titular → acompañante. Ver 4.10.
+
 -- Ajustes globales de clases (una fila)
 class_settings (
   id, book_ahead_days INT DEFAULT 7, cancel_hours INT DEFAULT 12,
-  membership_weekly_limit INT NULL,          -- NULL = ilimitado
+  free_classes_per_month INT DEFAULT 1,
+  overbook_tolerance INT DEFAULT 1,
   allow_pay_at_gym BOOLEAN DEFAULT true,
   online_hold_minutes INT DEFAULT 15,
+  reminder_hours INT DEFAULT 24,
   rules_text TEXT, updated_at
 )
 
 -- Tipo de clase
 class_types (
-  id, name, description, level TEXT,          -- Básico/Intermedio/Avanzado o 1-5
+  id, name, description, level TEXT,
   default_capacity INT, default_duration_min INT,
-  price_cents INT,                            -- clase suelta
-  default_instructor_id UUID NULL,            -- profiles.id (staff)
+  price_cents INT,                             -- precio normal (ej. 30000)
+  member_price_cents INT NULL,                 -- precio miembro (ej. 10000); NULL = igual al normal
+  eligible_free_monthly BOOLEAN DEFAULT false, -- entra en la gratis del mes
+  booking_mode TEXT CHECK (booking_mode IN ('online','staff_only')),
+  default_instructor_id UUID NULL,
   color TEXT, image_url TEXT, is_active BOOLEAN, sort_order INT, created_at
 )
 
 -- Horario semanal (plantilla)
 class_schedules (
-  id, class_type_id, weekday SMALLINT,        -- 0=domingo … 6=sábado
+  id, class_type_id, weekday SMALLINT,         -- 0=domingo … 6=sábado
   start_time TIME, duration_min INT, capacity INT,
   instructor_id UUID NULL, starts_on DATE, ends_on DATE NULL, is_active BOOLEAN
 )
 
--- Sesión concreta (generada desde horarios o creada suelta)
+-- Sesión concreta (generada desde horario o creada suelta)
 class_sessions (
   id, class_type_id, schedule_id NULL,
   starts_at TIMESTAMPTZ, ends_at TIMESTAMPTZ, capacity INT,
-  instructor_id UUID NULL, price_cents INT,
+  instructor_id UUID NULL,
+  price_cents INT, member_price_cents INT NULL,  -- copia al generar; editable por sesión
   status TEXT CHECK (status IN ('scheduled','cancelled','finished')),
+  attendance_taken BOOLEAN DEFAULT false,
   cancel_reason TEXT NULL, created_at,
-  UNIQUE (schedule_id, starts_at)             -- generar sin duplicar
+  UNIQUE (schedule_id, starts_at)
 )
 
 -- Reserva
 class_bookings (
-  id, session_id, climber_id,                 -- climbers.id (cuenta del cliente)
+  id, session_id, person_id,
   status TEXT CHECK (status IN ('pending_payment','booked','attended','no_show',
                                 'cancelled','cancelled_late','cancelled_by_gym')),
-  payment_type TEXT CHECK (payment_type IN ('membership','online','at_gym','courtesy')),
+  price_tier TEXT CHECK (price_tier IN ('regular','member','free_monthly','courtesy')),
+  payment_method TEXT CHECK (payment_method IN ('online','at_gym','none')),
   payment_status TEXT CHECK (payment_status IN ('not_needed','pending','paid','refunded')),
-  paid_method TEXT NULL,                      -- 'clip' | 'cash' | 'card' | ...
+  paid_with TEXT NULL,                         -- 'clip' | 'cash' | 'card'
   amount_cents INT, hold_expires_at TIMESTAMPTZ NULL,
-  booked_at, cancelled_at, checked_at, created_by UUID NULL,  -- staff si fue walk-in
-  UNIQUE (session_id, climber_id) WHERE status NOT IN ('cancelled','cancelled_late','cancelled_by_gym')
+  is_overbook BOOLEAN DEFAULT false,
+  needs_reschedule BOOLEAN DEFAULT false,
+  booked_at, cancelled_at, checked_at, created_by UUID NULL
+)
+-- Índice parcial (en Postgres va aparte, no dentro del CREATE TABLE):
+CREATE UNIQUE INDEX class_bookings_one_active
+  ON class_bookings (session_id, person_id)
+  WHERE status NOT IN ('cancelled','cancelled_late','cancelled_by_gym');
+
+-- Venta suelta (Introductoria sin sesión)
+class_sales (
+  id, class_type_id, person_id, sold_on DATE, amount_cents INT,
+  paid_with TEXT, note TEXT, created_by UUID, created_at
 )
 
 -- Pagos en línea de clases (mismo patrón que competition_payments)
@@ -264,87 +310,104 @@ class_payment_events (... bitácora cruda, solo inserción ...)
 
 -- Membresía mínima (semilla de la Fase 4)
 memberships (
-  id, climber_id, plan_name TEXT, valid_from DATE, valid_until DATE,
+  id, person_id, plan_name TEXT, valid_from DATE, valid_until DATE,
   note TEXT, created_by UUID, created_at
 )
-
--- Datos de cliente que faltan en climbers
-ALTER TABLE climbers ADD full_name TEXT, ADD phone TEXT, ADD birth_date DATE;
 
 class_audit_log (... igual que competition_audit_log ...)
 ```
 
-RPCs (funciones de Postgres) tentativas:
-- Públicas: `get_class_calendar(from, to)`, `book_class(session_id, payment_type)`, `cancel_booking(booking_id)`, `get_my_bookings()`.
-- Edge Function `class-payments` (o extender `competition-payments`): crear link de Clip para una reserva, webhook, consulta de estado, correos.
-- Staff (solo admin/staff): `admin_upsert_class_type`, `admin_upsert_schedule`, `admin_generate_sessions(weeks)`, `admin_cancel_session`, `admin_mark_attendance(booking_id, attended|no_show)`, `admin_walk_in(session_id, climber o datos)`, `admin_mark_paid(booking_id, method)`, `admin_set_membership(climber_id, valid_until)`, `get_class_report(month)`.
-- Cron: generar sesiones de las próximas semanas, marcar faltas al terminar, liberar holds vencidos, mandar recordatorios.
+RPCs tentativas:
+- Públicas: `get_class_calendar(from, to)` (incluye si la persona tiene gratis disponible), `book_class(session_id, price_tier, payment_method)`, `cancel_booking(booking_id)`, `get_my_bookings()`.
+- Edge Function `class-payments` (o extender `competition-payments`): link de Clip, webhook, consulta de estado, correos.
+- Staff: `admin_upsert_person`, `admin_mark_attendance`, `admin_walk_in`, `admin_mark_paid`, `admin_register_sale`, `admin_set_membership`, `get_class_report(month)`.
+- **Solo admin**: `admin_upsert_class_type`, `admin_upsert_schedule`, `admin_generate_sessions(weeks)`, `admin_cancel_session`, `admin_move_session` (con aviso), `admin_update_settings`.
+- Cron: generar sesiones de las próximas semanas, marcar faltas (si se pasó lista), liberar holds vencidos, recordatorios.
 
-Seguridad: RLS activado en todas las tablas sin políticas abiertas; todo pasa por RPCs `SECURITY DEFINER` que validan rol/usuario (patrón de la competencia).
+Seguridad: RLS en todas las tablas sin políticas abiertas; todo pasa por RPCs `SECURITY DEFINER` que validan rol (staff vs admin) y usuario.
 
-### 4.9 Reembolsos / saldo (pendiente de decidir)
-Caso: alguien pagó en línea una clase suelta y cancela con ≥12 h, o el gym cancela la sesión.
-- Opción A: **reembolso en Clip** (staff lo hace en el panel de Clip; Relámpago solo lo registra, como en la competencia).
-- Opción B: **saldo a favor** para otra clase (más simple para el negocio, evita comisiones).
-- Propuesta: B por defecto, A si la sesión la cancela el gym y el cliente lo pide.
+### 4.9 Correos (Resend, remitente `hola@jaibamuro.com`)
+- **Reserva confirmada** (fecha, hora, profe, precio aplicado, reglas, botón "Ver mis reservas").
+- **Recordatorio** 24 h antes (ajuste), con `pg_cron`.
+- **Cancelación** (si fue tarde: aviso de que se pierde / se gasta la gratis).
+- **Sesión cancelada o movida por el gym** (disculpa, nueva fecha si aplica, qué pasa con su pago).
+- **Pago recibido tarde / requiere reagendar**.
+- Textos visibles y editables en el código; más adelante en un panel (Fase 3).
 
-### 4.10 Pruebas antes de publicar
-- SQL en **PGlite** (local): cupo con dos reservas simultáneas al último lugar, ventanas de reserva, cancelación a 12 h exactas (borde), límite semanal de membresía (incluye faltas), membresía vencida, sesión cancelada, holds vencidos, permisos (anon vs cliente vs staff).
-- Edge Function con Clip y Resend falsos (pago aprobado, rechazado, duplicado, tarde).
-- Pantallas en navegador (local) contra datos de prueba.
-- En producción: una clase de prueba, reservar con cuenta del dueño, pagar $1 si hace falta, cancelar, revisar correos en Resend; luego borrar la prueba.
+### 4.10 Pendiente: acompañantes (diseñar a fondo después)
+Caso típico: una mamá con cuenta reserva para sus dos hijos. Preguntas a resolver:
+- ¿El acompañante es una persona propia en `people` (con su historial y responsiva) ligada al titular?
+- ¿Quién recibe los correos? ¿Quién paga?
+- ¿Un acompañante adulto puede después tener su propia cuenta y "independizarse"?
+- ¿Cuenta la gratis del mes del titular o del acompañante (si también es miembro)?
+- Responsiva de menor firmada por el tutor.
 
-### 4.11 Despliegue
-1. SQL nuevo en `src/supabase/clases.sql` (+ `clases_pagos.sql`) → el dueño da **Run** en el SQL Editor.
+### 4.11 Pruebas antes de publicar
+- SQL en **PGlite**: cupo con dos reservas simultáneas al último lugar, ventanas, cancelación en el borde de 12 h, clase gratis (mes calendario, no acumulable, devolución al cancelar a tiempo, gasto al faltar o cancelar tarde), precio miembro con membresía vencida, pago tardío con y sin lugar y con tolerancia de sobrecupo, falta automática solo con lista pasada, permisos (anon / cliente / staff / admin).
+- Edge Function con Clip y Resend falsos.
+- Pantallas en local con datos de prueba.
+- En producción: una clase de prueba, reservar con la cuenta del dueño, pagar $1 si hace falta, cancelar, revisar correos; luego borrar la prueba.
+
+### 4.12 Entregas y despliegue
+
+**Fase 1a (para arrancar clases ya):**
+- Personas (crear sin login), membresía mínima.
+- Tipos de clase, horarios, sesiones, ajustes (todo editable por admin).
+- Reserva con precio miembro, clase gratis mensual o pago en el gym.
+- Cancelación con regla de 12 h.
+- Clase de hoy (asistencia, walk-in, cobrar en mostrador).
+- Registrar Introductoria.
+- Correo de confirmación y de cancelación.
+
+**Fase 1b:**
+- Pago en línea con Clip (apartado, pago tardío, sobrecupo, reagendar).
+- Recordatorios, falta automática, mover sesión con aviso.
+- Reportes y CSV.
+
+**Despliegue (igual para ambas):**
+1. SQL nuevo en `src/supabase/clases.sql` (+ `clases_pagos.sql` en 1b) → el dueño da **Run**.
 2. Edge Function → el dueño da **Deploy** (Verify JWT apagado si recibe webhook de Clip).
-3. Frontend → `git push` (Vercel publica solo).
-4. Agregar "Clases" al menú del panel de staff y un enlace en la página principal / Mi cuenta.
+3. Frontend → `git push`.
+4. "Clases" en el menú de staff y enlace en la página principal / Mi cuenta.
 
-### 4.12 Estimación gruesa
-Al ritmo de la competencia (que se hizo en pocos días con pruebas): **1 a 2 semanas** para una primera versión usable de la Fase 1, sin contar las pruebas con clientes reales. La parte de pagos en línea es la más delicada (pero el patrón ya existe).
+Estimación gruesa: 1a en ~1 semana; 1b en ~1 semana más. Lo más delicado son los pagos en línea (pero el patrón ya existe).
 
 ---
 
-## 5. Preguntas abiertas (para pimponear)
+## 5. Preguntas abiertas
 
-**Clases**
-1. ¿Qué clases van a dar al principio? (nombres, nivel, duración, cupo, precio suelto, horarios, quién las da)
-2. ¿La membresía da clases ilimitadas o un máximo por semana? ¿Todas las membresías igual?
-3. ¿Con cuántos días de anticipación se puede reservar? (propuesta 7)
-4. "Pago en el gym": ¿se permite para cualquiera o solo para clientes conocidos? ¿Y si nunca paga?
-5. ¿Se permite que alguien llegue sin reservar si hay lugar (walk-in)?
-6. ¿Reembolso en Clip o saldo a favor cuando cancela a tiempo? (ver 4.9)
-7. ¿Recordatorio 24 h antes, la mañana del día, o ambos?
-8. ¿Se marca falta automáticamente al terminar la clase si nadie marcó asistencia, o siempre a mano?
-9. ¿Las clases deben verse en la TV (`/leaderboard/display`) o en la landing `jaibamuro.com`?
-10. ¿Los menores necesitan algo especial (responsiva, adulto)?
+**Respondidas el 2026-10-23** (ver 4.1 y 4.2): clases iniciales, membresía y gratis mensual, pago en el gym sin castigo, walk-ins con cuenta creada por staff, reembolso = reagendar, mover sesiones solo admin, cancelación tarde, sobrecupo tolerado con plan, EVO se apaga eventualmente.
 
-**Más allá de las clases**
-11. ¿Qué planes/membresías vende hoy y a qué precio? (para la Fase 4)
-12. ¿Qué correos automáticos quiere sí o sí? (bienvenida, vencimiento, te extrañamos, cumpleaños…)
-13. ¿Qué información del cliente necesita ver en su ficha?
-14. ¿Cuándo le gustaría apagar EVO del todo? (define el orden de las fases 4–6)
-15. ¿Torniquete algún día? ¿Qué aparato?
+**Pendientes:**
+1. **Escalada Jueves**: hora, duración, cupo, profe.
+2. **Calistenia**: horario definitivo (provisional lunes y miércoles 17:00), duración, cupo, profe.
+3. **Acompañantes**: diseño completo (ver 4.10).
+4. ¿Persona sin login (opción A en 4.8) o usuarios de Auth sin confirmar? (decisión técnica para Claude Code).
+5. ¿Recordatorio 24 h antes, la mañana del día, o ambos?
+6. ¿Las clases deben verse en la TV o en la landing `jaibamuro.com`?
+7. Menores: ¿qué responsiva? (Fase 2).
+8. ¿Qué planes/membresías vende hoy y a qué precio? (Fase 4).
+9. ¿Qué correos automáticos quiere sí o sí? (Fase 3).
+10. ¿Qué información del cliente necesita ver en su ficha? (Fase 2).
+11. Reconocimiento facial y torniquete: ¿qué aparato? (Fase 6; requiere consentimiento biométrico).
 
 ---
 
 ## 6. Cómo retomar este trabajo
 
 **Si lo retoma Claude Code (en este repo):**
-1. Leer este documento y `docs/bitacora.md` (cronología de todo lo hecho).
-2. Revisar el patrón de la competencia, que es el modelo a copiar: `src/supabase/competencia*.sql`, `supabase/functions/competition-payments/index.ts`, `src/pages/public/CompetitionPage.tsx`, `src/pages/staff/CompetitionAdminPage.tsx`.
-3. Confirmar con el dueño las decisiones pendientes (sección 4.2 y 5) antes de programar.
-4. Recordar: el dueño da Run/Deploy en Supabase; `npx tsc -b` antes de push; actualizar bitácora.
+1. Leer este documento y `docs/bitacora.md`.
+2. Revisar el patrón de la competencia: `src/supabase/competencia*.sql`, `supabase/functions/competition-payments/index.ts`, `src/pages/public/CompetitionPage.tsx`, `src/pages/staff/CompetitionAdminPage.tsx`.
+3. Decidir con el dueño el punto 4 de la sección 5 (personas sin login) antes de escribir SQL.
+4. Empezar por la Fase 1a. Recordar: el dueño da Run/Deploy en Supabase; `npx tsc -b` antes de push; actualizar bitácora.
 
-**Si se lo das a Claude en el chat (para pensar ideas):**
-- Pega este documento completo y pídele, por ejemplo:
-  - "Ayúdame a responder las preguntas abiertas de la sección 5 para mi gym de escalada."
-  - "Propón los textos de los correos de la sección 4.6."
-  - "¿Qué me falta considerar en las reglas de la sección 4.7?"
-  - "Diseña cómo se vería la pantalla `/clases` en el celular."
-- Las respuestas se pueden traer de vuelta a Claude Code para programarlas.
+**Si se lo das a Claude en el chat:**
+- "Diseñemos a fondo los acompañantes (sección 4.10)."
+- "Propón los textos de los correos de la sección 4.9."
+- "Diseña cómo se vería la pantalla `/clases` en el celular."
 
 ---
 
 ## 7. Historial de este documento
-- **2026-10-23**: creado. Investigación de EVO (clases), decisiones de cobro/faltas/cancelación/lista de espera, plan de fases y diseño de la Fase 1.
+- **2026-10-23 (v1)**: creado. Investigación de EVO (clases), decisiones de cobro/faltas/cancelación/lista de espera, plan de fases y diseño de la Fase 1.
+- **2026-10-23 (v2)**: catálogo inicial de 3 clases con precios; membresía = precio miembro + 1 clase gratis mensual no acumulable (mes calendario); cancelación tarde gasta la gratis; reembolso = reagendar; sin castigo a pago en el gym; plan de sobrecupo; toda persona con cuenta (personas sin login creadas por staff); acompañantes pendiente; mover sesiones solo admin con aviso; Fase 1 dividida en 1a/1b; reconocimiento facial + torniquete en Fase 6; corregido el índice único parcial.

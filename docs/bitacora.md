@@ -402,3 +402,12 @@ lista baje sola para que el último lugar (ej. el #100) también vea su nombre.
   sin lista de espera. Sin facturación automática (la hace la contadora).
 - Todo el plan, con detalle para retomarlo o pasárselo a otro asistente:
   `docs/plan-erp-clases.md`. Nada programado todavía.
+- Mismo día: el usuario afinó el plan con Claude en el chat (v2) y se
+  reemplazó `docs/plan-erp-clases.md`. Cambios clave: 3 clases iniciales
+  (Introductoria $200 solo staff; Escalada Jueves y Calistenia $300 / $100
+  miembro); la membresía da precio miembro + 1 clase gratis al mes (mes
+  calendario, no acumulable), no clases ilimitadas; cancelar tarde gasta la
+  gratis; reembolso = reagendar; sobrecupo tolerado con regla; toda persona
+  con cuenta (tabla `people`, puede existir sin login); acompañantes por
+  diseñar; Fase 1 dividida en 1a (arrancar) y 1b (Clip, recordatorios,
+  reportes).
