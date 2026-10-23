@@ -457,3 +457,12 @@ lista baje sola para que el último lugar (ej. el #100) también vea su nombre.
   cargaba los scripts dos veces (modo desarrollo); ahora cada script se carga
   una vez y todos esperan la misma carga.
 - Guía de despliegue y decisiones a revisar: `docs/erp-despliegue.md`.
+
+## 2026-10-23 — ERP desplegado en Supabase (sandbox)
+
+- El dueño corrió `erp.sql` (`clases.sql` ya estaba) y desplegó `class-emails` y `billing`, las dos con Verify JWT apagado.
+- Secretos puestos: `OPENPAY_PRIVATE_KEY` (sandbox) y `BILLING_CRON_KEY`.
+- Se corrió `erp_cron.sql` (job 3). Revisé que la llave del cron coincide con el secreto comparando el SHA-256 con el digest que muestra Supabase, sin leer la llave.
+- Quedó una función de ejemplo `rapid-worker` (Deploy antes de pegar el código); hay que borrarla.
+- Pendiente: Integraciones (ID de comercio y llave pública de sandbox), webhook de sandbox, prueba con la tarjeta 4111. Falta confirmar si el comercio de Openpay de EVO es del dueño (dashboard de producción).
+
