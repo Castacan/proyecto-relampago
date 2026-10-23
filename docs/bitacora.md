@@ -392,3 +392,13 @@ lista baje sola para que el último lugar (ej. el #100) también vea su nombre.
   personas). Sin patrocinador propio: pie "Jaibamuro".
 - La página del celular (`/leaderboard`) no cambia.
 - Probado en local contra producción (solo lectura).
+
+## 2026-10-23 — Plan: ERP/CRM propio (empezando por clases y reservas)
+- El usuario quiere ir dejando EVO (79 USD/mes) por partes y tener lo clave
+  en Relámpago. Prioridad: clases y reservas (va a empezar a dar clases).
+- Se revisó el módulo de clases de EVO (sin guardar nada) y se le preguntó
+  a EVA (su IA). Decisiones: pago por clase suelta en línea, incluida en
+  membresía o en el gym; falta = pierde la clase; cancelar hasta 12 h antes;
+  sin lista de espera. Sin facturación automática (la hace la contadora).
+- Todo el plan, con detalle para retomarlo o pasárselo a otro asistente:
+  `docs/plan-erp-clases.md`. Nada programado todavía.
