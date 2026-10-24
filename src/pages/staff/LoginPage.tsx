@@ -19,7 +19,7 @@ export default function LoginPage() {
     if (err) {
       setError('Correo o contraseña incorrectos')
     } else {
-      navigate('/staff')
+      navigate('/staff/inicio')
     }
   }
 
@@ -35,7 +35,7 @@ export default function LoginPage() {
       {/* Branding */}
       <div className="mb-10 text-center">
         <img src={logoVertical} alt="Jaibamuro" className="h-28 w-auto mx-auto mb-5" />
-        <p className="text-zinc-500 text-sm font-medium mt-1.5">Acceso para setters del gym</p>
+        <p className="text-zinc-500 text-sm font-medium mt-1.5">Acceso para el staff del gym</p>
       </div>
 
       {/* Form card */}
@@ -48,7 +48,7 @@ export default function LoginPage() {
               value={email}
               onChange={e => setEmail(e.target.value)}
               className="w-full bg-superficie-alta text-texto-principal rounded-xl px-4 py-3.5 text-sm outline-none border border-zinc-700/50 focus:border-primario/60 focus:ring-2 focus:ring-primario/20 placeholder-zinc-600 transition-all hover:border-zinc-600"
-              placeholder="setter@gym.com"
+              placeholder="tu@correo.com"
               required
               autoComplete="email"
             />
@@ -80,6 +80,7 @@ export default function LoginPage() {
             {loading ? 'Entrando...' : 'Entrar →'}
           </button>
         </form>
+        <p className="text-zinc-500 text-xs text-center mt-4">¿Olvidaste tu contraseña? Pídele al admin una nueva.</p>
       </div>
     </div>
   )

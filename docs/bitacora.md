@@ -505,3 +505,9 @@ El dueño pidió una lista de funciones al estilo EVO (guardada en la memoria 'p
 
 - /mi-cuenta se quedaba en blanco para cuentas sin ficha de persona (por ejemplo, una cuenta nueva de staff de prueba): MyMembership hacía `.map` sobre listas que get_my_portal no trae cuando person es null. Ahora se protege (commit 0ac7abe), verificado en vivo.
 - Seguridad (23-oct, ver staff_fix.sql): ya solo quedan 3 perfiles de staff (admin, Ximena, Adán). Alta de staff en Empleados → Acceso al panel.
+
+## 2026-10-24 — Staff con usuario y contraseña
+
+- Edge Function `staff-admin` (Verify JWT apagado, solo admin): crea la cuenta con contraseña temporal (o usa la existente) y la deja como staff o admin; pone una contraseña nueva si se olvidó. Queda registrado en la bitácora sin la contraseña.
+- Empleados → Acceso al panel: alta con correo, nombre, contraseña temporal y rol; botón "Nueva contraseña" por persona.
+- Panel: "Cambiar mi contraseña" (supabase.auth.updateUser). /login dice "staff del gym", lleva a /staff/inicio y aclara que el admin da contraseñas nuevas.

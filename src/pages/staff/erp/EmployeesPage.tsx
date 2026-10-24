@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { call, erpError, money, toCents, toPesos, fmtDate, todayMx, EXPENSE_METHODS, PAID_FROM } from '../../../lib/erp'
 import { Page, Card, Badge, Empty, Spinner, Msg, input, label, btnPrimary, btnGhost, MoneyField } from '../../../components/erp/ui'
 import { FilesBox } from './PersonExtras'
+import { supabase } from '../../../lib/supabase'
 
 // Empleados (admin): datos, contrato/pago, documentos y nómina (cae en Egresos).
 
@@ -64,17 +65,30 @@ export default function EmployeesPage() {
   )
 }
 
-// Quién puede entrar al panel (/staff). Solo el admin lo administra.
+// Quién puede entrar al panel (/staff) con su correo y contraseña. Solo el admin lo administra.
 interface StaffUser { id: string; name: string; role: 'staff' | 'admin'; email: string | null; last_sign_in_at: string | null }
 const STAFF_ERRORS: Record<string, string> = {
-  account_not_found: 'Ese correo todavía no tiene cuenta. Pídele que entre una vez a app.jaibamuro.com/mi-cuenta con ese correo (le llega un código) y vuelve a intentarlo.',
+  invalid_email: 'Revisa el correo.',
+  weak_password: 'La contraseña debe tener al menos 8 caracteres.',
+  password_required: 'Es una cuenta nueva: escribe una contraseña temporal (mínimo 8 caracteres).',
   cannot_remove_self: 'No te puedes quitar a ti mismo.',
+  cannot_demote_self: 'No te puedes quitar el rol de admin a ti mismo.',
   has_history: 'No se puede quitar porque tiene historial (armó rutas, etc.).',
+  forbidden: 'Solo un admin puede hacer esto.',
+}
+
+async function staffAdmin(body: Record<string, unknown>): Promise<{ data: { created?: boolean } | null; error: string | null }> {
+  const { data, error } = await supabase.functions.invoke('staff-admin', { body })
+  if (error) return { data: null, error: 'No se pudo usar la función staff-admin (¿ya se desplegó?).' }
+  if (data?.error) return { data: null, error: STAFF_ERRORS[data.error] ?? data.message ?? data.error }
+  return { data, error: null }
 }
 
 function StaffAccessCard({ onChanged }: { onChanged: () => void }) {
   const [users, setUsers] = useState<StaffUser[] | null>(null)
-  const [f, setF] = useState({ email: '', name: '', role: 'staff' })
+  const [f, setF] = useState({ email: '', name: '', role: 'staff', password: '' })
+  const [pwFor, setPwFor] = useState<string | null>(null)
+  const [newPw, setNewPw] = useState('')
   const [msg, setMsg] = useState<{ text: string; tone: 'ok' | 'error' } | null>(null)
   const [busy, setBusy] = useState(false)
   const load = useCallback(async () => {
@@ -83,13 +97,21 @@ function StaffAccessCard({ onChanged }: { onChanged: () => void }) {
   }, [])
   useEffect(() => { load() }, [load])
 
-  const add = async () => {
+  const save = async () => {
     setBusy(true); setMsg(null)
-    const { error } = await call('admin_add_staff', { p_email: f.email, p_name: f.name, p_role: f.role })
+    const { data, error } = await staffAdmin({ action: 'save', email: f.email, name: f.name, role: f.role, password: f.password || null })
     setBusy(false)
-    if (error) { setMsg({ text: STAFF_ERRORS[error] ?? erpError(error), tone: 'error' }); return }
-    setMsg({ text: `${f.email} ya puede entrar al panel como ${f.role === 'admin' ? 'admin' : 'staff'}.`, tone: 'ok' })
-    setF({ email: '', name: '', role: 'staff' }); load(); onChanged()
+    if (error || !data) { setMsg({ text: error ?? 'Error', tone: 'error' }); return }
+    setMsg({ text: `${f.email} ${data.created ? 'ya tiene cuenta' : 'quedó'} como ${f.role === 'admin' ? 'admin' : 'staff'}. Entra en app.jaibamuro.com/login con su correo${f.password ? ' y la contraseña que pusiste' : ''}.`, tone: 'ok' })
+    setF({ email: '', name: '', role: 'staff', password: '' }); load(); onChanged()
+  }
+  const setPassword = async (u: StaffUser) => {
+    setBusy(true); setMsg(null)
+    const { error } = await staffAdmin({ action: 'set_password', profile_id: u.id, password: newPw })
+    setBusy(false)
+    if (error) { setMsg({ text: error, tone: 'error' }); return }
+    setMsg({ text: `Listo: ${u.name} ya entra con la contraseña nueva.`, tone: 'ok' })
+    setPwFor(null); setNewPw('')
   }
   const remove = async (u: StaffUser) => {
     if (!window.confirm(`¿Quitarle el acceso al panel a ${u.name}? Su cuenta de cliente sigue igual.`)) return
@@ -100,30 +122,43 @@ function StaffAccessCard({ onChanged }: { onChanged: () => void }) {
 
   return (
     <Card title="Acceso al panel (usuarios de staff)">
-      <p className="text-zinc-400 text-sm mb-3">Solo estas cuentas pueden entrar a app.jaibamuro.com/staff. El staff vende, abre caja, ve personas, clases e inventario; el admin además ve egresos, empleados, bitácora, estados y configuración.</p>
+      <p className="text-zinc-400 text-sm mb-3">Solo estas cuentas entran a app.jaibamuro.com/login con su correo y contraseña. El staff vende, abre caja, ve personas, clases e inventario; el admin además ve egresos, empleados, bitácora, estados y configuración.</p>
       {users === null ? <Spinner /> : (
         <div className="divide-y divide-zinc-800/80 mb-4">
           {users.map(u => (
-            <div key={u.id} className="py-2 flex items-center justify-between gap-3 text-sm">
-              <div className="min-w-0">
-                <p className="text-texto-principal font-semibold">{u.name} <Badge cls={u.role === 'admin' ? 'text-primario bg-primario/10' : undefined}>{u.role}</Badge></p>
-                <p className="text-zinc-500 text-xs">{u.email ?? '—'} · último acceso {u.last_sign_in_at ? fmtDate(u.last_sign_in_at.slice(0, 10)) : 'nunca'}</p>
+            <div key={u.id} className="py-2 text-sm">
+              <div className="flex items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="text-texto-principal font-semibold">{u.name} <Badge cls={u.role === 'admin' ? 'text-primario bg-primario/10' : undefined}>{u.role}</Badge></p>
+                  <p className="text-zinc-500 text-xs">{u.email ?? '—'} · último acceso {u.last_sign_in_at ? fmtDate(u.last_sign_in_at.slice(0, 10)) : 'nunca'}</p>
+                </div>
+                <span className="flex gap-3 shrink-0">
+                  <button onClick={() => { setPwFor(pwFor === u.id ? null : u.id); setNewPw('') }} className="text-zinc-400 hover:text-texto-principal text-xs font-bold">Nueva contraseña</button>
+                  <button onClick={() => remove(u)} className="text-zinc-500 hover:text-alerta text-xs font-bold">Quitar acceso</button>
+                </span>
               </div>
-              <button onClick={() => remove(u)} className="text-zinc-500 hover:text-alerta text-xs font-bold">Quitar acceso</button>
+              {pwFor === u.id && (
+                <div className="flex gap-2 mt-2">
+                  <input type="text" value={newPw} onChange={e => setNewPw(e.target.value)} placeholder="Contraseña nueva (mín. 8)" autoComplete="new-password" className={input} />
+                  <button onClick={() => setPassword(u)} disabled={busy || newPw.length < 8} className={btnPrimary}>Guardar</button>
+                </div>
+              )}
             </div>
           ))}
         </div>
       )}
+      <p className="text-zinc-300 text-sm font-bold mb-2">Dar de alta a alguien</p>
       <div className="grid sm:grid-cols-4 gap-2 items-end">
-        <div className="sm:col-span-2"><label className={label}>Correo</label><input type="email" value={f.email} onChange={e => setF({ ...f, email: e.target.value })} placeholder="correo@ejemplo.com" className={input} /></div>
+        <div><label className={label}>Correo</label><input type="email" value={f.email} onChange={e => setF({ ...f, email: e.target.value })} placeholder="correo@ejemplo.com" autoComplete="off" className={input} /></div>
         <div><label className={label}>Nombre</label><input value={f.name} onChange={e => setF({ ...f, name: e.target.value })} className={input} /></div>
+        <div><label className={label}>Contraseña temporal</label><input type="text" value={f.password} onChange={e => setF({ ...f, password: e.target.value })} placeholder="mín. 8 caracteres" autoComplete="new-password" className={input} /></div>
         <div><label className={label}>Rol</label>
           <select value={f.role} onChange={e => setF({ ...f, role: e.target.value })} className={input}>
             <option value="staff">Staff</option><option value="admin">Admin (ve todo)</option>
           </select></div>
       </div>
-      <button onClick={add} disabled={busy || !f.email.includes('@')} className={`${btnPrimary} mt-3`}>{busy ? 'Guardando…' : 'Dar acceso al panel'}</button>
-      <p className="text-zinc-500 text-xs mt-2">La persona primero entra una vez a app.jaibamuro.com/mi-cuenta con su correo (le llega un código). Después la das de alta aquí y ya puede abrir el panel.</p>
+      <button onClick={save} disabled={busy || !f.email.includes('@')} className={`${btnPrimary} mt-3`}>{busy ? 'Guardando…' : 'Dar acceso al panel'}</button>
+      <p className="text-zinc-500 text-xs mt-2">Si la persona ya tiene cuenta (por ejemplo, porque escala aquí), se usa la misma; la contraseña es opcional en ese caso. Después ella la puede cambiar en el panel con "Cambiar mi contraseña".</p>
       {msg && <div className="mt-2"><Msg text={msg.text} tone={msg.tone} /></div>}
     </Card>
   )

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Outlet, NavLink, useLocation } from 'react-router-dom'
 import { signOut } from '../../lib/auth'
+import { supabase } from '../../lib/supabase'
 import { useProfile } from '../../hooks/useProfile'
 import { isOwner } from '../../lib/owner'
 import logoHorizontal from '../../assets/logo-horizontal.png'
@@ -66,6 +67,7 @@ export default function StaffLayout() {
   const showInsights = isAdmin && isOwner(email)
   const location = useLocation()
   const [mobileOpen, setMobileOpen] = useState(false)
+  const [pwOpen, setPwOpen] = useState(false)
   const [compact, setCompact] = useState<boolean>(() => readJson(COMPACT_KEY, false))
   const [open, setOpen] = useState<Record<string, boolean>>(() => readJson(OPEN_KEY, { clientes: true, ventas: true, finanzas: true, clases: true, muro: true }))
 
@@ -175,6 +177,7 @@ export default function StaffLayout() {
         </div>
         {nav(compact)}
         <div className="border-t border-zinc-800/60 p-2">
+          {!compact && <button onClick={() => setPwOpen(true)} className="w-full text-left text-zinc-500 hover:text-texto-principal text-xs font-semibold px-3 py-1.5 rounded-lg hover:bg-superficie-alta">Cambiar mi contraseña</button>}
           <button onClick={signOut} className={`w-full text-zinc-400 hover:text-texto-principal text-xs font-semibold px-3 py-2 rounded-lg hover:bg-superficie-alta ${compact ? 'text-center' : 'text-left'}`}>
             {compact ? '⏻' : `Salir${profile?.name ? ` · ${profile.name}` : ''}`}
           </button>
@@ -191,6 +194,7 @@ export default function StaffLayout() {
             </div>
             {nav(false)}
             <div className="border-t border-zinc-800/60 p-2">
+              <button onClick={() => setPwOpen(true)} className="w-full text-left text-zinc-500 hover:text-texto-principal text-xs font-semibold px-3 py-1.5">Cambiar mi contraseña</button>
               <button onClick={signOut} className="w-full text-left text-zinc-400 hover:text-texto-principal text-xs font-semibold px-3 py-2">Salir</button>
             </div>
           </div>
@@ -209,6 +213,39 @@ export default function StaffLayout() {
         <main className="flex-1 overflow-hidden min-h-0">
           <Outlet />
         </main>
+      </div>
+      {pwOpen && <ChangePasswordModal onClose={() => setPwOpen(false)} />}
+    </div>
+  )
+}
+
+// El staff cambia su propia contraseña (con la sesión ya iniciada).
+function ChangePasswordModal({ onClose }: { onClose: () => void }) {
+  const [pw, setPw] = useState('')
+  const [pw2, setPw2] = useState('')
+  const [msg, setMsg] = useState<{ text: string; ok: boolean } | null>(null)
+  const [busy, setBusy] = useState(false)
+  const save = async () => {
+    if (pw.length < 8) { setMsg({ text: 'Mínimo 8 caracteres.', ok: false }); return }
+    if (pw !== pw2) { setMsg({ text: 'Las dos contraseñas no coinciden.', ok: false }); return }
+    setBusy(true)
+    const { error } = await supabase.auth.updateUser({ password: pw })
+    setBusy(false)
+    setMsg(error ? { text: 'No se pudo cambiar. Intenta de nuevo.', ok: false } : { text: 'Listo, tu contraseña cambió.', ok: true })
+    if (!error) { setPw(''); setPw2('') }
+  }
+  const field = 'w-full bg-superficie-alta border border-zinc-700/50 rounded-xl px-3 py-2.5 text-texto-principal text-sm focus:outline-none focus:border-primario/60'
+  return (
+    <div className="fixed inset-0 z-[60] bg-black/60 flex items-center justify-center p-4" onClick={onClose}>
+      <div className="w-full max-w-sm bg-superficie rounded-2xl border border-zinc-800 p-5 space-y-3" onClick={e => e.stopPropagation()}>
+        <h2 className="text-texto-principal font-bold">Cambiar mi contraseña</h2>
+        <input type="password" value={pw} onChange={e => setPw(e.target.value)} placeholder="Contraseña nueva (mín. 8)" autoComplete="new-password" className={field} />
+        <input type="password" value={pw2} onChange={e => setPw2(e.target.value)} placeholder="Repítela" autoComplete="new-password" className={field} />
+        {msg && <p className={`text-sm font-semibold ${msg.ok ? 'text-exito' : 'text-alerta'}`}>{msg.text}</p>}
+        <div className="flex gap-2">
+          <button onClick={save} disabled={busy} className="flex-1 py-2.5 rounded-xl bg-primario text-texto-en-acento font-bold text-sm disabled:opacity-50">{busy ? 'Guardando…' : 'Guardar'}</button>
+          <button onClick={onClose} className="px-4 py-2.5 rounded-xl bg-superficie-alta text-zinc-300 text-sm font-bold">Cerrar</button>
+        </div>
       </div>
     </div>
   )
