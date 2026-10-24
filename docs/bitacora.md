@@ -500,3 +500,8 @@ El dueño pidió una lista de funciones al estilo EVO (guardada en la memoria 'p
 - Pruebas: CRM 64 + render de correo 6, sin regresiones (finanzas 74, ERP 67, billing 37, clases 51). UI revisada en local: firma de menor con tutor, hoja imprimible, check-in negado por falta de membresía.
 - Pendiente: Run erp_crm.sql, desplegar crm-emails (Verify JWT off), Run erp_crm_cron.sql.
 
+
+## 2026-10-24 — Arreglo: Mi cuenta en blanco
+
+- /mi-cuenta se quedaba en blanco para cuentas sin ficha de persona (por ejemplo, una cuenta nueva de staff de prueba): MyMembership hacía `.map` sobre listas que get_my_portal no trae cuando person es null. Ahora se protege (commit 0ac7abe), verificado en vivo.
+- Seguridad (23-oct, ver staff_fix.sql): ya solo quedan 3 perfiles de staff (admin, Ximena, Adán). Alta de staff en Empleados → Acceso al panel.
