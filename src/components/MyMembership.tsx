@@ -22,8 +22,14 @@ export default function MyMembership() {
 
   const [access, setAccess] = useState<{ access_code: string; pending_documents: { title: string }[] } | null>(null)
   const [showQr, setShowQr] = useState(false)
-  useEffect(() => { call<Portal>('get_my_portal').then(({ data }) => setP(data ?? null)) }, [])
-  useEffect(() => { call<{ access_code: string; pending_documents: { title: string }[] }>('get_my_access').then(({ data }) => setAccess(data?.access_code ? data : null)) }, [])
+  // Sin sesión o sin ficha la función no trae listas: no se muestra nada (y no truena).
+  useEffect(() => {
+    call<Portal>('get_my_portal').then(({ data, error }) => {
+      if (error || !data) { setP(null); return }
+      setP({ ...data, subscriptions: data.subscriptions ?? [], sales: data.sales ?? [], free_left_this_month: data.free_left_this_month ?? 0 })
+    })
+  }, [])
+  useEffect(() => { call<{ access_code: string; pending_documents: { title: string }[] }>('get_my_access').then(({ data }) => setAccess(data?.access_code ? { access_code: data.access_code, pending_documents: data.pending_documents ?? [] } : null)) }, [])
 
   const updateCard = async (id: string) => {
     setBusy(id)
