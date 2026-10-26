@@ -41,6 +41,8 @@ import AuditPage from './pages/staff/erp/AuditPage'
 import EmployeesPage from './pages/staff/erp/EmployeesPage'
 import StatementsPage from './pages/staff/erp/StatementsPage'
 import ChecklistPage from './pages/staff/erp/ChecklistPage'
+import MyAttendancePage from './pages/staff/erp/MyAttendancePage'
+import AttendanceAdminPage from './pages/staff/erp/AttendanceAdminPage'
 import ChecklistAdminPage from './pages/staff/erp/ChecklistAdminPage'
 import ChecklistTemplatePage from './pages/staff/erp/ChecklistTemplatePage'
 import SignaturePage from './pages/staff/erp/SignaturePage'
@@ -114,6 +116,8 @@ export default function App() {
           <Route path="turno" element={<ErrorBoundary label="Turno"><ChecklistPage /></ErrorBoundary>} />
           <Route path="turno/:date" element={<ErrorBoundary label="Turno"><ChecklistPage /></ErrorBoundary>} />
           <Route path="turnos" element={<ErrorBoundary label="Turnos"><ChecklistAdminPage /></ErrorBoundary>} />
+          <Route path="asistencia" element={<ErrorBoundary label="Mi asistencia"><MyAttendancePage /></ErrorBoundary>} />
+          <Route path="asistencia/reporte" element={<ErrorBoundary label="Asistencia"><AttendanceAdminPage /></ErrorBoundary>} />
           <Route path="config/checklist" element={<ErrorBoundary label="Plantilla del checklist"><ChecklistTemplatePage /></ErrorBoundary>} />
           <Route path="config/correos" element={<ErrorBoundary label="Correos"><EmailsConfigPage /></ErrorBoundary>} />
           <Route path="config/documentos" element={<ErrorBoundary label="Documentos"><LegalDocsConfigPage /></ErrorBoundary>} />

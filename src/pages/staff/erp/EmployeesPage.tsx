@@ -213,10 +213,49 @@ function EmployeeDetail({ id, logins, onChanged }: { id: string; logins: List['s
           </Card>
         </div>
       )}
+      <ScheduleCard employeeId={e.id} />
       <Card title="Documentos (contrato, INE, comprobantes…)">
         <FilesBox ownerKind="employee" ownerId={e.id} files={d.files} canDelete onChanged={load} />
       </Card>
     </div>
+  )
+}
+
+// Horario semanal: de aquí salen los retardos y faltas de Asistencia.
+const DAYS = ['', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo']
+function ScheduleCard({ employeeId }: { employeeId: string }) {
+  const [rows, setRows] = useState<{ dow: number; start_time: string; end_time: string }[] | null>(null)
+  const [msg, setMsg] = useState<{ text: string; tone: 'ok' | 'error' } | null>(null)
+  useEffect(() => {
+    call<{ schedule: { dow: number; start_time: string; end_time: string | null }[] }>('get_employee_schedule', { p_employee_id: employeeId }).then(({ data }) => {
+      const got = data?.schedule ?? []
+      setRows([1, 2, 3, 4, 5, 6, 7].map(dow => {
+        const r = got.find(x => x.dow === dow)
+        return { dow, start_time: r?.start_time.slice(0, 5) ?? '', end_time: r?.end_time?.slice(0, 5) ?? '' }
+      }))
+    })
+  }, [employeeId])
+  if (!rows) return <Card title="Horario"><Spinner /></Card>
+  const set = (dow: number, x: Partial<{ start_time: string; end_time: string }>) => { setRows(rows.map(r => r.dow === dow ? { ...r, ...x } : r)); setMsg(null) }
+  const save = async () => {
+    const { error } = await call('admin_save_employee_schedule', { p_employee_id: employeeId, p: rows.filter(r => r.start_time) })
+    setMsg(error ? { text: error === 'bad_times' ? 'La hora de salida debe ser después de la de entrada.' : erpError(error), tone: 'error' } : { text: 'Horario guardado.', tone: 'ok' })
+  }
+  return (
+    <Card title="Horario (para retardos y faltas)">
+      <div className="space-y-1.5">
+        {rows.map(r => (
+          <div key={r.dow} className="grid grid-cols-[6rem_1fr_1fr] gap-2 items-center text-sm">
+            <span className={r.start_time ? 'text-texto-principal font-semibold' : 'text-zinc-500'}>{DAYS[r.dow]}</span>
+            <input type="time" value={r.start_time} onChange={x => set(r.dow, { start_time: x.target.value })} className={input} aria-label={`Entrada ${DAYS[r.dow]}`} />
+            <input type="time" value={r.end_time} onChange={x => set(r.dow, { end_time: x.target.value })} disabled={!r.start_time} className={input} aria-label={`Salida ${DAYS[r.dow]}`} />
+          </div>
+        ))}
+      </div>
+      <p className="text-zinc-500 text-xs mt-2">Deja la entrada vacía en los días que descansa.</p>
+      {msg && <div className="mt-2"><Msg text={msg.text} tone={msg.tone} /></div>}
+      <button onClick={save} className={`${btnPrimary} mt-3`}>Guardar horario</button>
+    </Card>
   )
 }
 

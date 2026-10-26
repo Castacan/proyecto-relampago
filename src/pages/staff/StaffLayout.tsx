@@ -22,6 +22,7 @@ const ICONS: Record<string, string> = {
   receipt: 'M4 2v20l3-2 3 2 3-2 3 2 3-2 1 .7V2l-3 2-3-2-3 2-3-2-3 2zM8 8h8M8 12h8M8 16h5',
   chart: 'M3 3v18h18M7 15l4-4 3 3 5-6',
   calendar: 'M3 4h18v18H3zM16 2v4M8 2v4M3 10h18',
+  clock: 'M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20zM12 6v6l4 2',
   wall: 'M3 3h7v7H3zM14 3h7v7h-7zM14 14h7v7h-7zM3 14h7v7H3z',
   qr: 'M3 3h6v6H3zM15 3h6v6h-6zM3 15h6v6H3zM15 15h2v2h-2zM19 19h2v2h-2zM15 19h2v2h-2zM19 15h2v2h-2z',
   spray: 'M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zM9 9h.01M15 9h.01M8 14s1.5 2 4 2 4-2 4-2',
@@ -92,6 +93,7 @@ export default function StaffLayout() {
     ] },
     { id: 'equipo', label: 'Equipo', icon: 'users', items: [
       { to: '/staff/turnos', label: 'Turnos y encargados', icon: 'calendar', show: isAdmin },
+      { to: '/staff/asistencia/reporte', label: 'Asistencia', icon: 'clock', show: isAdmin },
       { to: '/staff/empleados', label: 'Empleados', icon: 'badge', show: isAdmin },
       { to: '/staff/bitacora', label: 'Bitácora', icon: 'list', show: isAdmin },
     ] },
@@ -138,6 +140,9 @@ export default function StaffLayout() {
       </NavLink>
       <NavLink to="/staff/turno" end className={({ isActive }) => linkClass(isActive)} title="Turno de hoy">
         <Icon name="check" />{!isCompact && <span>Turno de hoy</span>}
+      </NavLink>
+      <NavLink to="/staff/asistencia" end className={({ isActive }) => linkClass(isActive)} title="Mi asistencia">
+        <Icon name="clock" />{!isCompact && <span>Mi asistencia</span>}
       </NavLink>
       {groups.map(g => (
         <div key={g.id} className="pt-1">

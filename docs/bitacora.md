@@ -607,3 +607,38 @@ encargado siempre; la migración de EVO todavía no.
 
 **Falta:** que el dueño dé Run a erp_checklist_encargado.sql, dé de alta a
 Erick (necesita su correo) y lo elija como encargado fijo.
+
+## 2026-10-26 — Asistencia del staff con selfie y WiFi del muro
+
+**Decisiones del dueño:** cada quien checa con su celular (opción a);
+10 min de tolerancia; desde 25 min tarde es falta; 3 retardos al mes = 1 falta.
+
+**Hecho:**
+- `src/supabase/erp_asistencia.sql` (después de erp_crm.sql):
+  - Ajustes editables (tolerancia, falta desde, retardos = falta, exigir WiFi,
+    "contar desde" y el texto del aviso con versión).
+  - Redes del muro: la IP pública se lee de `request.headers` (PostgREST).
+    IPv4 exacta e IPv6 por prefijo /64. El admin registra "el WiFi en el que
+    estoy".
+  - Horario por empleado y día, registros con selfie (bucket privado
+    `asistencia`: el staff sube y solo el admin ve), aviso aceptado con
+    nombre, días justificados, registros a mano con motivo y borrar
+    registros. Todo va a la bitácora.
+  - `erp_attendance_days` da el estado de cada día: a tiempo, retardo,
+    falta, falta por llegar tarde, justificado, aún no llega o sin horario.
+- Pantallas:
+  - `/staff/asistencia` "Mi asistencia" (todos): aviso, botón grande de
+    entrada/salida con la cámara de frente, y cómo va el mes.
+  - `/staff/asistencia/reporte` (admin): resumen por empleado, días con
+    selfies, justificar, registro a mano, y ajustes y WiFi.
+  - Empleados → ficha → "Horario".
+- Pruebas: 47 en `asist_test.mjs` (PGlite) y en el navegador con el servidor
+  falso: aviso, entrada, falta por llegar tarde y reporte. El servidor falso
+  guarda la foto como multipart, así que ahí no se ve la miniatura; en
+  Supabase real sí.
+
+**Falta:**
+- Que el dueño dé Run a `erp_asistencia.sql`.
+- Que registre el WiFi estando en el muro y le ponga horario a cada quien.
+- Que revise el texto del aviso (es un BORRADOR).
+- Verificar en vivo que la IP que llega sea la del celular.
