@@ -19,7 +19,7 @@ export default function LoginPage() {
     if (err) {
       setError('Correo o contraseña incorrectos')
     } else {
-      navigate('/staff/inicio')
+      navigate('/staff/turno')
     }
   }
 

@@ -511,3 +511,49 @@ El dueño pidió una lista de funciones al estilo EVO (guardada en la memoria 'p
 - Edge Function `staff-admin` (Verify JWT apagado, solo admin): crea la cuenta con contraseña temporal (o usa la existente) y la deja como staff o admin; pone una contraseña nueva si se olvidó. Queda registrado en la bitácora sin la contraseña.
 - Empleados → Acceso al panel: alta con correo, nombre, contraseña temporal y rol; botón "Nueva contraseña" por persona.
 - Panel: "Cambiar mi contraseña" (supabase.auth.updateUser). /login dice "staff del gym", lleva a /staff/inicio y aclara que el admin da contraseñas nuevas.
+
+## 2026-10-26 — Checklist diario del staff (turnos)
+
+**Pedido:** el brief `BRIEF_checklist_jaibamuro.md`. Cada turno debe tener un
+encargado, un checklist con horarios y evidencia, y el admin debe poder
+revisarlo en 2 minutos.
+
+**Decisiones del dueño:**
+- La Caja de la app es la del checklist. "Contar el fondo" abre la Caja y
+  "Corte de caja" la cierra. El monto se captura una sola vez y la
+  diferencia sale calculada.
+- En los textos de la semilla dice "la app", no "EVO".
+- El desmontaje del sábado se elige con las rutas de la pared. El staff las
+  marca como desmontadas, quedan retiradas y su QR queda libre.
+
+**Hecho:**
+- `src/supabase/erp_checklist.sql`:
+  - **Plantilla:** bloques con horario y días. Cada tarea toma los días de
+    su bloque o tiene los suyos (tarea del día, extras del viernes).
+  - **Copia del día:** se guarda una copia por día, `checklist_day_tasks`,
+    así que editar la plantilla no cambia días ya generados.
+  - **Encargado y desmontaje por fecha:** `checklist_days`.
+  - **Reportes en el momento:** `checklist_notes`.
+  - **Fotos:** bucket privado `checklist`.
+  - **Reglas al marcar y cerrar:** foto, monto o reporte obligatorios según
+    la tarea. "No se hizo" exige motivo. Solo el encargado o el admin cierra
+    el turno, y no se puede con obligatorias pendientes ni sin la bitácora de
+    3 líneas.
+  - **Semilla:** el checklist que Inge revisó.
+- **Pantallas:**
+  - `/staff/turno` (todos): "Turno de hoy" en el menú, y el login lleva ahí.
+  - `/staff/turno/:fecha` (admin).
+  - `/staff/turnos` (admin): encargado por fecha, desmontaje del sábado e
+    historial por fecha y persona.
+  - `/staff/config/checklist` (admin): editor de la plantilla con vista por
+    día.
+- **Pruebas:** 62 en PGlite (`checklist_test.mjs`). También lo probé en el
+  navegador con el servidor falso: marcar, foto, fondo que abre la caja,
+  desmontaje y guardar la plantilla.
+
+**Pendiente de decidir (no implementado, editable en la plantilla):**
+- La clase de los jueves a las 5 pm.
+- La zona 1, que hoy no se cepilla ningún día.
+- Quién es el encargado de cada día.
+- Erick todavía no tiene cuenta de staff.
+

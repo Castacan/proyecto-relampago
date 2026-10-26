@@ -40,6 +40,9 @@ import AccessPage from './pages/staff/erp/AccessPage'
 import AuditPage from './pages/staff/erp/AuditPage'
 import EmployeesPage from './pages/staff/erp/EmployeesPage'
 import StatementsPage from './pages/staff/erp/StatementsPage'
+import ChecklistPage from './pages/staff/erp/ChecklistPage'
+import ChecklistAdminPage from './pages/staff/erp/ChecklistAdminPage'
+import ChecklistTemplatePage from './pages/staff/erp/ChecklistTemplatePage'
 import SignaturePage from './pages/staff/erp/SignaturePage'
 import { EmailsConfigPage, LegalDocsConfigPage } from './pages/staff/erp/CrmConfigPages'
 import MyDocumentsPage from './pages/public/MyDocumentsPage'
@@ -108,6 +111,10 @@ export default function App() {
           <Route path="bitacora" element={<ErrorBoundary label="Bitácora"><AuditPage /></ErrorBoundary>} />
           <Route path="empleados" element={<ErrorBoundary label="Empleados"><EmployeesPage /></ErrorBoundary>} />
           <Route path="estados" element={<ErrorBoundary label="Estados financieros"><StatementsPage /></ErrorBoundary>} />
+          <Route path="turno" element={<ErrorBoundary label="Turno"><ChecklistPage /></ErrorBoundary>} />
+          <Route path="turno/:date" element={<ErrorBoundary label="Turno"><ChecklistPage /></ErrorBoundary>} />
+          <Route path="turnos" element={<ErrorBoundary label="Turnos"><ChecklistAdminPage /></ErrorBoundary>} />
+          <Route path="config/checklist" element={<ErrorBoundary label="Plantilla del checklist"><ChecklistTemplatePage /></ErrorBoundary>} />
           <Route path="config/correos" element={<ErrorBoundary label="Correos"><EmailsConfigPage /></ErrorBoundary>} />
           <Route path="config/documentos" element={<ErrorBoundary label="Documentos"><LegalDocsConfigPage /></ErrorBoundary>} />
           <Route path="domiciliaciones" element={<ErrorBoundary label="Domiciliaciones"><SubscriptionsPage /></ErrorBoundary>} />

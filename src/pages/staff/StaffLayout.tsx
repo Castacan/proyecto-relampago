@@ -91,6 +91,7 @@ export default function StaffLayout() {
       { to: '/staff/estados', label: 'Estados financieros', icon: 'receipt', show: isAdmin },
     ] },
     { id: 'equipo', label: 'Equipo', icon: 'users', items: [
+      { to: '/staff/turnos', label: 'Turnos y encargados', icon: 'calendar', show: isAdmin },
       { to: '/staff/empleados', label: 'Empleados', icon: 'badge', show: isAdmin },
       { to: '/staff/bitacora', label: 'Bitácora', icon: 'list', show: isAdmin },
     ] },
@@ -112,6 +113,7 @@ export default function StaffLayout() {
     { id: 'config', label: 'Configuración', icon: 'settings', items: [
       { to: '/staff/config/productos', label: 'Productos y planes', icon: 'box', show: isAdmin },
       { to: '/staff/config/integraciones', label: 'Integraciones y pagos', icon: 'plug', show: isAdmin },
+      { to: '/staff/config/checklist', label: 'Plantilla del checklist', icon: 'list', show: isAdmin },
       { to: '/staff/config/documentos', label: 'Responsiva y reglamento', icon: 'file', show: isAdmin },
       { to: '/staff/config/correos', label: 'Correos automáticos', icon: 'mail', show: isAdmin },
       { to: '/staff/config/general', label: 'Ajustes generales', icon: 'sliders', show: isAdmin },
@@ -133,6 +135,9 @@ export default function StaffLayout() {
     <nav className="flex-1 overflow-y-auto overscroll-contain px-2 py-3 space-y-1">
       <NavLink to="/staff/inicio" className={({ isActive }) => linkClass(isActive)} title="Inicio">
         <Icon name="home" />{!isCompact && <span>Inicio</span>}
+      </NavLink>
+      <NavLink to="/staff/turno" end className={({ isActive }) => linkClass(isActive)} title="Turno de hoy">
+        <Icon name="check" />{!isCompact && <span>Turno de hoy</span>}
       </NavLink>
       {groups.map(g => (
         <div key={g.id} className="pt-1">
