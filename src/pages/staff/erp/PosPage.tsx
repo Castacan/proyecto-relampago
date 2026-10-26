@@ -1,9 +1,10 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
-import { call, erpError, money, toCents, durationLabel, KIND_LABELS, METHOD_LABELS, POS_METHODS, type Product, type ProductKind } from '../../../lib/erp'
+import { call, erpError, money, fmtDate, toCents, durationLabel, KIND_LABELS, METHOD_LABELS, POS_METHODS, type Product, type ProductKind } from '../../../lib/erp'
 import { Page, Card, Empty, Msg, Spinner, input, label, btnPrimary, btnGhost, btnSmall } from '../../../components/erp/ui'
 import { PersonPicker, type Person } from '../classes/people'
 
+interface TodayPerson { id: string; full_name: string; phone: string | null; email: string | null; entered_at: string | null; bought: string | null; last_at: string; membership_until: string | null }
 interface Line { product: Product; qty: number; discount: string; startsOn: string }
 interface Payment { method: string; amount: string; reference: string }
 
@@ -22,6 +23,10 @@ export default function PosPage() {
   const [error, setError] = useState<string | null>(null)
   const [done, setDone] = useState<{ folio: number; total: number; change: number } | null>(null)
   const [isAdmin, setIsAdmin] = useState(false)
+  const [todayPeople, setTodayPeople] = useState<TodayPerson[] | null>(null)
+  const [entryMsg, setEntryMsg] = useState<{ text: string; tone: 'ok' | 'error' } | null>(null)
+  const loadTodayPeople = useCallback(async () => { const { data } = await call<{ people: TodayPerson[] }>('get_today_people'); setTodayPeople(data?.people ?? []) }, [])
+  useEffect(() => { loadTodayPeople() }, [loadTodayPeople])
 
   useEffect(() => {
     call<{ products: Product[] }>('get_products', { p_include_inactive: false }).then(({ data }) => setProducts((data?.products ?? []).filter(p => !p.is_recurring)))
@@ -81,8 +86,22 @@ export default function PosPage() {
     setBusy(false)
     if (error === 'out_of_stock' && data?.product) { setError(`No hay suficiente ${data.product}: quedan ${data.stock ?? 0}.`); return }
     if (error || !data) { setError(erpError(error ?? undefined)); return }
-    setDone({ folio: data.folio, total: data.total_cents, change })
+    setDone({ folio: data.folio, total: data.total_cents, change }); setEntryMsg(null)
+    loadTodayPeople()
     setLines([]); setDiscount(''); setPayments([{ method: 'cash', amount: '', reference: '' }]); setCashGiven(''); setNote('')
+  }
+
+  const giveEntry = async () => {
+    if (!person) return
+    const { data, error } = await call<{ result: string; reasons: string[] }>('staff_check_in', { p_person_id: person.id, p_code: null, p_method: 'manual', p_override_reason: null })
+    if (error || !data) { setEntryMsg({ text: erpError(error ?? undefined), tone: 'error' }); return }
+    setEntryMsg(data.result === 'denied' ? { text: 'No puede pasar (revisa su ficha: firmas o acceso bloqueado).', tone: 'error' } : { text: 'Entrada registrada.', tone: 'ok' })
+    loadTodayPeople()
+  }
+  const pickToday = (t: TodayPerson) => {
+    setDone(null)
+    setPerson({ id: t.id, full_name: t.full_name, phone: t.phone, email: t.email, birth_date: null, has_login: false, source: null, note: null,
+      membership_until: t.membership_until, membership_last_until: null })
   }
 
   return (
@@ -99,11 +118,19 @@ export default function PosPage() {
             <p className="text-exito font-bold">Venta #{done.folio} registrada · {money(done.total)}</p>
             {done.change > 0 && <p className="text-texto-principal text-lg font-black">Cambio: {money(done.change)}</p>}
           </div>
-          {person && <Link to={`/staff/personas/${person.id}`} className={btnGhost}>Ver ficha de {person.full_name.split(' ')[0]}</Link>}
-        </div></Card>
+          {person && (
+            <div className="flex flex-wrap gap-2">
+              {!todayPeople?.some(t => t.id === person.id && t.entered_at) && <button onClick={giveEntry} className={btnPrimary}>Dar entrada a {person.full_name.split(' ')[0]}</button>}
+              <Link to={`/staff/personas/${person.id}`} className={btnGhost}>Ver ficha de {person.full_name.split(' ')[0]}</Link>
+            </div>
+          )}
+        </div>
+        {entryMsg && <div className="mt-2"><Msg text={entryMsg.text} tone={entryMsg.tone} /></div>}
+        </Card>
       )}
 
-      <div className="grid lg:grid-cols-[1fr_380px] gap-4 items-start">
+      <div className="grid lg:grid-cols-[1fr_380px] xl:grid-cols-[230px_1fr_380px] gap-4 items-start">
+        <TodayList people={todayPeople} selectedId={person?.id ?? null} onPick={pickToday} />
         <div className="space-y-4">
           <Card title="Persona">
             <PersonPicker selected={person} onPick={p => { setPerson(p); setDone(null) }} />
@@ -206,5 +233,28 @@ export default function PosPage() {
         </Card>
       </div>
     </Page>
+  )
+}
+
+// Quién ya entró o compró hoy: tocar a alguien lo elige para la venta.
+function TodayList({ people, selectedId, onPick }: { people: TodayPerson[] | null; selectedId: string | null; onPick: (p: TodayPerson) => void }) {
+  return (
+    <Card title="Hoy en el muro" className="lg:col-span-2 xl:col-span-1 xl:sticky xl:top-0">
+      {people === null ? <Spinner /> : people.length === 0 ? <Empty>Nadie ha entrado ni comprado hoy.</Empty> : (
+        <div className="space-y-1 max-h-[70vh] overflow-y-auto -mx-2">
+          {people.map(t => (
+            <button key={t.id} onClick={() => onPick(t)}
+              className={`w-full text-left px-2 py-2 rounded-lg ${selectedId === t.id ? 'bg-primario/15 ring-1 ring-primario/50' : 'hover:bg-superficie-alta'}`}>
+              <p className="text-texto-principal text-sm font-semibold leading-tight truncate">{t.full_name}</p>
+              <p className="text-zinc-500 text-[11px] leading-snug">
+                {t.entered_at ? `Entró ${new Date(t.entered_at).toLocaleTimeString('es-MX', { hour: 'numeric', minute: '2-digit', timeZone: 'America/Mexico_City' })}` : 'No ha entrado'}
+                {t.membership_until ? ` · memb. hasta ${fmtDate(t.membership_until)}` : ''}
+              </p>
+              {t.bought && <p className="text-zinc-400 text-[11px] leading-snug truncate" title={t.bought}>Compró: {t.bought}</p>}
+            </button>
+          ))}
+        </div>
+      )}
+    </Card>
   )
 }

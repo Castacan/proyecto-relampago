@@ -649,3 +649,49 @@ Erick (necesita su correo) y lo elija como encargado fijo.
   profiles (altas nuevas) y al abrir Mi asistencia. Los admins no se vuelven
   empleados. Pruebas: 52 en `asist_test.mjs`. Hay que volver a correr
   erp_asistencia.sql completo (es idempotente).
+
+## 2026-10-26 — Recepción con reconocimiento facial
+
+**Pedido del dueño:** no quiere que el cliente busque su QR cada vez. Va a
+comprar una laptop con webcam para recepción.
+- Cliente nuevo: escanea un QR, crea su cuenta, llena sus datos y firma
+  responsiva, reglamento y aviso de privacidad. Luego se le toma la foto con
+  la webcam y se le hace la primera venta.
+- Cliente que ya vino: se asoma a la cámara y sale su perfil, con su
+  membresía activa o inactiva; si no tiene, se le cobra.
+- Vender: una columna con quién ya entró o compró hoy.
+
+**Hecho:**
+- `src/supabase/erp_recepcion.sql` (después de erp_crm.sql):
+  - Documento `privacidad`, BORRADOR, con consentimiento biométrico.
+  - Tabla `person_faces`: descriptor de 128 números; solo el staff lo lee
+    por RPC.
+  - `get_my_registration` / `save_my_registration`: datos, emergencia y
+    tutor si es menor.
+  - `staff_save_face`: exige firma del aviso.
+  - También: `staff_delete_face`, `get_face_index`, `get_face_status`,
+    `get_reception_pending` (nuevos de 3 días sin cara) y
+    `get_today_people`.
+- `@vladmandic/face-api` corre en el navegador.
+  - Los modelos están en `public/models/face` (13 MB) y la librería en un
+    chunk aparte.
+  - El escaneo usa el detector chico (~40 ms por cuadro). El registro usa
+    SSD, promedia 3 cuadros y avisa si la cara se parece a otra ya
+    registrada.
+  - Umbral: distancia 0.5, con 2 cuadros seguidos.
+- Pantallas:
+  - `/registro` (público, 3 pasos). Si la compu tiene sesión de staff, no
+    deja registrar.
+  - Acceso rediseñado: webcam, perfil en vista previa (Dar entrada /
+    Cobrar / No es esta persona), "+ Cliente nuevo" con el QR a /registro,
+    "Nuevos sin foto" con Tomar foto, y "Registrar su cara" para clientes
+    viejos.
+  - Vender: "Hoy en el muro" y "Dar entrada" después de cobrar.
+- Pruebas: 28 en `recep_test.mjs` y en el navegador con el servidor falso
+  (registro completo, pendientes, perfil, cobrar, entrada, lista de hoy, y
+  modelos cargando y comparando). La cámara real no se probó: la prueba el
+  dueño en la laptop.
+
+**Ojo:** el aviso es obligatorio. Si en Acceso está prendido "Pide
+responsiva firmada", a los clientes que no lo han firmado se les niega la
+entrada hasta que lo firmen.

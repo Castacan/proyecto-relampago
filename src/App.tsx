@@ -48,6 +48,7 @@ import ChecklistTemplatePage from './pages/staff/erp/ChecklistTemplatePage'
 import SignaturePage from './pages/staff/erp/SignaturePage'
 import { EmailsConfigPage, LegalDocsConfigPage } from './pages/staff/erp/CrmConfigPages'
 import MyDocumentsPage from './pages/public/MyDocumentsPage'
+import RegistroPage from './pages/public/RegistroPage'
 import { ProductsConfigPage, IntegrationsPage, GeneralSettingsPage } from './pages/staff/erp/ConfigPages'
 import SubscriptionSetupPage from './pages/public/SubscriptionSetupPage'
 import NotFoundPage from './pages/public/NotFoundPage'
@@ -79,6 +80,7 @@ export default function App() {
         <Route path="/clases" element={<ClassesPage />} />
         <Route path="/domiciliacion/:token" element={<SubscriptionSetupPage />} />
         <Route path="/firmar" element={<MyDocumentsPage />} />
+        <Route path="/registro" element={<RegistroPage />} />
         <Route path="/staff/firma/:id" element={<ProtectedRoute><SignaturePage /></ProtectedRoute>} />
         <Route
           path="/staff"
