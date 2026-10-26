@@ -642,3 +642,10 @@ Erick (necesita su correo) y lo elija como encargado fijo.
 - Que registre el WiFi estando en el muro y le ponga horario a cada quien.
 - Que revise el texto del aviso (es un BORRADOR).
 - Verificar en vivo que la IP que llega sea la del celular.
+
+- Ajuste (mismo día): todo usuario con rol staff es empleado. `erp_ensure_employee`
+  liga al usuario con una ficha sin usuario que tenga su correo o su nombre, o le
+  crea una. Esto pasa al correr el SQL (para el staff de hoy), con un trigger en
+  profiles (altas nuevas) y al abrir Mi asistencia. Los admins no se vuelven
+  empleados. Pruebas: 52 en `asist_test.mjs`. Hay que volver a correr
+  erp_asistencia.sql completo (es idempotente).

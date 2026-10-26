@@ -6,6 +6,7 @@
 --   la base revisa que la petición venga de la IP pública del WiFi del muro
 --   (el nombre del WiFi no se puede leer desde el navegador).
 --   El empleado se identifica por employees.profile_id = su usuario del panel.
+--   Todo usuario con rol staff tiene ficha de empleado: se crea o se liga sola.
 --
 --   Reglas de Inge: 10 min de tolerancia; desde 25 min tarde es falta;
 --   3 retardos en el mes = 1 falta. Todo editable en los ajustes.
@@ -149,11 +150,61 @@ RETURNS BOOLEAN LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS
   SELECT p_ip IS NOT NULL AND EXISTS (SELECT 1 FROM attendance_networks n WHERE p_ip <<= n.net);
 $function$;
 
-CREATE OR REPLACE FUNCTION public.erp_my_employee()
-RETURNS UUID LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $function$
-  SELECT id FROM employees WHERE auth.uid() IS NOT NULL AND profile_id = auth.uid() AND status = 'active'
-  ORDER BY created_at LIMIT 1;
+-- Todo el staff (no admin) es empleado: si su usuario no tiene ficha, se liga a una
+-- ficha sin usuario con su mismo correo o nombre, o se le crea una.
+CREATE OR REPLACE FUNCTION public.erp_ensure_employee(p_profile UUID)
+RETURNS UUID LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $function$
+DECLARE
+  v_name TEXT;
+  v_email TEXT;
+  v_id UUID;
+BEGIN
+  SELECT id INTO v_id FROM employees WHERE profile_id = p_profile ORDER BY (status = 'active') DESC, created_at LIMIT 1;
+  IF v_id IS NOT NULL THEN RETURN v_id; END IF;
+  SELECT p.name, u.email INTO v_name, v_email
+    FROM profiles p LEFT JOIN auth.users u ON u.id = p.id
+   WHERE p.id = p_profile AND p.role = 'staff';
+  IF NOT FOUND THEN RETURN NULL; END IF;
+  SELECT id INTO v_id FROM employees
+   WHERE profile_id IS NULL AND status = 'active'
+     AND ((v_email IS NOT NULL AND lower(email) = lower(v_email)) OR lower(btrim(full_name)) = lower(btrim(v_name)))
+   ORDER BY (v_email IS NOT NULL AND lower(email) = lower(v_email)) DESC, created_at LIMIT 1;
+  IF v_id IS NOT NULL THEN
+    UPDATE employees SET profile_id = p_profile, email = coalesce(email, v_email), updated_at = now() WHERE id = v_id;
+  ELSE
+    INSERT INTO employees (full_name, profile_id, email, hire_date)
+    VALUES (coalesce(nullif(btrim(v_name), ''), v_email, 'Staff'), p_profile, v_email, (now() AT TIME ZONE 'America/Mexico_City')::date)
+    RETURNING id INTO v_id;
+  END IF;
+  RETURN v_id;
+END;
 $function$;
+
+CREATE OR REPLACE FUNCTION public.erp_my_employee()
+RETURNS UUID LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $function$
+DECLARE
+  v_id UUID;
+BEGIN
+  IF auth.uid() IS NULL THEN RETURN NULL; END IF;
+  v_id := erp_ensure_employee(auth.uid());
+  RETURN (SELECT id FROM employees WHERE id = v_id AND status = 'active');
+END;
+$function$;
+
+-- Staff nuevo (alta desde Acceso al panel) → su ficha de empleado al momento.
+CREATE OR REPLACE FUNCTION public.erp_profile_employee_trg()
+RETURNS TRIGGER LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $function$
+BEGIN
+  IF NEW.role = 'staff' THEN PERFORM erp_ensure_employee(NEW.id); END IF;
+  RETURN NEW;
+END;
+$function$;
+DROP TRIGGER IF EXISTS profiles_ensure_employee ON public.profiles;
+CREATE TRIGGER profiles_ensure_employee AFTER INSERT OR UPDATE OF role ON public.profiles
+  FOR EACH ROW EXECUTE FUNCTION public.erp_profile_employee_trg();
+
+-- Los que ya son staff hoy.
+SELECT public.erp_ensure_employee(id) FROM public.profiles WHERE role = 'staff';
 
 -- Un renglón por día con horario (o con registro) del empleado en el rango.
 --   status: ok | late | absent (no llegó) | absent_late (llegó ≥ absence_min tarde)
@@ -229,7 +280,7 @@ $function$;
 -- Empleado (desde su celular)
 -- ------------------------------------------------------------
 CREATE OR REPLACE FUNCTION public.get_my_attendance()
-RETURNS JSONB LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = public AS $function$
+RETURNS JSONB LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $function$
 DECLARE
   v_emp UUID;
   e employees;
@@ -532,6 +583,7 @@ DECLARE
 BEGIN
   FOREACH f IN ARRAY ARRAY[
     'erp_now()', 'erp_request_ip()', 'erp_ip_net(inet)', 'erp_ip_at_gym(inet)', 'erp_my_employee()',
+    'erp_ensure_employee(uuid)', 'erp_profile_employee_trg()',
     'erp_attendance_days(uuid,date,date)', 'erp_attendance_summary(uuid,date,date)', 'erp_attendance_settings_json()'
   ] LOOP
     EXECUTE format('REVOKE ALL ON FUNCTION public.%s FROM PUBLIC, anon, authenticated', f);

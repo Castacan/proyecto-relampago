@@ -36,7 +36,7 @@ export const STATUS: Record<DayStatus, { label: string; cls: string }> = {
 
 export const ATTENDANCE_ERRORS: Record<string, string> = {
   ...ERP_ERRORS,
-  not_employee: 'Tu usuario no está ligado a una ficha de empleado. Pídele al admin que te ligue en Empleados.',
+  not_employee: 'Esta pantalla es para el staff (los admins no checan). Si eres staff, revisa en Empleados que tu ficha no esté dada de baja.',
   consent_required: 'Primero acepta el aviso de uso de tu foto.',
   name_required: 'Escribe tu nombre completo.',
   not_at_gym: 'No estás conectado al WiFi del muro. Conéctate al WiFi (no datos móviles) e intenta de nuevo.',
