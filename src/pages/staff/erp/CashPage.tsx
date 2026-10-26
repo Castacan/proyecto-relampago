@@ -7,8 +7,9 @@ interface Summary { by_method: Record<string, number>; sales_total: number; sale
 interface Movement { id: string; kind: string; amount_cents: number; note: string; created_at: string }
 interface SaleRow { id: string; folio: number; created_at: string; status: string; total_cents: number; person_name: string | null; source: string; items: string | null; methods: string | null }
 interface OpenSession { id: string; business_date: string; opened_at: string; opening_cash_cents: number; opened_by_name: string | null; note: string | null; summary: Summary; movements: Movement[]; sales: SaleRow[] }
-interface ClosedSession { id: string; business_date: string; opened_at: string; closed_at: string; opening_cash_cents: number; expected_cash_cents: number; counted_cash_cents: number; difference_cents: number; note: string | null; summary: Summary }
-interface Status { require_open_cash: boolean; today: string; open: OpenSession | null; history: ClosedSession[] }
+interface ClosedSession { id: string; business_date: string; opened_at: string; closed_at: string; opening_cash_cents: number; expected_cash_cents: number; counted_cash_cents: number | null; difference_cents: number | null; auto_closed: boolean; note: string | null; summary: Summary }
+export interface CashAlert { id: string; business_date: string; opened_by_name: string | null; expected_cash_cents: number | null; sales_count: number; sales_total_cents: number }
+interface Status { require_open_cash: boolean; today: string; open: OpenSession | null; history: ClosedSession[]; alerts?: CashAlert[] }
 
 const MOV_LABELS: Record<string, string> = { withdrawal: 'Retiro de efectivo', expense: 'Gasto pagado con caja', deposit: 'Ingreso de efectivo (cambio)' }
 
@@ -28,6 +29,7 @@ export default function CashPage() {
   return (
     <Page title="Caja" subtitle={s.open ? `Abierta desde ${fmtDateTime(s.open.opened_at)}${s.open.opened_by_name ? ` por ${s.open.opened_by_name}` : ''}` : 'Ábrela al empezar el día y ciérrala al terminar.'}
       actions={<Link to="/staff/vender" className={btnGhost}>Ir a vender</Link>}>
+      <CashAlerts alerts={s.alerts ?? []} onAck={load} />
       {s.open ? <OpenCash session={s.open} onChanged={load} /> : <OpenForm onOpened={load} />}
       <Card title="Cortes anteriores">
         {s.history.length === 0 ? <Empty>Todavía no hay cortes.</Empty> : (
@@ -36,17 +38,45 @@ export default function CashPage() {
               <div key={h.id} className="py-2.5 flex flex-wrap items-center justify-between gap-2 text-sm">
                 <div>
                   <p className="text-texto-principal font-semibold">{fmtDate(h.business_date)}</p>
-                  <p className="text-zinc-500 text-xs">Ventas {money(h.summary.sales_total)} ({h.summary.sales_count}) · efectivo esperado {money(h.expected_cash_cents)} · contado {money(h.counted_cash_cents)}{h.note && ` · ${h.note}`}</p>
+                  <p className="text-zinc-500 text-xs">Ventas {money(h.summary.sales_total)} ({h.summary.sales_count}) · efectivo esperado {money(h.expected_cash_cents)} · contado {h.counted_cash_cents == null ? 'nadie contó' : money(h.counted_cash_cents)}{h.note && ` · ${h.note}`}</p>
                 </div>
-                <Badge cls={h.difference_cents === 0 ? 'text-exito bg-exito/10' : 'text-white bg-alerta'}>
-                  {h.difference_cents === 0 ? 'Cuadró' : `${h.difference_cents > 0 ? 'Sobró' : 'Faltó'} ${money(Math.abs(h.difference_cents))}`}
-                </Badge>
+                {h.auto_closed || h.difference_cents == null ? <Badge cls="text-white bg-alerta">Sin corte (se cerró sola)</Badge> : (
+                  <Badge cls={h.difference_cents === 0 ? 'text-exito bg-exito/10' : 'text-white bg-alerta'}>
+                    {h.difference_cents === 0 ? 'Cuadró' : `${h.difference_cents > 0 ? 'Sobró' : 'Faltó'} ${money(Math.abs(h.difference_cents))}`}
+                  </Badge>
+                )}
               </div>
             ))}
           </div>
         )}
       </Card>
     </Page>
+  )
+}
+
+// Aviso al admin: cajas que se cerraron solas porque nadie hizo el corte.
+export function CashAlerts({ alerts, onAck }: { alerts: CashAlert[]; onAck: () => void }) {
+  const [busy, setBusy] = useState<string | null>(null)
+  if (alerts.length === 0) return null
+  const ack = async (id: string) => {
+    setBusy(id)
+    await call('admin_ack_cash_alert', { p_session_id: id })
+    setBusy(null)
+    onAck()
+  }
+  return (
+    <Card title="Caja sin corte" tone="alert">
+      <div className="space-y-3">
+        {alerts.map(a => (
+          <div key={a.id} className="flex flex-wrap items-center justify-between gap-3">
+            <p className="text-sm text-zinc-200">
+              <b>{fmtDate(a.business_date)}</b>: nadie hizo el corte y se cerró sola a medianoche. Abrió {a.opened_by_name ?? '—'} · {a.sales_count} ventas ({money(a.sales_total_cents)}) · efectivo esperado <b>{money(a.expected_cash_cents)}</b>.
+            </p>
+            <button onClick={() => ack(a.id)} disabled={busy === a.id} className={btnSmall}>{busy === a.id ? '…' : 'Enterado'}</button>
+          </div>
+        ))}
+      </div>
+    </Card>
   )
 }
 

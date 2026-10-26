@@ -7,6 +7,9 @@
 //   POST {action:'preview', key, draft?} → (admin) asunto y HTML, sin mandar.
 //   POST {action:'test', key, draft?}    → (admin) manda la prueba SOLO al correo
 //                                          del admin que la pide.
+//   POST {action:'cash_alert'}       → (cron 00:05) avisa a los admins de cajas que
+//                                      se cerraron solas porque nadie hizo el corte
+//                                      (ver src/supabase/erp_caja_cierre.sql).
 //
 // Solo se mandan las automatizaciones PRENDIDAS en el panel; todas vienen
 // apagadas. Cada correo sale una sola vez por (automatización, persona, fecha).
@@ -125,6 +128,32 @@ async function runDue(): Promise<{ sent: number; errors: number }> {
   return { sent, errors }
 }
 
+type CashAlert = { id: string; business_date: string; opened_by_name: string | null; expected_cash_cents: number | null; sales_count: number; sales_total_cents: number }
+const pesos = (c: number | null) => `$${((c ?? 0) / 100).toLocaleString('es-MX', { maximumFractionDigits: 2 })}`
+
+async function sendCashAlerts(): Promise<{ sent: number; alerts: number }> {
+  const { data, error } = await db.rpc('cash_alerts_to_email')
+  if (error) throw new Error(error.message)
+  const { admins, alerts } = data as { admins: string[]; alerts: CashAlert[] }
+  if (!alerts.length || !admins.length) return { sent: 0, alerts: alerts.length }
+  const lines = alerts.map(a => `${a.business_date}: abrió ${a.opened_by_name ?? 'alguien'}, ${a.sales_count} ventas (${pesos(a.sales_total_cents)}), efectivo esperado ${pesos(a.expected_cash_cents)}.`).join('\n')
+  const { subject, html } = render({
+    key: 'cash_alert', marketing: false,
+    subject: alerts.length === 1 ? `Caja sin corte del ${alerts[0].business_date}` : `${alerts.length} cajas sin corte`,
+    heading: 'Nadie hizo el corte de caja',
+    body: `La caja se cerró sola a medianoche, sin que nadie contara el efectivo:
+
+${lines}
+
+Revisa con el staff cuánto efectivo había y márcalo como enterado en Caja.`,
+    button_text: 'Abrir Caja', button_url: 'https://app.jaibamuro.com/staff/caja',
+  }, {})
+  let sent = 0
+  for (const to of admins) if ((await sendEmail(to, subject, html)).ok) sent++
+  if (sent > 0) await db.rpc('cash_alert_mark_emailed', { p_ids: alerts.map(a => a.id) })
+  return { sent, alerts: alerts.length }
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: cors })
   if (req.method !== 'POST') return json({ error: 'method_not_allowed' }, 405)
@@ -135,6 +164,11 @@ Deno.serve(async (req) => {
       const cronOk = !!CRON_KEY && req.headers.get('x-cron-key') === CRON_KEY
       if (!cronOk && !(await adminFromRequest(req))) return json({ error: 'forbidden' }, 403)
       return json(await runDue())
+    }
+    if (body.action === 'cash_alert') {
+      const cronOk = !!CRON_KEY && req.headers.get('x-cron-key') === CRON_KEY
+      if (!cronOk && !(await adminFromRequest(req))) return json({ error: 'forbidden' }, 403)
+      return json(await sendCashAlerts())
     }
     if (body.action === 'preview' || body.action === 'test') {
       const admin = await adminFromRequest(req)

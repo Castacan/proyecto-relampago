@@ -63,6 +63,7 @@ Membresía Parejas **no** se creó (ya no se vende).
    4. `src/supabase/erp_crm.sql` (responsivas, archivos, acceso, empleados, estados, correos, bitácora; después de erp_finanzas.sql). Crea el bucket privado `expedientes`.
    5. Edge Function `crm-emails` (Verify JWT apagado) y luego `src/supabase/erp_crm_cron.sql` (toma solo la llave del cron de cobros).
    6. `src/supabase/erp_checklist.sql` (checklist diario del staff; después de erp_crm.sql). Crea el bucket privado `checklist` y la plantilla inicial (solo si está vacía).
+   7. `src/supabase/erp_caja_cierre.sql` (cierre automático de caja + aviso al admin; **siempre al final**, también si se vuelve a correr erp.sql o erp_checklist.sql). Programa el cron `erp-cierre-caja` (00:05 de México) y requiere la versión de `crm-emails` con la acción `cash_alert`.
 2. **Edge Functions → crear y desplegar** (Verify JWT **apagado** en las dos):
    - `class-emails` (código en `supabase/functions/class-emails/index.ts`)
    - `billing` (código en `supabase/functions/billing/index.ts`)

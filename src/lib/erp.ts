@@ -88,6 +88,7 @@ export const ERP_ERRORS: Record<string, string> = {
   forbidden: 'No tienes permiso para esto.',
   cash_closed: 'La caja está cerrada. Ábrela para poder cobrar.',
   cash_already_open: 'Ya hay una caja abierta.',
+  cash_auto_closed: 'Esa caja era de otro día: se cerró sola y el admin recibió aviso. Abre la caja de hoy.',
   empty_sale: 'Agrega al menos un artículo.',
   person_not_found: 'No encontramos a esa persona.',
   person_required: 'Elige a la persona: este plan le da membresía.',

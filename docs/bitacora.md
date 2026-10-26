@@ -557,3 +557,29 @@ revisarlo en 2 minutos.
 - Quién es el encargado de cada día.
 - Erick todavía no tiene cuenta de staff.
 
+## 2026-10-26 — Caja: cierre automático y aviso al admin
+
+**Pedido del dueño:** la caja debe cerrarse sola al terminar el día. Si el
+staff no hizo el corte, el admin debe recibir un aviso, y nadie debe poder
+cerrar al día siguiente la caja de un día anterior. Además, la caja de las
+pruebas del 23-oct seguía abierta y no dejaba abrir la de hoy.
+
+**Hecho:** `src/supabase/erp_caja_cierre.sql`, que se corre al final.
+- `erp_autoclose_stale_cash()` cierra toda caja abierta de un día anterior:
+  - Se guarda el efectivo esperado; lo contado y la diferencia quedan vacíos
+    y la caja queda marcada `auto_closed`.
+  - Se registra en la bitácora.
+- **Cuándo se ejecuta:**
+  - Con el cron `erp-cierre-caja`, a las 00:05 de México.
+  - Cada vez que alguien abre Caja, Inicio o el Turno de hoy, o intenta
+    abrir caja.
+- `close_cash` rechaza el corte de una caja de otro día con el error
+  `cash_auto_closed`.
+- **Avisos al admin:**
+  - Un recuadro "Caja sin corte" en Inicio y en Caja, con el botón
+    "Enterado".
+  - Un correo a los admins desde `crm-emails`, acción `cash_alert`. Se
+    manda una sola vez por caja.
+- En el historial de Caja aparece "Sin corte (se cerró sola)".
+- **Pruebas:** 73 en `checklist_test.mjs` (11 nuevas de caja).
+

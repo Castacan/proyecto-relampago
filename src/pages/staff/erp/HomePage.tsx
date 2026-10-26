@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { call, fmtDate, fmtDateTime, money } from '../../../lib/erp'
 import { fmtTime } from '../../../lib/classes'
+import { CashAlerts, type CashAlert } from './CashPage'
 import { Page, Card, Stat, Spinner, Empty, Badge, btnPrimary, btnGhost } from '../../../components/erp/ui'
 
 interface Dashboard {
@@ -24,8 +25,12 @@ export default function HomePage() {
   const [d, setD] = useState<Dashboard | null>(null)
   const [error, setError] = useState<string | null>(null)
 
+  const [alerts, setAlerts] = useState<CashAlert[]>([])
+  const loadAlerts = () => call<{ alerts: CashAlert[] }>('get_cash_alerts').then(({ data }) => setAlerts(data?.alerts ?? []))
+
   useEffect(() => {
-    call<Dashboard>('get_staff_dashboard').then(({ data, error }) => {
+    // Primero los avisos de caja: eso cierra la caja que quedó abierta de otro día.
+    loadAlerts().then(() => call<Dashboard>('get_staff_dashboard')).then(({ data, error }) => {
       if (error || !data) { setError('No se pudo cargar el inicio. ¿Ya se corrió el SQL del ERP?'); return }
       setD(data)
     })
@@ -37,6 +42,7 @@ export default function HomePage() {
   return (
     <Page title="Inicio" subtitle={fmtDate(d.today)}
       actions={<><Link to="/staff/vender" className={btnPrimary}>Vender</Link><Link to="/staff/personas" className={btnGhost}>Buscar persona</Link></>}>
+      <CashAlerts alerts={alerts} onAck={loadAlerts} />
       {!d.cash && d.require_open_cash && (
         <Card tone="alert">
           <div className="flex flex-wrap items-center justify-between gap-3">
