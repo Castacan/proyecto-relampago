@@ -583,3 +583,27 @@ pruebas del 23-oct seguía abierta y no dejaba abrir la de hoy.
 - En el historial de Caja aparece "Sin corte (se cerró sola)".
 - **Pruebas:** 73 en `checklist_test.mjs` (11 nuevas de caja).
 
+
+## 2026-10-26 — Encargado fijo y alta de empleado con acceso al panel
+
+**Respuestas del dueño:** asistencia con la cara con el celular de cada quien
+(opción a); sí juntar "Nuevo empleado" con "Dar acceso al panel"; Erick es el
+encargado siempre; la migración de EVO todavía no.
+
+**Hecho:**
+- `src/supabase/erp_checklist_encargado.sql` (se corre después de
+  erp_checklist.sql): `checklist_settings.default_lead_id`, un trigger que pone
+  el encargado fijo a todo día nuevo, y `get_checklist_default_lead` /
+  `admin_set_checklist_default_lead` (este también llena los días de hoy en
+  adelante que siguen abiertos y sin encargado). Un día en particular se sigue
+  cambiando a mano y eso manda.
+- /staff/turnos: selector "Encargado fijo" arriba de la lista.
+- Empleados: el formulario del empleado tiene "Acceso al panel" (sin acceso /
+  ya tiene usuario / darle acceso con su correo + contraseña temporal + rol).
+  Llama a `staff-admin` y liga el perfil a la ficha. El alta suelta quedó
+  plegada en "Dar acceso a alguien que no está en Empleados".
+- Pruebas: 82 en `checklist_test.mjs` (9 nuevas) y prueba en el navegador con
+  el servidor falso.
+
+**Falta:** que el dueño dé Run a erp_checklist_encargado.sql, dé de alta a
+Erick (necesita su correo) y lo elija como encargado fijo.

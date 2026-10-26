@@ -60,7 +60,7 @@ export default function EmployeesPage() {
         </div>
       )}
       <p className="text-zinc-500 text-xs">{active.length} activos.</p>
-      <StaffAccessCard onChanged={load} />
+      <StaffAccessCard key={list.staff_logins.length} onChanged={load} />
     </Page>
   )
 }
@@ -77,7 +77,7 @@ const STAFF_ERRORS: Record<string, string> = {
   forbidden: 'Solo un admin puede hacer esto.',
 }
 
-async function staffAdmin(body: Record<string, unknown>): Promise<{ data: { created?: boolean } | null; error: string | null }> {
+async function staffAdmin(body: Record<string, unknown>): Promise<{ data: { created?: boolean; id?: string } | null; error: string | null }> {
   const { data, error } = await supabase.functions.invoke('staff-admin', { body })
   if (error) return { data: null, error: 'No se pudo usar la función staff-admin (¿ya se desplegó?).' }
   if (data?.error) return { data: null, error: STAFF_ERRORS[data.error] ?? data.message ?? data.error }
@@ -87,6 +87,7 @@ async function staffAdmin(body: Record<string, unknown>): Promise<{ data: { crea
 function StaffAccessCard({ onChanged }: { onChanged: () => void }) {
   const [users, setUsers] = useState<StaffUser[] | null>(null)
   const [f, setF] = useState({ email: '', name: '', role: 'staff', password: '' })
+  const [open, setOpen] = useState(false)
   const [pwFor, setPwFor] = useState<string | null>(null)
   const [newPw, setNewPw] = useState('')
   const [msg, setMsg] = useState<{ text: string; tone: 'ok' | 'error' } | null>(null)
@@ -147,8 +148,10 @@ function StaffAccessCard({ onChanged }: { onChanged: () => void }) {
           ))}
         </div>
       )}
-      <p className="text-zinc-300 text-sm font-bold mb-2">Dar de alta a alguien</p>
-      <div className="grid sm:grid-cols-4 gap-2 items-end">
+      <p className="text-zinc-400 text-sm mb-3">Para un empleado, dale acceso desde "+ Nuevo empleado" o "Editar datos" (queda ligado a su ficha).</p>
+      <button onClick={() => setOpen(v => !v)} className={btnGhost}>{open ? 'Cerrar' : 'Dar acceso a alguien que no está en Empleados'}</button>
+      {open && <>
+      <div className="grid mt-3 sm:grid-cols-4 gap-2 items-end">
         <div><label className={label}>Correo</label><input type="email" value={f.email} onChange={e => setF({ ...f, email: e.target.value })} placeholder="correo@ejemplo.com" autoComplete="off" className={input} /></div>
         <div><label className={label}>Nombre</label><input value={f.name} onChange={e => setF({ ...f, name: e.target.value })} className={input} /></div>
         <div><label className={label}>Contraseña temporal</label><input type="text" value={f.password} onChange={e => setF({ ...f, password: e.target.value })} placeholder="mín. 8 caracteres" autoComplete="new-password" className={input} /></div>
@@ -159,6 +162,7 @@ function StaffAccessCard({ onChanged }: { onChanged: () => void }) {
       </div>
       <button onClick={save} disabled={busy || !f.email.includes('@')} className={`${btnPrimary} mt-3`}>{busy ? 'Guardando…' : 'Dar acceso al panel'}</button>
       <p className="text-zinc-500 text-xs mt-2">Si la persona ya tiene cuenta (por ejemplo, porque escala aquí), se usa la misma; la contraseña es opcional en ese caso. Después ella la puede cambiar en el panel con "Cambiar mi contraseña".</p>
+      </>}
       {msg && <div className="mt-2"><Msg text={msg.text} tone={msg.tone} /></div>}
     </Card>
   )
@@ -224,13 +228,24 @@ function EmployeeForm({ e, logins, onSaved }: { e?: Employee; logins: List['staf
     pay_rate: toPesos(e?.pay_rate_cents ?? null), bank_name: e?.bank_name ?? '', bank_account: e?.bank_account ?? '',
     emergency_name: e?.emergency_name ?? '', emergency_phone: e?.emergency_phone ?? '', notes: e?.notes ?? '',
   })
+  // Acceso al panel en el mismo formulario: sin acceso, un usuario que ya existe o darle uno nuevo con su correo.
+  const [access, setAccess] = useState<'none' | 'existing' | 'new'>(e?.profile_id ? 'existing' : 'none')
+  const [acc, setAcc] = useState({ role: 'staff', password: '' })
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const set = (x: Partial<typeof f>) => { setF(v => ({ ...v, ...x })); setError(null) }
   const save = async () => {
     setBusy(true)
     const { pay_rate, ...rest } = f
-    const { data, error } = await call<{ id: string }>('admin_save_employee', { p: { id: e?.id ?? null, ...rest, pay_rate_cents: pay_rate === '' ? '' : toCents(pay_rate) } })
+    let profile_id = access === 'existing' ? rest.profile_id : ''
+    if (access === 'new') {
+      if (!rest.full_name.trim()) { setBusy(false); setError('Escribe el nombre completo.'); return }
+      if (!rest.email.includes('@')) { setBusy(false); setError('Para darle acceso al panel escribe su correo.'); return }
+      const r = await staffAdmin({ action: 'save', email: rest.email, name: rest.full_name, role: acc.role, password: acc.password || null })
+      if (r.error || !r.data?.id) { setBusy(false); setError(r.error ?? 'No se pudo dar el acceso.'); return }
+      profile_id = r.data.id
+    }
+    const { data, error } = await call<{ id: string }>('admin_save_employee', { p: { id: e?.id ?? null, ...rest, profile_id, pay_rate_cents: pay_rate === '' ? '' : toCents(pay_rate) } })
     setBusy(false)
     if (error || !data) { setError(erpError(error ?? undefined)); return }
     onSaved(data.id)
@@ -242,11 +257,29 @@ function EmployeeForm({ e, logins, onSaved }: { e?: Employee; logins: List['staf
     <div className="space-y-3">
       <div className="grid sm:grid-cols-3 gap-3">
         {txt('full_name', 'Nombre completo')}{txt('position', 'Puesto', 'text', 'Recepción, coach, armador…')}
-        <div><label className={label}>Usuario del panel (opcional)</label>
-          <select value={f.profile_id} onChange={x => set({ profile_id: x.target.value })} className={input}>
-            <option value="">Sin usuario</option>{logins.map(l => <option key={l.id} value={l.id}>{l.name} ({l.role})</option>)}
+        <div><label className={label}>Acceso al panel</label>
+          <select value={access} onChange={x => { setAccess(x.target.value as typeof access); setError(null) }} className={input}>
+            <option value="none">Sin acceso</option>
+            {logins.length > 0 && <option value="existing">Ya tiene usuario</option>}
+            <option value="new">Darle acceso con su correo</option>
           </select></div>
         {txt('phone', 'Celular')}{txt('email', 'Correo', 'email')}{txt('birth_date', 'Nacimiento', 'date')}
+        {access === 'existing' && (
+          <div className="sm:col-span-3"><label className={label}>Usuario del panel</label>
+            <select value={f.profile_id} onChange={x => set({ profile_id: x.target.value })} className={input}>
+              <option value="">Elige…</option>{logins.map(l => <option key={l.id} value={l.id}>{l.name} ({l.role})</option>)}
+            </select></div>
+        )}
+        {access === 'new' && (
+          <div className="sm:col-span-3 grid sm:grid-cols-3 gap-3 rounded-xl border border-primario/30 bg-primario/5 p-3">
+            <div><label className={label}>Contraseña temporal</label><input type="text" value={acc.password} onChange={x => setAcc({ ...acc, password: x.target.value })} placeholder="mín. 8 caracteres" autoComplete="new-password" className={input} /></div>
+            <div><label className={label}>Rol</label>
+              <select value={acc.role} onChange={x => setAcc({ ...acc, role: x.target.value })} className={input}>
+                <option value="staff">Staff</option><option value="admin">Admin (ve todo)</option>
+              </select></div>
+            <p className="text-zinc-400 text-xs self-end">Entra en app.jaibamuro.com/login con el correo de arriba. Si ya tiene cuenta (porque escala aquí) la contraseña es opcional.</p>
+          </div>
+        )}
         <div className="sm:col-span-3">{txt('address', 'Domicilio')}</div>
         {txt('curp', 'CURP')}{txt('rfc', 'RFC')}{txt('nss', 'NSS (IMSS)')}
         {txt('hire_date', 'Fecha de ingreso', 'date')}{txt('end_date', 'Fecha de baja', 'date')}

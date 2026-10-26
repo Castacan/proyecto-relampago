@@ -33,16 +33,25 @@ function PlanCard() {
   const [plan, setPlan] = useState<Plan | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [teardown, setTeardown] = useState<PlanDay | null>(null)
+  const [defaultLead, setDefaultLead] = useState<string | null>(null)
   const load = useCallback(async () => {
     const { data, error } = await call<Plan>('get_checklist_plan', { p_from: from, p_to: addDays(from, 13) })
     if (error) { setError(checklistError(error)); return }
     setPlan(data)
+    const { data: dl } = await call<{ lead_id: string | null }>('get_checklist_default_lead')
+    setDefaultLead(dl?.lead_id ?? null)
   }, [from])
   useEffect(() => { load() }, [load])
 
   const setLead = async (d: PlanDay, lead: string) => {
     setError(null)
     const { error } = await call('admin_set_checklist_day', { p_date: d.date, p: { lead_id: lead || null } })
+    if (error) { setError(checklistError(error)); return }
+    load()
+  }
+  const saveDefaultLead = async (lead: string) => {
+    setError(null)
+    const { error } = await call('admin_set_checklist_default_lead', { p_profile_id: lead || null })
     if (error) { setError(checklistError(error)); return }
     load()
   }
@@ -56,6 +65,14 @@ function PlanCard() {
         <button onClick={() => setFrom(addDays(from, 7))} className={btnSmall}>→</button>
       </div>}>
       <Msg text={error} />
+      <div className="flex flex-wrap items-center gap-2 mb-3">
+        <label htmlFor="default-lead" className="text-zinc-300 text-sm font-semibold">Encargado fijo</label>
+        <select id="default-lead" value={defaultLead ?? ''} onChange={e => saveDefaultLead(e.target.value)} className={`${field} w-52 py-2`}>
+          <option value="">Ninguno (asignar por día)</option>
+          {plan.staff.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+        </select>
+        <p className="text-zinc-500 text-xs w-full">Cada día nuevo lo toma solo. Si un día lo cubre otra persona, cámbialo abajo solo en ese día.</p>
+      </div>
       <div className="divide-y divide-zinc-800/80">
         {plan.days.map(d => (
           <div key={d.date} className={`py-2.5 flex flex-wrap items-center gap-x-3 gap-y-2 ${d.date === plan.today ? 'bg-primario/5 -mx-2 px-2 rounded-lg' : ''}`}>
@@ -65,7 +82,7 @@ function PlanCard() {
             </div>
             {d.has_template ? (
               <select value={d.lead_id ?? ''} onChange={e => setLead(d, e.target.value)} className={`${field} w-44 py-2`} aria-label={`Encargado del ${fmtDate(d.date)}`}>
-                <option value="">Sin asignar</option>
+                <option value="">{d.status === null && defaultLead ? `${plan.staff.find(s => s.id === defaultLead)?.name ?? 'Fijo'} (fijo)` : 'Sin asignar'}</option>
                 {plan.staff.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
               </select>
             ) : <span className="text-zinc-500 text-sm w-44">Cerrado (sin checklist)</span>}
