@@ -345,7 +345,9 @@ export function GeneralSettingsPage() {
   const [retry, setRetry] = useState('')
   const [busy, setBusy] = useState(false)
   const [msg, setMsg] = useState<{ text: string; tone: 'ok' | 'error' } | null>(null)
+  const [cashEmail, setCashEmail] = useState<boolean | null>(null)
   useEffect(() => {
+    call<{ enabled: boolean }>('get_cash_alert_email').then(({ data }) => setCashEmail(data?.enabled ?? null))
     call<{ erp: ErpSettings }>('get_erp_settings').then(({ data }) => { if (data?.erp) { setS(data.erp); setRetry(data.erp.retry_days.join(', ')) } })
   }, [])
   if (!s) return <Page title="Ajustes generales"><Spinner /></Page>
@@ -354,7 +356,9 @@ export function GeneralSettingsPage() {
     setBusy(true); setMsg(null)
     const days = retry.split(/[,\s]+/).filter(Boolean).map(Number)
     const { error } = await call('admin_update_erp_settings', { p_patch: { ...s, retry_days: days } })
+    const r = cashEmail === null ? { error: null } : await call('admin_set_cash_alert_email', { p_enabled: cashEmail })
     setBusy(false)
+    if (!error && r.error) { setMsg({ text: erpError(r.error), tone: 'error' }); return }
     setMsg(error ? { text: erpError(error), tone: 'error' } : { text: 'Guardado.', tone: 'ok' })
   }
 
@@ -367,6 +371,13 @@ export function GeneralSettingsPage() {
             <input type="checkbox" checked={s.require_open_cash} onChange={e => setS({ ...s, require_open_cash: e.target.checked })} className="accent-primario w-4 h-4" />
             Obligar a abrir caja para poder vender o cobrar
           </label>
+          {cashEmail !== null && (
+            <label className="flex items-center gap-2 text-sm text-zinc-200">
+              <input type="checkbox" checked={cashEmail} onChange={e => setCashEmail(e.target.checked)} className="accent-primario w-4 h-4" />
+              Mandarme un correo cuando una caja se cierre sola sin corte
+              <span className="text-zinc-500 text-xs">(el aviso dentro de la app sale siempre)</span>
+            </label>
+          )}
           <div>
             <label className={label}>Reintentos de cobro rechazado (días después de cada intento)</label>
             <input value={retry} onChange={e => setRetry(e.target.value)} className={`${input} max-w-xs`} placeholder="1, 3, 5" />

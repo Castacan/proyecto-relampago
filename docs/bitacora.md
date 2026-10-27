@@ -793,3 +793,16 @@ magnesiera $20 (Pase diario $120, Clase introductoria $200, igual que aquí).
 
 **No se hizo:** la clase vendida en mostrador no aparta lugar en la sesión
 de la semana (la reserva sigue en Clases).
+
+## 2026-10-27 — Correo de "caja sin corte" apagado
+
+- El dueño recibió correos de "caja sin corte" sin estar usando la app.
+- `src/supabase/erp_caja_correo.sql` (después de erp_caja_cierre.sql):
+  - Agrega `erp_settings.cash_alert_email`, por defecto false.
+    `cash_alerts_to_email` no entrega avisos si está apagado; la caja se
+    sigue cerrando sola.
+  - `get_cash_alert_email` / `admin_set_cash_alert_email`: al prenderlo
+    marca como enviadas las cajas viejas, para que no lleguen de golpe.
+- Ajustes generales tiene la casilla "Mandarme un correo cuando una caja se
+  cierre sola sin corte". El aviso dentro de la app no cambia.
+- Pruebas: 86 en `caja_correo_test.mjs`.
