@@ -217,7 +217,7 @@ function NewProduct({ categories, onDone }: { categories: string[]; onDone: () =
       </div>
       <Msg text={error} />
       <button onClick={save} disabled={busy || f.name.trim().length < 2} className={`${btnPrimary} mt-3`}>{busy ? 'Guardando…' : 'Crear producto'}</button>
-      <p className="text-zinc-500 text-xs mt-2">Los planes, pases y clases se crean en <Link to="/staff/config/productos" className="underline">Configuración → Productos y planes</Link>.</p>
+      <p className="text-zinc-500 text-xs mt-2">Los planes, pases y clases se crean en <Link to="/staff/config/productos" className="underline">Configuración → Productos y servicios</Link>.</p>
     </Card>
   )
 }

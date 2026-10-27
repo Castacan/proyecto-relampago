@@ -9,48 +9,77 @@ export function ProductsConfigPage() {
   const [products, setProducts] = useState<Product[] | null>(null)
   const [editing, setEditing] = useState<string | null>(null)
   const [creating, setCreating] = useState(false)
+  const [q, setQ] = useState('')
+  const [tab, setTab] = useState<'services' | 'products'>('services')
+  const [showInactive, setShowInactive] = useState(false)
   const load = useCallback(async () => {
     const { data } = await call<{ products: Product[] }>('get_products', { p_include_inactive: true })
     setProducts(data?.products ?? [])
   }, [])
   useEffect(() => { load() }, [load])
 
+  const ql = q.trim().toLowerCase()
+  const isService = (p: Product) => p.kind !== 'product'
+  const visible = (products ?? []).filter(p => (showInactive || p.is_active) && (ql
+    ? p.name.toLowerCase().includes(ql) || (p.sku ?? '').toLowerCase().includes(ql) || (p.category ?? '').toLowerCase().includes(ql)
+    : (tab === 'services') === isService(p)))
+  // Subgrupos por categoría; lo que no tiene categoría va al final.
+  const groups = new Map<string, Product[]>()
+  for (const p of visible) { const k = p.category ?? (isService(p) ? 'Otros servicios' : 'Sin categoría'); groups.set(k, [...(groups.get(k) ?? []), p]) }
+  const order = [...groups.keys()].sort((a, b) => (a === 'Servicios' ? -1 : b === 'Servicios' ? 1 : 0) || (/^(Otros|Sin)/.test(a) ? 1 : /^(Otros|Sin)/.test(b) ? -1 : a.localeCompare(b)))
+  const counts = { services: (products ?? []).filter(p => isService(p) && p.is_active).length, products: (products ?? []).filter(p => !isService(p) && p.is_active).length }
+
   return (
-    <Page title="Productos y planes" subtitle="Todo lo que se vende: membresías, pases, clases sueltas y productos."
+    <Page title="Productos y servicios" subtitle="Todo lo que se vende: membresías, pases, clases y rentas (servicios) y lo que lleva inventario (productos)."
       actions={<button onClick={() => setCreating(v => !v)} className={btnPrimary}>{creating ? 'Cerrar' : '+ Nuevo'}</button>}>
-      {creating && <Card title="Nuevo producto" tone="accent"><ProductForm onSaved={() => { setCreating(false); load() }} /></Card>}
-      {products === null ? <Spinner /> : products.length === 0 ? <Empty>No hay productos.</Empty> : (
-        <div className="space-y-2">
-          {products.map(p => (
-            <Card key={p.id}>
-              <button onClick={() => setEditing(editing === p.id ? null : p.id)} className="w-full text-left">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <span className="flex items-center gap-2">
-                    <span className={`font-bold ${p.is_active ? 'text-texto-principal' : 'text-zinc-500'}`}>{p.name}</span>
-                    <Badge>{KIND_LABELS[p.kind]}</Badge>
-                    {p.is_recurring && <Badge cls="text-primario bg-primario/10">Domiciliación</Badge>}
-                    {!p.is_active && <Badge>Inactivo</Badge>}
-                  </span>
-                  <span className="text-texto-principal font-black">{money(p.price_cents)}</span>
-                </div>
-                <p className="text-zinc-400 text-xs mt-1">
-                  {p.grants_membership ? `Da membresía de ${durationLabel(p)}` : 'No da membresía'}
-                  {p.is_recurring && ` · ${p.promo_active ? `Promo activa: ${scheduleLabel(p.price_cents, p.promo_cycles, p.promo_price_cents)}` : 'Sin promoción'}`}
-                  {p.track_stock && ` · ${p.stock ?? 0} en inventario`}
-                </p>
-              </button>
-              {editing === p.id && <div className="mt-4"><ProductForm p={p} onSaved={() => { setEditing(null); load() }} /></div>}
-            </Card>
-          ))}
+      {creating && <Card title="Nuevo" tone="accent"><ProductForm defaultKind={tab === 'products' ? 'product' : 'service'} onSaved={() => { setCreating(false); load() }} /></Card>}
+      <div className="flex flex-wrap items-center gap-2">
+        <input value={q} onChange={e => setQ(e.target.value)} placeholder="Buscar por nombre, categoría o clave…" className={`${input.replace('w-full ', '')} flex-1 min-w-[14rem]`} aria-label="Buscar" />
+        {!ql && <>
+          <button onClick={() => setTab('services')} className={tab === 'services' ? btnPrimary : btnGhost}>Servicios ({counts.services})</button>
+          <button onClick={() => setTab('products')} className={tab === 'products' ? btnPrimary : btnGhost}>Productos ({counts.products})</button>
+        </>}
+        <label className="flex items-center gap-2 text-sm text-zinc-300">
+          <input type="checkbox" checked={showInactive} onChange={e => setShowInactive(e.target.checked)} className="accent-primario w-4 h-4" />
+          Ver inactivos
+        </label>
+      </div>
+      {products === null ? <Spinner /> : visible.length === 0 ? <Empty>{ql ? 'No hay nada con esa búsqueda.' : 'No hay nada aquí todavía.'}</Empty> : order.map(g => (
+        <div key={g} className="space-y-1">
+          <p className="text-zinc-500 text-[11px] font-bold uppercase tracking-widest px-1">{g}</p>
+          <div className="bg-superficie rounded-2xl border border-zinc-800/80 divide-y divide-zinc-800/80 overflow-hidden">
+            {groups.get(g)!.map(p => (
+              <div key={p.id}>
+                <button onClick={() => setEditing(editing === p.id ? null : p.id)} className="w-full text-left px-4 py-3 hover:bg-superficie-alta">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <span className="flex flex-wrap items-center gap-2">
+                      <span className={`font-bold ${p.is_active ? 'text-texto-principal' : 'text-zinc-500'}`}>{p.name}</span>
+                      <Badge>{KIND_LABELS[p.kind]}</Badge>
+                      {p.is_recurring && <Badge cls="text-primario bg-primario/10">Domiciliación</Badge>}
+                      {p.for_sale === false && <Badge>Solo consumo</Badge>}
+                      {!p.is_active && <Badge>Inactivo</Badge>}
+                    </span>
+                    <span className="text-texto-principal font-black">{money(p.price_cents)}</span>
+                  </div>
+                  <p className="text-zinc-400 text-xs mt-1">
+                    {p.grants_membership ? `Da membresía de ${durationLabel(p)}` : p.kind === 'product' ? (p.sku ?? 'Producto') : 'No da membresía'}
+                    {p.is_recurring && ` · ${p.promo_active ? `Promo activa: ${scheduleLabel(p.price_cents, p.promo_cycles, p.promo_price_cents)}` : 'Sin promoción'}`}
+                    {p.track_stock && ` · ${p.stock ?? 0} en inventario`}
+                  </p>
+                </button>
+                {editing === p.id && <div className="px-4 pb-4"><ProductForm p={p} onSaved={() => { setEditing(null); load() }} /></div>}
+              </div>
+            ))}
+          </div>
         </div>
-      )}
+      ))}
     </Page>
   )
 }
 
-function ProductForm({ p, onSaved }: { p?: Product; onSaved: () => void }) {
+function ProductForm({ p, onSaved, defaultKind = 'plan' }: { p?: Product; onSaved: () => void; defaultKind?: ProductKind }) {
   const [f, setF] = useState({
-    kind: (p?.kind ?? 'plan') as ProductKind, name: p?.name ?? '', description: p?.description ?? '', price: toPesos(p?.price_cents ?? 0),
+    kind: (p?.kind ?? defaultKind) as ProductKind, name: p?.name ?? '', description: p?.description ?? '', price: toPesos(p?.price_cents ?? 0),
     grants_membership: p?.grants_membership ?? true, duration_unit: p?.duration_unit ?? 'month', duration_value: String(p?.duration_value ?? 1),
     is_recurring: p?.is_recurring ?? false, promo_active: p?.promo_active ?? false, promo_cycles: String(p?.promo_cycles ?? ''),
     promo_price: toPesos(p?.promo_price_cents ?? null), track_stock: p?.track_stock ?? false, stock: String(p?.stock ?? ''),
@@ -73,7 +102,7 @@ function ProductForm({ p, onSaved }: { p?: Product; onSaved: () => void }) {
       track_stock: f.track_stock, stock: p ? '' : f.stock, cost_cents: f.cost === '' ? '' : toCents(f.cost), stock_min: f.stock_min,
       allow_negative_stock: f.allow_negative_stock, sku: f.sku, is_active: f.is_active, sort_order: Number(f.sort_order), class_type_id: p?.class_type_id ?? null,
     } })
-    if (!error && data?.id && f.kind === 'product') await call('admin_set_product_extras', { p_product_id: data.id, p_category: f.category, p_for_sale: f.for_sale })
+    if (!error && data?.id) await call('admin_set_product_extras', { p_product_id: data.id, p_category: f.category, p_for_sale: f.kind !== 'product' || f.for_sale })
     setBusy(false)
     if (error) { setError(erpError(error)); return }
     onSaved()
@@ -91,6 +120,7 @@ function ProductForm({ p, onSaved }: { p?: Product; onSaved: () => void }) {
         <div className="sm:col-span-2"><label className={label}>Nombre</label><input value={f.name} onChange={e => set({ name: e.target.value })} className={input} /></div>
         <MoneyField id="pf-price" label={f.is_recurring ? 'Precio mensual normal' : 'Precio'} value={f.price} onChange={v => set({ price: v })} />
         <div><label className={label}>Orden en la lista</label><input type="number" value={f.sort_order} onChange={e => set({ sort_order: e.target.value })} className={input} /></div>
+        <div><label className={label}>Grupo en Vender</label><input value={f.category} onChange={e => set({ category: e.target.value })} placeholder="Servicios, Barritas, Bebidas…" className={input} /></div>
       </div>
       <div><label className={label}>Descripción (opcional)</label><input value={f.description} onChange={e => set({ description: e.target.value })} className={input} /></div>
 
@@ -136,7 +166,6 @@ function ProductForm({ p, onSaved }: { p?: Product; onSaved: () => void }) {
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
             <MoneyField id={`pf-cost-${p?.id ?? 'new'}`} label="Costo por pieza (para margen)" value={f.cost} onChange={v => set({ cost: v })} />
             <div><label className={label}>Clave / código (opcional)</label><input value={f.sku} onChange={e => set({ sku: e.target.value })} className={input} /></div>
-            <div><label className={label}>Categoría (opcional)</label><input value={f.category} onChange={e => set({ category: e.target.value })} placeholder="Bebidas, snacks, limpieza…" className={input} /></div>
           </div>
           <label className="flex items-center gap-2 text-sm text-zinc-200">
             <input type="checkbox" checked={!f.for_sale} onChange={e => set({ for_sale: !e.target.checked })} className="accent-primario w-4 h-4" />

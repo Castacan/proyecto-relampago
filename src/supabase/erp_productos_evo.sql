@@ -20,22 +20,22 @@ DECLARE
   v_n INT := 0;
 BEGIN
   FOR r IN SELECT * FROM (VALUES
-    -- nombre,                               categoría,  precio, costo, existencia, vende sin existencia, evo_id
+    -- nombre,                               categoría (Gomitas va suelta),  precio, costo, existencia, vende sin existencia, evo_id
     ('Agua Kirkland 500 ml',                 'Bebidas',   1000,   250,   60, false, 6378),
     ('Cerveza',                              'Bebidas',   2500,  NULL,    0, true,  9321),
     ('Refresco',                             'Bebidas',   2000,  NULL,    0, true,  9320),
-    ('Barra Wild Caramelo 45 g',             'Snacks',    4000,  3000,    0, false, 6383),
-    ('Barra Wild Chocolate 45 g',            'Snacks',    4000,  3000,    0, false, 6382),
-    ('Barra Wild Chocolate amargo 45 g',     'Snacks',    4000,  3000,   16, false, 6386),
-    ('Barra Wild Chocolate/cacahuate 45 g',  'Snacks',    4000,  3000,   16, false, 6381),
-    ('Barra Wild Chocolate/coco 45 g',       'Snacks',    4000,  3000,    2, false, 6380),
-    ('Barra Wild Chocolate/moka 45 g',       'Snacks',    4000,  3000,    0, false, 6385),
-    ('Barra Wild Chocolate/naranja 45 g',    'Snacks',    4000,  3000,   12, false, 6384),
-    ('Barra Wild Limón 45 g',                'Snacks',    4000,  3000,    0, false, 6387),
-    ('Gomitas',                              'Snacks',    5000,  3000,    0, true,  8547),
-    ('Magnesia Staiker Moonstones',          'Magnesia', 20000, 11200,    3, false, 6370),
-    ('Magnesia Staiker polvo 130 g',         'Magnesia', 15000,  7000,    0, false, 6369),
-    ('Magnesia Yohua',                       'Magnesia', 24000, 11500,    3, false, 6368)
+    ('Barra Wild Caramelo 45 g',             'Barritas',  4000,  3000,    0, false, 6383),
+    ('Barra Wild Chocolate 45 g',            'Barritas',  4000,  3000,    0, false, 6382),
+    ('Barra Wild Chocolate amargo 45 g',     'Barritas',  4000,  3000,   16, false, 6386),
+    ('Barra Wild Chocolate/cacahuate 45 g',  'Barritas',  4000,  3000,   16, false, 6381),
+    ('Barra Wild Chocolate/coco 45 g',       'Barritas',  4000,  3000,    2, false, 6380),
+    ('Barra Wild Chocolate/moka 45 g',       'Barritas',  4000,  3000,    0, false, 6385),
+    ('Barra Wild Chocolate/naranja 45 g',    'Barritas',  4000,  3000,   12, false, 6384),
+    ('Barra Wild Limón 45 g',                'Barritas',  4000,  3000,    0, false, 6387),
+    ('Gomitas',                              NULL,         5000,  3000,    0, true,  8547),
+    ('Magnesia Staiker Moonstones',          'Magnesias',20000, 11200,    3, false, 6370),
+    ('Magnesia Staiker polvo 130 g',         'Magnesias',15000,  7000,    0, false, 6369),
+    ('Magnesia Yohua',                       'Magnesias',24000, 11500,    3, false, 6368)
   ) AS t(name, category, price, cost, qty, neg, evo_id)
   LOOP
     IF EXISTS (SELECT 1 FROM products WHERE lower(name) = lower(r.name) OR sku = 'EVO-' || r.evo_id) THEN CONTINUE; END IF;

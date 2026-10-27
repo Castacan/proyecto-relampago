@@ -749,3 +749,47 @@ tiene; en Jaibamuro está en 0).
 - Cerveza (−37) y Refresco (−2) estaban en negativo y sin costo en EVO:
   entran en 0, permitiendo vender sin existencia, para que el dueño los
   cuente. Gomitas también vendía sin stock en EVO.
+
+## 2026-10-26 — Vender por grupos, servicios y clases semanales
+
+**Pedido del dueño:**
+- La Membresía trimestral ya no existe.
+- Vender por subgrupos (Barritas, Magnesias, Bebidas).
+- Un grupo SERVICIOS con Pase diario, Clase introductoria, Renta de gatas,
+  Renta de magnesia y Membresía mensual.
+- Clases semanales de escalada y calistenia a $300; con membresía activa
+  $100 o la clase gratis del mes.
+- Productos y planes ordenado en productos y servicios, con búsqueda.
+
+**EVO:** Administrativo → Servicios: Renta de gatas $30, Renta de
+magnesiera $20 (Pase diario $120, Clase introductoria $200, igual que aquí).
+
+**Hecho:**
+- `src/supabase/erp_vender_grupos.sql` se corre AL FINAL: redefine
+  `create_sale` y `class_free_used`.
+  - Catálogo: desactiva la trimestral; crea las rentas y "Clase de escalada"
+    y "Clase de calistenia" (ligadas a los tipos Escalada Jueves y
+    Calistenia, $300 y $100 miembro); asigna categorías.
+  - `sale_items.class_tier`, más `get_class_pricing(persona)` (si es miembro,
+    clases gratis que le quedan y precio de miembro).
+  - `create_sale` acepta `class_tier` member o free_monthly. Valida que tenga
+    membresía (o que la compre en la misma venta) y que le quede clase
+    gratis. La descripción lleva "(precio miembro)" o "(clase gratis del
+    mes)".
+  - `class_free_used` cuenta también las clases gratis vendidas en mostrador:
+    la de mostrador y la reservada en línea comparten el límite de 1 al mes,
+    y anular la venta la devuelve.
+- Vender:
+  - Mosaicos por grupo (Servicios y Clases semanales primero), con "← Todos"
+    para regresar; lo que no tiene grupo va suelto.
+  - En la cuenta, las clases tienen botones Miembro, Clase gratis del mes y
+    Normal.
+- Configuración: "Productos y servicios" con pestañas, subgrupos por
+  categoría, búsqueda, "Ver inactivos" y campo "Grupo en Vender" para todos
+  los tipos.
+- `erp_productos_evo.sql` ya usa las categorías Barritas y Magnesias, con
+  Gomitas suelta.
+- Pruebas: 26 en `grupos_test.mjs` y en el navegador con el servidor falso.
+
+**No se hizo:** la clase vendida en mostrador no aparta lugar en la sesión
+de la semana (la reserva sigue en Clases).

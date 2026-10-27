@@ -113,7 +113,7 @@ export default function StaffLayout() {
       { to: '/staff/competencia', label: 'Competencia', icon: 'trophy', show: isAdmin },
     ] },
     { id: 'config', label: 'Configuración', icon: 'settings', items: [
-      { to: '/staff/config/productos', label: 'Productos y planes', icon: 'box', show: isAdmin },
+      { to: '/staff/config/productos', label: 'Productos y servicios', icon: 'box', show: isAdmin },
       { to: '/staff/config/integraciones', label: 'Integraciones y pagos', icon: 'plug', show: isAdmin },
       { to: '/staff/config/checklist', label: 'Plantilla del checklist', icon: 'list', show: isAdmin },
       { to: '/staff/config/documentos', label: 'Responsiva y reglamento', icon: 'file', show: isAdmin },

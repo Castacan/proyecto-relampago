@@ -1,11 +1,15 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
-import { call, erpError, money, fmtDate, toCents, durationLabel, KIND_LABELS, METHOD_LABELS, POS_METHODS, type Product, type ProductKind } from '../../../lib/erp'
+import { call, erpError, money, fmtDate, toCents, durationLabel, METHOD_LABELS, POS_METHODS, type Product } from '../../../lib/erp'
 import { Page, Card, Empty, Msg, Spinner, input, label, btnPrimary, btnGhost, btnSmall } from '../../../components/erp/ui'
 import { PersonPicker, type Person } from '../classes/people'
 
 interface TodayPerson { id: string; full_name: string; phone: string | null; email: string | null; entered_at: string | null; bought: string | null; last_at: string; membership_until: string | null }
-interface Line { product: Product; qty: number; discount: string; startsOn: string }
+type Tier = 'regular' | 'member' | 'free_monthly'
+interface Line { product: Product; qty: number; discount: string; startsOn: string; tier?: Tier }
+interface ClassPricing { is_member: boolean; free_left: number; products: Record<string, { member_price_cents: number; eligible_free_monthly: boolean }> }
+// Orden de los grupos en Vender (lo demás va alfabético; sin grupo, suelto al final).
+const GROUP_ORDER = ['Servicios', 'Clases semanales']
 interface Payment { method: string; amount: string; reference: string }
 
 export default function PosPage() {
@@ -25,6 +29,9 @@ export default function PosPage() {
   const [isAdmin, setIsAdmin] = useState(false)
   const [todayPeople, setTodayPeople] = useState<TodayPerson[] | null>(null)
   const [entryMsg, setEntryMsg] = useState<{ text: string; tone: 'ok' | 'error' } | null>(null)
+  const [group, setGroup] = useState<string | null>(null)
+  const [pricing, setPricing] = useState<ClassPricing | null>(null)
+  const [pricingKey, setPricingKey] = useState(0)
   const loadTodayPeople = useCallback(async () => { const { data } = await call<{ people: TodayPerson[] }>('get_today_people'); setTodayPeople(data?.people ?? []) }, [])
   useEffect(() => { loadTodayPeople() }, [loadTodayPeople])
 
@@ -43,18 +50,40 @@ export default function PosPage() {
     })
   }, [params])
 
-  const subtotal = lines.reduce((a, l) => a + l.product.price_cents * l.qty - toCents(l.discount), 0)
+  // Clases semanales: precio de miembro o clase gratis del mes si tiene membresía (o la compra en esta venta).
+  useEffect(() => {
+    setPricing(null)
+    call<ClassPricing>('get_class_pricing', { p_person_id: person?.id ?? null }).then(({ data }) => setPricing(data ?? null))
+  }, [person?.id, pricingKey])
+  const buysMembership = lines.some(l => l.product.grants_membership && !l.product.is_recurring)
+  const isMember = !!person && (!!pricing?.is_member || buysMembership)
+  const freeLeft = pricing?.is_member ? pricing.free_left : buysMembership ? 1 : 0
+  const isClass = (p: Product) => p.kind === 'class' && !!pricing?.products[p.id]
+  const unitPrice = (l: Line) => l.tier === 'free_monthly' ? 0 : l.tier === 'member' ? (pricing?.products[l.product.id]?.member_price_cents ?? l.product.price_cents) : l.product.price_cents
+  // Al cambiar de persona (o de membresía) se ajusta la tarifa de las clases.
+  useEffect(() => {
+    setLines(ls => ls.map(l => !isClass(l.product) ? l
+      : !isMember ? { ...l, tier: 'regular' }
+      : l.tier === 'free_monthly' && freeLeft > 0 ? l : { ...l, tier: 'member' }))
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isMember, freeLeft, pricing])
+  const freeUsedInCart = lines.filter(l => l.tier === 'free_monthly').reduce((a, l) => a + l.qty, 0)
+
+  const subtotal = lines.reduce((a, l) => a + unitPrice(l) * l.qty - toCents(l.discount), 0)
   const total = Math.max(subtotal - toCents(discount), 0)
   const paid = payments.reduce((a, p) => a + toCents(p.amount), 0)
   const cashPart = payments.filter(p => p.method === 'cash').reduce((a, p) => a + toCents(p.amount), 0)
   const change = cashGiven ? Math.max(toCents(cashGiven) - cashPart, 0) : 0
   const needsPerson = lines.some(l => l.product.grants_membership)
 
-  const grouped = useMemo(() => {
-    const g = new Map<ProductKind, Product[]>()
-    for (const p of products ?? []) g.set(p.kind, [...(g.get(p.kind) ?? []), p])
-    return [...g.entries()]
+  const { groups, loose } = useMemo(() => {
+    const g = new Map<string, Product[]>()
+    const loose: Product[] = []
+    for (const p of products ?? []) { if (p.category) g.set(p.category, [...(g.get(p.category) ?? []), p]); else loose.push(p) }
+    const rank = (k: string) => { const i = GROUP_ORDER.indexOf(k); return i < 0 ? 99 : i }
+    return { groups: [...g.entries()].sort(([a], [b]) => rank(a) - rank(b) || a.localeCompare(b)), loose }
   }, [products])
+  const shown = group ? groups.find(([k]) => k === group)?.[1] ?? [] : []
 
   const add = (p: Product) => {
     setDone(null); setError(null)
@@ -62,7 +91,7 @@ export default function PosPage() {
       const i = ls.findIndex(l => l.product.id === p.id)
       if (i >= 0 && !p.grants_membership) return ls.map((l, j) => j === i ? { ...l, qty: l.qty + 1 } : l)
       if (i >= 0) return ls
-      return [...ls, { product: p, qty: 1, discount: '', startsOn: '' }]
+      return [...ls, { product: p, qty: 1, discount: '', startsOn: '', tier: isClass(p) ? (isMember ? 'member' : 'regular') : undefined }]
     })
   }
   // Si solo hay una forma de pago, se llena sola con el total.
@@ -74,11 +103,12 @@ export default function PosPage() {
     setError(null)
     if (lines.length === 0) { setError('Agrega al menos un artículo.'); return }
     if (needsPerson && !person) { setError('Elige a la persona: el plan le da membresía.'); return }
-    if (paid !== total) { setError(`Los pagos suman ${money(paid)} y el total es ${money(total)}.`); return }
+    if (paid !== total && total > 0) { setError(`Los pagos suman ${money(paid)} y el total es ${money(total)}.`); return }
+    if (freeUsedInCart > freeLeft) { setError(`Solo le queda ${freeLeft} clase gratis este mes.`); return }
     setBusy(true)
     const { data, error } = await call<{ folio: number; total_cents: number; product?: string; stock?: number }>('create_sale', { p_sale: {
       person_id: person?.id ?? null,
-      items: lines.map(l => ({ product_id: l.product.id, quantity: l.qty, discount_cents: toCents(l.discount), starts_on: l.startsOn || null })),
+      items: lines.map(l => ({ product_id: l.product.id, quantity: l.qty, discount_cents: toCents(l.discount), starts_on: l.startsOn || null, class_tier: l.tier ?? null })),
       discount_cents: toCents(discount),
       payments: payments.filter(p => toCents(p.amount) > 0).map(p => ({ method: p.method, amount_cents: toCents(p.amount), reference: p.reference || null })),
       note: note || null,
@@ -87,7 +117,7 @@ export default function PosPage() {
     if (error === 'out_of_stock' && data?.product) { setError(`No hay suficiente ${data.product}: quedan ${data.stock ?? 0}.`); return }
     if (error || !data) { setError(erpError(error ?? undefined)); return }
     setDone({ folio: data.folio, total: data.total_cents, change }); setEntryMsg(null)
-    loadTodayPeople()
+    loadTodayPeople(); setPricingKey(k => k + 1)
     setLines([]); setDiscount(''); setPayments([{ method: 'cash', amount: '', reference: '' }]); setCashGiven(''); setNote('')
   }
 
@@ -136,24 +166,24 @@ export default function PosPage() {
             <PersonPicker selected={person} onPick={p => { setPerson(p); setDone(null) }} />
             {needsPerson && !person && <p className="text-amarillo-suave text-xs mt-2">Necesaria: hay un plan en la venta.</p>}
           </Card>
-          <Card title="Artículos">
-            {products === null ? <Spinner /> : products.length === 0 ? <Empty>No hay productos. Créalos en Configuración → Productos y planes.</Empty> : (
-              <div className="space-y-4">
-                {grouped.map(([kind, items]) => (
-                  <div key={kind}>
-                    <p className="text-zinc-500 text-[11px] font-bold uppercase tracking-widest mb-2">{KIND_LABELS[kind]}</p>
-                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                      {items.map(p => (
-                        <button key={p.id} onClick={() => add(p)} disabled={p.track_stock && !p.allow_negative_stock && (p.stock ?? 0) <= 0}
-                          className="text-left rounded-xl border border-zinc-700/50 bg-fondo/60 hover:bg-superficie-alta hover:border-primario/50 p-3 transition-all disabled:opacity-40">
-                          <p className="text-texto-principal text-sm font-bold leading-tight">{p.name}</p>
-                          <p className="text-primario text-sm font-black mt-1">{money(p.price_cents)}</p>
-                          <p className="text-zinc-500 text-[11px]">{durationLabel(p)}{p.track_stock ? ` · ${p.stock ?? 0} en stock` : ''}</p>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                ))}
+          <Card title={group ?? 'Artículos'} actions={group ? <button onClick={() => setGroup(null)} className={btnSmall}>← Todos</button> : undefined}>
+            {products === null ? <Spinner /> : products.length === 0 ? <Empty>No hay productos. Créalos en Configuración → Productos y servicios.</Empty> : group ? (
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">{shown.map(p => <ProductTile key={p.id} p={p} onAdd={add} pricing={pricing} isMember={isMember} />)}</div>
+            ) : (
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                {groups.map(([g, items]) => {
+                  const prices = items.map(p => p.price_cents)
+                  const min = Math.min(...prices), max = Math.max(...prices)
+                  return (
+                    <button key={g} onClick={() => setGroup(g)}
+                      className="text-left rounded-xl border border-primario/30 bg-primario/5 hover:bg-primario/10 hover:border-primario/60 p-3 transition-all">
+                      <p className="text-texto-principal text-sm font-black uppercase tracking-wide leading-tight">{g}</p>
+                      <p className="text-zinc-400 text-xs mt-1">{items.length} {items.length === 1 ? 'opción' : 'opciones'}</p>
+                      <p className="text-primario text-xs font-bold">{min === max ? money(min) : `${money(min)} – ${money(max)}`}</p>
+                    </button>
+                  )
+                })}
+                {loose.map(p => <ProductTile key={p.id} p={p} onAdd={add} pricing={pricing} isMember={isMember} />)}
               </div>
             )}
           </Card>
@@ -167,7 +197,7 @@ export default function PosPage() {
                   <div className="flex items-start justify-between gap-2">
                     <div>
                       <p className="text-texto-principal text-sm font-bold">{l.product.name}</p>
-                      <p className="text-zinc-500 text-xs">{money(l.product.price_cents)} c/u</p>
+                      <p className="text-zinc-500 text-xs">{money(unitPrice(l))} c/u</p>
                     </div>
                     <button onClick={() => setLines(ls => ls.filter((_, j) => j !== i))} className="text-zinc-500 hover:text-alerta text-lg leading-none">×</button>
                   </div>
@@ -176,12 +206,24 @@ export default function PosPage() {
                       <div className="flex items-center gap-1">
                         <button onClick={() => setLines(ls => ls.map((x, j) => j === i ? { ...x, qty: Math.max(1, x.qty - 1) } : x))} className={btnSmall}>−</button>
                         <span className="text-texto-principal text-sm font-bold w-6 text-center">{l.qty}</span>
-                        <button onClick={() => setLines(ls => ls.map((x, j) => j === i ? { ...x, qty: x.qty + 1 } : x))} className={btnSmall}>+</button>
+                        <button onClick={() => setLines(ls => ls.map((x, j) => j === i ? { ...x, qty: x.qty + 1 } : x))} disabled={l.tier === 'free_monthly'} className={btnSmall}>+</button>
                       </div>
                     )}
                     <input value={l.discount} onChange={e => setLines(ls => ls.map((x, j) => j === i ? { ...x, discount: e.target.value } : x))}
                       type="number" min={0} placeholder="Descuento $" className={`${input} py-1.5`} />
                   </div>
+                  {l.tier && (
+                    isMember ? (
+                      <div className="flex flex-wrap gap-1">
+                        {(['member', 'free_monthly', 'regular'] as Tier[]).filter(t => t !== 'free_monthly' || (pricing?.products[l.product.id]?.eligible_free_monthly && (freeLeft > 0 || l.tier === 'free_monthly'))).map(t => (
+                          <button key={t} onClick={() => setLines(ls => ls.map((x, j) => j === i ? { ...x, tier: t, qty: t === 'free_monthly' ? 1 : x.qty } : x))}
+                            className={`${btnSmall} ${l.tier === t ? '!bg-primario !text-texto-en-acento !border-primario' : ''}`}>
+                            {t === 'member' ? `Miembro ${money(pricing?.products[l.product.id]?.member_price_cents ?? 0)}` : t === 'free_monthly' ? `Clase gratis del mes${freeLeft ? ` (le queda ${freeLeft})` : ''}` : `Normal ${money(l.product.price_cents)}`}
+                          </button>
+                        ))}
+                      </div>
+                    ) : <p className="text-zinc-500 text-[11px]">{person ? 'Sin membresía activa: precio normal.' : 'Elige a la persona: con membresía activa paga ' + money(pricing?.products[l.product.id]?.member_price_cents ?? 0) + ' o usa su clase gratis.'}</p>
+                  )}
                   {l.product.grants_membership && (
                     <div>
                       <label className="text-zinc-400 text-[11px]">Inicia (vacío = hoy o al vencer su membresía actual)</label>
@@ -256,5 +298,17 @@ function TodayList({ people, selectedId, onPick }: { people: TodayPerson[] | nul
         </div>
       )}
     </Card>
+  )
+}
+
+function ProductTile({ p, onAdd, pricing, isMember }: { p: Product; onAdd: (p: Product) => void; pricing: ClassPricing | null; isMember: boolean }) {
+  const member = p.kind === 'class' ? pricing?.products[p.id]?.member_price_cents : undefined
+  return (
+    <button onClick={() => onAdd(p)} disabled={p.track_stock && !p.allow_negative_stock && (p.stock ?? 0) <= 0}
+      className="text-left rounded-xl border border-zinc-700/50 bg-fondo/60 hover:bg-superficie-alta hover:border-primario/50 p-3 transition-all disabled:opacity-40">
+      <p className="text-texto-principal text-sm font-bold leading-tight">{p.name}</p>
+      <p className="text-primario text-sm font-black mt-1">{isMember && member != null ? <>{money(member)} <span className="text-zinc-500 line-through text-xs font-semibold">{money(p.price_cents)}</span></> : money(p.price_cents)}</p>
+      <p className="text-zinc-500 text-[11px]">{durationLabel(p)}{p.track_stock ? ` · ${p.stock ?? 0} en stock` : ''}{member != null && !isMember ? ` · miembro ${money(member)}` : ''}</p>
+    </button>
   )
 }
