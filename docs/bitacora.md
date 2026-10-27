@@ -735,3 +735,17 @@ entrada hasta que lo firmen.
 
 **No se hizo (platicar):** comisión por producto para el staff (EVO la
 tiene; en Jaibamuro está en 0).
+
+## 2026-10-26 — Productos de EVO dados de alta
+
+- El dueño no quiere comisión por producto.
+- Se leyeron en vivo de EVO (Administrativo → Productos, en la página
+  evo3.w12app.com.br/Administrativo/Produtos/Produtos, solo lectura) los 15
+  productos activos: precio, costo, existencia y "vende sin stock".
+- `src/supabase/erp_productos_evo.sql`: los crea con sku `EVO-<id>`,
+  categoría (Bebidas, Snacks, Magnesia) y la existencia de ese día como
+  "Existencia inicial". Es idempotente y funciona antes o después de
+  erp_inventario.sql (probado en PGlite).
+- Cerveza (−37) y Refresco (−2) estaban en negativo y sin costo en EVO:
+  entran en 0, permitiendo vender sin existencia, para que el dueño los
+  cuente. Gomitas también vendía sin stock en EVO.
