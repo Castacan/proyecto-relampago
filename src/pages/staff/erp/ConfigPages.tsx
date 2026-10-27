@@ -56,6 +56,7 @@ function ProductForm({ p, onSaved }: { p?: Product; onSaved: () => void }) {
     promo_price: toPesos(p?.promo_price_cents ?? null), track_stock: p?.track_stock ?? false, stock: String(p?.stock ?? ''),
     cost: toPesos(p?.cost_cents ?? null), stock_min: String(p?.stock_min ?? ''), allow_negative_stock: p?.allow_negative_stock ?? false, sku: p?.sku ?? '',
     is_active: p?.is_active ?? true, sort_order: String(p?.sort_order ?? 0),
+    category: p?.category ?? '', for_sale: p?.for_sale ?? true,
   })
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -64,7 +65,7 @@ function ProductForm({ p, onSaved }: { p?: Product; onSaved: () => void }) {
 
   const save = async () => {
     setBusy(true)
-    const { error } = await call('admin_save_product', { p_product: {
+    const { data, error } = await call<{ id: string }>('admin_save_product', { p_product: {
       id: p?.id ?? null, kind: f.kind, name: f.name, description: f.description, price_cents: toCents(f.price),
       grants_membership: isPlan && f.grants_membership, duration_unit: f.is_recurring ? 'month' : f.duration_unit,
       duration_value: f.is_recurring ? 1 : Number(f.duration_value), is_recurring: f.kind === 'plan' && f.is_recurring,
@@ -72,6 +73,7 @@ function ProductForm({ p, onSaved }: { p?: Product; onSaved: () => void }) {
       track_stock: f.track_stock, stock: p ? '' : f.stock, cost_cents: f.cost === '' ? '' : toCents(f.cost), stock_min: f.stock_min,
       allow_negative_stock: f.allow_negative_stock, sku: f.sku, is_active: f.is_active, sort_order: Number(f.sort_order), class_type_id: p?.class_type_id ?? null,
     } })
+    if (!error && data?.id && f.kind === 'product') await call('admin_set_product_extras', { p_product_id: data.id, p_category: f.category, p_for_sale: f.for_sale })
     setBusy(false)
     if (error) { setError(erpError(error)); return }
     onSaved()
@@ -134,7 +136,12 @@ function ProductForm({ p, onSaved }: { p?: Product; onSaved: () => void }) {
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
             <MoneyField id={`pf-cost-${p?.id ?? 'new'}`} label="Costo por pieza (para margen)" value={f.cost} onChange={v => set({ cost: v })} />
             <div><label className={label}>Clave / código (opcional)</label><input value={f.sku} onChange={e => set({ sku: e.target.value })} className={input} /></div>
+            <div><label className={label}>Categoría (opcional)</label><input value={f.category} onChange={e => set({ category: e.target.value })} placeholder="Bebidas, snacks, limpieza…" className={input} /></div>
           </div>
+          <label className="flex items-center gap-2 text-sm text-zinc-200">
+            <input type="checkbox" checked={!f.for_sale} onChange={e => set({ for_sale: !e.target.checked })} className="accent-primario w-4 h-4" />
+            Solo para consumo interno (limpieza, papel…): no sale en Vender
+          </label>
           <label className="flex items-center gap-2 text-sm text-zinc-200">
             <input type="checkbox" checked={f.track_stock} onChange={e => set({ track_stock: e.target.checked })} className="accent-primario w-4 h-4" />
             Llevar inventario (se descuenta al vender)

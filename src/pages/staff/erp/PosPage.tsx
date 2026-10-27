@@ -29,7 +29,7 @@ export default function PosPage() {
   useEffect(() => { loadTodayPeople() }, [loadTodayPeople])
 
   useEffect(() => {
-    call<{ products: Product[] }>('get_products', { p_include_inactive: false }).then(({ data }) => setProducts((data?.products ?? []).filter(p => !p.is_recurring)))
+    call<{ products: Product[] }>('get_products', { p_include_inactive: false }).then(({ data }) => setProducts((data?.products ?? []).filter(p => !p.is_recurring && p.for_sale !== false)))
     call<{ open: unknown; require_open_cash: boolean }>('get_cash_status').then(({ data }) => { setCashOpen(!!data?.open); setRequireCash(data?.require_open_cash ?? true) })
     call<{ is_admin: boolean }>('get_erp_settings').then(({ data }) => setIsAdmin(!!data?.is_admin))
   }, [])

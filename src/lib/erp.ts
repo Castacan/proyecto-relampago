@@ -27,6 +27,8 @@ export interface Product {
   sku: string | null
   is_active: boolean
   sort_order: number
+  category?: string | null
+  for_sale?: boolean
 }
 
 // Egresos (erp_finanzas.sql)
@@ -39,7 +41,7 @@ export const EXPENSE_METHODS: Record<string, string> = { cash: 'Efectivo', card:
 export const PAID_FROM: Record<string, string> = { cash_register: 'De la caja', bank: 'Banco / cuenta', other: 'Otro' }
 export const PAYEE_KINDS: Record<string, string> = { supplier: 'Proveedor', employee: 'Empleado', government: 'Gobierno / impuestos', other: 'Otro' }
 export const STOCK_KINDS: Record<string, string> = {
-  initial: 'Existencia inicial', purchase: 'Entrada', sale: 'Venta', sale_void: 'Venta anulada', adjust: 'Ajuste', consumption: 'Consumo',
+  initial: 'Existencia inicial', purchase: 'Entrada', sale: 'Venta', sale_void: 'Venta anulada', adjust: 'Ajuste por conteo', consumption: 'Consumo', waste: 'Merma',
 }
 
 export const KIND_LABELS: Record<ProductKind, string> = {

@@ -695,3 +695,43 @@ comprar una laptop con webcam para recepción.
 **Ojo:** el aviso es obligatorio. Si en Acceso está prendido "Pide
 responsiva firmada", a los clientes que no lo han firmado se les niega la
 entrada hasta que lo firmen.
+
+## 2026-10-26 — Inventario: revisión y mejoras tomando como referencia EVO
+
+**Revisión:**
+- Ya existía y funciona (pruebas de finanzas): la venta descuenta, anular
+  regresa, y hay entrada (con egreso), conteo y salida (consumo/merma).
+- Los productos se creaban solo en Configuración.
+
+**EVO (visto en vivo, solo lectura):**
+- Ficha del producto: precio de venta y compra, cantidad actual y mínima,
+  comisión, "para consumo / para venta" y "permite ventas sin stock".
+- Entrada/salida por producto con fecha.
+- "Reajuste de valores" en bloque ($ o %).
+- El reporte de Productos es de EVO Pro, que Jaibamuro no tiene.
+
+**Hecho:**
+- `src/supabase/erp_inventario.sql` (después de erp_finanzas.sql):
+  - Productos: `category` y `for_sale`. Los de solo consumo no salen en
+    Vender.
+  - Movimientos: tipo `waste` (merma) aparte del ajuste por conteo, más
+    `occurred_on` (fecha del movimiento) y `batch_id`.
+  - RPCs: `admin_set_product_extras`, `stock_out_v2`, `stock_entry_batch`
+    (varios productos y un solo egreso; valida todo antes de mover),
+    `get_stock_report` (rango, tipo y producto, con totales; costo solo
+    admin) y `admin_bulk_reprice` (%, $ o fijo, redondeo a peso, bitácora
+    con precios anteriores).
+  - `get_inventory` y `get_stock_movements` redefinidas.
+- Inventario rehecho:
+  - Botones: "+ Producto", "+ Entrada de pedido", "Reajustar precios".
+  - Búsqueda, filtro por categoría y lista agrupada.
+  - Salida con merma o consumo y fecha.
+  - Pestaña Movimientos con totales y CSV.
+- Configuración → Productos: categoría y "solo consumo interno".
+- Vender oculta los productos de solo consumo.
+- Pruebas: 34 en `inv_test.mjs`, más las de finanzas, y en el navegador con
+  el servidor falso (crear, pedido con egreso, merma, venta, movimientos y
+  reajuste).
+
+**No se hizo (platicar):** comisión por producto para el staff (EVO la
+tiene; en Jaibamuro está en 0).
