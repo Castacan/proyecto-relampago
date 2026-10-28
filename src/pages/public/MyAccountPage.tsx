@@ -161,16 +161,6 @@ export default function MyAccountPage() {
 
       <div className="flex-1 max-w-md mx-auto w-full px-5 py-6 space-y-6">
 
-        <MyMembership />
-
-        <Link
-          to="/spraywall"
-          className="flex items-center justify-between px-4 py-3.5 bg-superficie border border-zinc-800/60 rounded-2xl hover:border-zinc-700 transition-all"
-        >
-          <span className="text-texto-principal font-semibold text-sm">Ver Spraywall</span>
-          <span className="text-zinc-500 text-sm">→</span>
-        </Link>
-
         {/* Nombre / alias */}
         <div>
           <p className="text-zinc-500 text-[11px] font-bold uppercase tracking-widest mb-3">Tu alias</p>
@@ -254,6 +244,16 @@ export default function MyAccountPage() {
             </div>
           )}
         </div>
+
+        <MyMembership />
+
+        <Link
+          to="/spraywall"
+          className="flex items-center justify-between px-4 py-3.5 bg-superficie border border-zinc-800/60 rounded-2xl hover:border-zinc-700 transition-all"
+        >
+          <span className="text-texto-principal font-semibold text-sm">Ver Spraywall</span>
+          <span className="text-zinc-500 text-sm">→</span>
+        </Link>
 
         {/* Email info */}
         <div className="pb-4">

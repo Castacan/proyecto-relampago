@@ -64,7 +64,7 @@ export default function ChecklistTemplatePage() {
       const where = data?.block ? ` (bloque ${data.block}${data.task ? `, tarea ${data.task}` : ''})` : ''
       setMsg({ text: checklistError(error) + where, tone: 'error' }); return
     }
-    setMsg({ text: 'Plantilla guardada. Se usa a partir del siguiente día que empiece.', tone: 'ok' })
+    setMsg({ text: 'Plantilla guardada. El turno de hoy ya se actualizó (lo que ya se marcó se conserva).', tone: 'ok' })
     load()
   }
 
@@ -73,7 +73,7 @@ export default function ChecklistTemplatePage() {
 
   return (
     <Page title="Plantilla del checklist" width="max-w-3xl"
-      subtitle={<>Lo que el staff ve cada día. Editarla no cambia días que ya empezaron (para hoy, si nadie ha marcado nada, usa “Volver a generar” en el <Link to="/staff/turno" className="text-primario underline">turno de hoy</Link>).</>}
+      subtitle={<>Lo que el staff ve cada día. Al guardar, el <Link to="/staff/turno" className="text-primario underline">turno de hoy</Link> se pone al día: lo nuevo aparece, lo quitado se va y lo que ya se marcó se conserva. Los días ya cerrados no cambian.</>}
       actions={<button onClick={save} disabled={busy || !dirty} className={btnPrimary}>{busy ? 'Guardando…' : dirty ? 'Guardar cambios' : 'Guardado'}</button>}>
       {msg && <Msg text={msg.text} tone={msg.tone} />}
 

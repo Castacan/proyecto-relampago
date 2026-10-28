@@ -884,3 +884,16 @@ permitiendo al staff lo de antes.
 - Pruebas: `nomina_test.mjs` (7) y `turno_test.mjs` (17), más el navegador
   con el servidor falso (copiar horario y la sugerencia de $3,520 para el
   16–31 oct).
+
+### 2026-10-28 — La plantilla del checklist actualiza el turno de hoy; Mi cuenta reordenada
+
+- `erp_checklist_sync.sql` (correr después de `erp_checklist.sql`):
+  - Nueva `erp_checklist_resync(fecha)`. Al guardar la plantilla
+    (`admin_save_checklist_template`, redefinida) se ponen al día los días
+    abiertos ya generados, de hoy en adelante.
+  - Lo nuevo se agrega y lo editado se actualiza sin perder lo marcado.
+  - Lo quitado se borra solo si nadie lo marcó. Los días cerrados no cambian.
+- Plantilla: el texto ahora explica que hoy se actualiza solo.
+- Mi cuenta (cliente): primero Tu alias, luego Puntos, Últimas rutas y
+  Spraywall, y la membresía hasta abajo.
+- Pruebas: `sync_test.mjs` (9), y `turno_test` y `checklist_test` siguen OK.
