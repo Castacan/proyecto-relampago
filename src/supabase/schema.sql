@@ -539,7 +539,8 @@ $$;
 --     en las 3. Sigue sin poder farmearse: el dedup mensual de arriba ya
 --     evita repetir el bonus reenviando la "más nueva" día tras día dentro
 --     del mismo mes (el dedup DIARIO ya lo impedía de por sí, por ruta).
--- Requiere scan reciente (<30 min) en `scans` por user_id o device_id.
+-- Requiere scan reciente (<30 min) de CUALQUIER ruta en `scans` por user_id o
+-- device_id (2026-10-28, sends_ventana_scan.sql: el escaneo prueba que estás en el muro).
 -- Actualizada 2026-09-09: aplica climbers.points_multiplier (default 1,
 -- sin efecto) DESPUÉS de grado+bonus, redondeado para no romper el tipo
 -- INT de points_daily/points_monthly — ver set_climber_points_multiplier
@@ -578,8 +579,7 @@ AS $function$
 
     IF NOT EXISTS (
       SELECT 1 FROM scans
-      WHERE route_id = p_route_id
-        AND (user_id = v_uid OR device_id = p_device_id)
+      WHERE (user_id = v_uid OR device_id = p_device_id)
         AND scanned_at > now() - interval '30 minutes'
     ) THEN RETURN '{"error":"no_recent_scan"}'::JSONB; END IF;
 

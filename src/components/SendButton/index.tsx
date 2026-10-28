@@ -141,7 +141,7 @@ export default function SendButton({ route, qrId, climber, climberLoading, onNee
         <div className="w-full">
           <div className="py-3.5 rounded-2xl bg-superficie-alta border border-orange-500/30 text-center mb-3">
             <p className="text-orange-400 font-bold text-sm">Confirma que estás junto a la ruta</p>
-            <p className="text-zinc-500 text-xs mt-0.5">Escanea el QR de la ruta para confirmar el send.</p>
+            <p className="text-zinc-500 text-xs mt-0.5">Escanea el QR de la ruta. Después tienes 30 min para mandar otras sin volver a escanear.</p>
           </div>
           <button
             onClick={() => setScanModalOpen(true)}

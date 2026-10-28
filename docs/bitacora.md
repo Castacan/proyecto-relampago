@@ -897,3 +897,16 @@ permitiendo al staff lo de antes.
 - Mi cuenta (cliente): primero Tu alias, luego Puntos, Últimas rutas y
   Spraywall, y la membresía hasta abajo.
 - Pruebas: `sync_test.mjs` (9), y `turno_test` y `checklist_test` siguen OK.
+
+### 2026-10-28 — Un escaneo vale 30 min para cualquier ruta
+
+- `sends_ventana_scan.sql`: `submit_send` acepta un escaneo de cualquier
+  ruta en los últimos 30 min. Antes tenía que ser un escaneo de esa misma ruta.
+  - Parcha la versión de producción con `pg_get_functiondef` y solo quita
+    `route_id = p_route_id`. Se puede correr más de una vez.
+  - `schema.sql` quedó actualizado igual.
+- SendButton: el aviso explica la ventana de 30 min.
+- Prueba: `scan_test.mjs`:
+  - Antes del parche, otra ruta daba `no_recent_scan`.
+  - Después, otra ruta da `success`.
+  - Un escaneo de hace 31 min sigue pidiendo escanear.
