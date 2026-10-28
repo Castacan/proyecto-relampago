@@ -1,5 +1,6 @@
-import { useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { createContext, useContext, useEffect, useState } from 'react'
+import { Link as RouterLink, type LinkProps } from 'react-router-dom'
+import { useCanSee } from '../../../lib/staffSections'
 import { call, fmtDate, fmtDateTime, money } from '../../../lib/erp'
 import { fmtTime } from '../../../lib/classes'
 import { CashAlerts, type CashAlert } from './CashPage'
@@ -21,7 +22,21 @@ interface Dashboard {
   expenses_due?: { id: string; description: string; payee: string | null; amount_cents: number; due_on: string }[] | null
 }
 
+// En Inicio, los links a secciones que el staff todavía no tiene se muestran como texto.
+const CanSee = createContext<(path: string) => boolean>(() => true)
+function Link({ to, className, children, hideIfLocked }: LinkProps & { to: string; hideIfLocked?: boolean }) {
+  const canSee = useContext(CanSee)
+  if (canSee(to)) return <RouterLink to={to} className={className}>{children}</RouterLink>
+  if (hideIfLocked) return null
+  return <div className={className}>{children}</div>
+}
+
 export default function HomePage() {
+  const canSee = useCanSee()
+  return <CanSee.Provider value={canSee}><Home /></CanSee.Provider>
+}
+
+function Home() {
   const [d, setD] = useState<Dashboard | null>(null)
   const [error, setError] = useState<string | null>(null)
 
@@ -41,7 +56,7 @@ export default function HomePage() {
 
   return (
     <Page title="Inicio" subtitle={fmtDate(d.today)}
-      actions={<><Link to="/staff/vender" className={btnPrimary}>Vender</Link><Link to="/staff/personas" className={btnGhost}>Buscar persona</Link></>}>
+      actions={<><Link hideIfLocked to="/staff/vender" className={btnPrimary}>Vender</Link><Link hideIfLocked to="/staff/personas" className={btnGhost}>Buscar persona</Link></>}>
       <CashAlerts alerts={alerts} onAck={loadAlerts} />
       {!d.cash && d.require_open_cash && (
         <Card tone="alert">
@@ -50,7 +65,7 @@ export default function HomePage() {
               <p className="text-texto-principal font-bold">La caja está cerrada</p>
               <p className="text-zinc-400 text-sm">Ábrela al empezar el día para poder cobrar.</p>
             </div>
-            <Link to="/staff/caja" className={btnPrimary}>Abrir caja</Link>
+            <Link hideIfLocked to="/staff/caja" className={btnPrimary}>Abrir caja</Link>
           </div>
         </Card>
       )}
@@ -63,7 +78,7 @@ export default function HomePage() {
       </div>
 
       <div className="grid lg:grid-cols-2 gap-4">
-        <Card title="Clases de hoy" actions={<Link to="/staff/clases" className="text-primario text-xs font-bold">Ver todo</Link>}>
+        <Card title="Clases de hoy" actions={<Link hideIfLocked to="/staff/clases" className="text-primario text-xs font-bold">Ver todo</Link>}>
           {d.classes_today.length === 0 ? <Empty>No hay clases hoy.</Empty> : (
             <div className="space-y-2">
               {d.classes_today.map(c => (
@@ -112,7 +127,7 @@ export default function HomePage() {
         </Card>
 
         {d.expenses_due && d.expenses_due.length > 0 && (
-          <Card title="Pagos por vencer" actions={<Link to="/staff/egresos" className="text-primario text-xs font-bold">Egresos</Link>}>
+          <Card title="Pagos por vencer" actions={<Link hideIfLocked to="/staff/egresos" className="text-primario text-xs font-bold">Egresos</Link>}>
             <div className="space-y-1">
               {d.expenses_due.map(e => (
                 <Link key={e.id} to="/staff/egresos" className="flex items-center justify-between gap-2 rounded-xl px-3 py-2 hover:bg-superficie-alta">
@@ -128,7 +143,7 @@ export default function HomePage() {
         )}
 
         {d.low_stock && d.low_stock.length > 0 && (
-          <Card title="Por surtir" actions={<Link to="/staff/inventario" className="text-primario text-xs font-bold">Inventario</Link>}>
+          <Card title="Por surtir" actions={<Link hideIfLocked to="/staff/inventario" className="text-primario text-xs font-bold">Inventario</Link>}>
             <div className="space-y-1">
               {d.low_stock.map(p => (
                 <Link key={p.id} to="/staff/inventario" className="flex items-center justify-between gap-2 rounded-xl px-3 py-2 hover:bg-superficie-alta">

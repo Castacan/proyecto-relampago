@@ -3,6 +3,7 @@ import { call, erpError, money, toCents, toPesos, fmtDate, todayMx, EXPENSE_METH
 import { Page, Card, Badge, Empty, Spinner, Msg, input, label, btnPrimary, btnGhost, MoneyField } from '../../../components/erp/ui'
 import { FilesBox } from './PersonExtras'
 import { supabase } from '../../../lib/supabase'
+import { STAFF_SECTIONS, useStaffSections, setStaffSectionsCache } from '../../../lib/staffSections'
 
 // Empleados (admin): datos, contrato/pago, documentos y nómina (cae en Egresos).
 
@@ -61,7 +62,42 @@ export default function EmployeesPage() {
       )}
       <p className="text-zinc-500 text-xs">{active.length} activos.</p>
       <StaffAccessCard key={list.staff_logins.length} onChanged={load} />
+      <StaffSectionsCard />
     </Page>
+  )
+}
+
+// Qué secciones del panel ve el staff (el admin siempre ve todo). Se activan poco a poco.
+function StaffSectionsCard() {
+  const current = useStaffSections()
+  const [sel, setSel] = useState<string[] | null>(null)
+  const [msg, setMsg] = useState<{ text: string; tone: 'ok' | 'error' } | null>(null)
+  const [busy, setBusy] = useState(false)
+  useEffect(() => { if (current && sel === null) setSel(current) }, [current, sel])
+  if (!sel) return <Card title="Secciones que ve el staff"><Spinner /></Card>
+  const changed = JSON.stringify([...sel].sort()) !== JSON.stringify([...(current ?? [])].sort())
+  const save = async () => {
+    setBusy(true); setMsg(null)
+    const { error } = await call('admin_set_staff_sections', { p_sections: sel })
+    setBusy(false)
+    if (error) { setMsg({ text: error === 'server' ? 'No se pudo guardar. ¿Ya se corrió erp_staff_secciones.sql?' : erpError(error), tone: 'error' }); return }
+    setStaffSectionsCache(sel)
+    setMsg({ text: 'Guardado. El staff lo ve al recargar la página.', tone: 'ok' })
+  }
+  return (
+    <Card title="Secciones que ve el staff">
+      <p className="text-zinc-400 text-sm mb-3">Mientras no todo está al 100, el staff solo ve lo que actives aquí. Tú (admin) siempre ves todo. Egresos, empleados, bitácora, estados y configuración son solo del admin.</p>
+      <div className="grid sm:grid-cols-2 gap-x-6 gap-y-2">
+        {STAFF_SECTIONS.map(s => (
+          <label key={s.key} className="flex items-center gap-2 text-sm text-zinc-200">
+            <input type="checkbox" checked={sel.includes(s.key)} onChange={e => setSel(v => e.target.checked ? [...(v ?? []), s.key] : (v ?? []).filter(x => x !== s.key))} className="accent-primario w-4 h-4" />
+            {s.label}
+          </label>
+        ))}
+      </div>
+      {msg && <div className="mt-2"><Msg text={msg.text} tone={msg.tone} /></div>}
+      <button onClick={save} disabled={busy || !changed} className={`${btnPrimary} mt-3`}>{busy ? 'Guardando…' : 'Guardar secciones'}</button>
+    </Card>
   )
 }
 

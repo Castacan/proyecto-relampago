@@ -4,6 +4,7 @@ import { signOut } from '../../lib/auth'
 import { supabase } from '../../lib/supabase'
 import { useProfile } from '../../hooks/useProfile'
 import { isOwner } from '../../lib/owner'
+import { useStaffSections, sectionOf, STAFF_SECTIONS } from '../../lib/staffSections'
 import logoHorizontal from '../../assets/logo-horizontal.png'
 
 // Menú lateral desplegable por secciones (como el de EVO). En pantallas
@@ -63,8 +64,11 @@ function readJson<T>(key: string, fallback: T): T {
 function writeJson(key: string, v: unknown) { try { localStorage.setItem(key, JSON.stringify(v)) } catch { /* sin almacenamiento */ } }
 
 export default function StaffLayout() {
-  const { profile, email } = useProfile()
+  const { profile, email, loaded } = useProfile()
   const isAdmin = profile?.role === 'admin'
+  // Staff: solo las secciones que el admin activó (el admin ve todo).
+  const sections = useStaffSections()
+  const allowed = (to: string) => isAdmin || (!!sections && !!profile && sections.includes(sectionOf(to) ?? '__solo_admin__'))
   const showInsights = isAdmin && isOwner(email)
   const location = useLocation()
   const [mobileOpen, setMobileOpen] = useState(false)
@@ -121,7 +125,7 @@ export default function StaffLayout() {
       { to: '/staff/config/general', label: 'Ajustes generales', icon: 'sliders', show: isAdmin },
       { to: '/staff/admin', label: 'Admin del muro', icon: 'shield', show: isAdmin },
     ] },
-  ].map(g => ({ ...g, items: g.items.filter(i => i.show !== false) })).filter(g => g.items.length > 0)
+  ].map(g => ({ ...g, items: g.items.filter(i => i.show !== false && allowed(i.to)) })).filter(g => g.items.length > 0)
 
   const toggleGroup = (id: string) => {
     const next = { ...open, [id]: open[id] === false }
@@ -135,15 +139,21 @@ export default function StaffLayout() {
 
   const nav = (isCompact: boolean) => (
     <nav className="flex-1 overflow-y-auto overscroll-contain px-2 py-3 space-y-1">
-      <NavLink to="/staff/inicio" className={({ isActive }) => linkClass(isActive)} title="Inicio">
-        <Icon name="home" />{!isCompact && <span>Inicio</span>}
-      </NavLink>
-      <NavLink to="/staff/turno" end className={({ isActive }) => linkClass(isActive)} title="Turno de hoy">
-        <Icon name="check" />{!isCompact && <span>Turno de hoy</span>}
-      </NavLink>
-      <NavLink to="/staff/asistencia" end className={({ isActive }) => linkClass(isActive)} title="Mi asistencia">
-        <Icon name="clock" />{!isCompact && <span>Mi asistencia</span>}
-      </NavLink>
+      {allowed('/staff/inicio') && (
+        <NavLink to="/staff/inicio" className={({ isActive }) => linkClass(isActive)} title="Inicio">
+          <Icon name="home" />{!isCompact && <span>Inicio</span>}
+        </NavLink>
+      )}
+      {allowed('/staff/turno') && (
+        <NavLink to="/staff/turno" end className={({ isActive }) => linkClass(isActive)} title="Turno de hoy">
+          <Icon name="check" />{!isCompact && <span>Turno de hoy</span>}
+        </NavLink>
+      )}
+      {allowed('/staff/asistencia') && (
+        <NavLink to="/staff/asistencia" end className={({ isActive }) => linkClass(isActive)} title="Mi asistencia">
+          <Icon name="clock" />{!isCompact && <span>Mi asistencia</span>}
+        </NavLink>
+      )}
       {groups.map(g => (
         <div key={g.id} className="pt-1">
           {isCompact ? (
@@ -221,10 +231,25 @@ export default function StaffLayout() {
           <span className="text-zinc-600 text-[11px] font-medium bg-superficie-alta px-1.5 py-0.5 rounded-md">staff</span>
         </header>
         <main className="flex-1 overflow-hidden min-h-0">
-          <Outlet />
+          {!loaded || (profile && !isAdmin && !sections) ? null
+            : profile && !isAdmin && !allowed(location.pathname) ? <NotEnabled home={STAFF_SECTIONS.find(s => sections?.includes(s.key))?.paths[0]} />
+            : <Outlet />}
         </main>
       </div>
       {pwOpen && <ChangePasswordModal onClose={() => setPwOpen(false)} />}
+    </div>
+  )
+}
+
+// Sección que el admin todavía no activa para el staff.
+function NotEnabled({ home }: { home?: string }) {
+  return (
+    <div className="h-full flex items-center justify-center p-6">
+      <div className="max-w-sm text-center space-y-3">
+        <p className="text-texto-principal font-bold text-lg">Esta sección todavía no está activa</p>
+        <p className="text-zinc-400 text-sm">El administrador la irá activando para el staff poco a poco.</p>
+        {home && <NavLink to={home} className="inline-block px-4 py-2.5 rounded-xl bg-primario text-texto-en-acento font-bold text-sm">Ir al inicio</NavLink>}
+      </div>
     </div>
   )
 }

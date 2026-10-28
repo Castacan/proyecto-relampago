@@ -806,3 +806,48 @@ de la semana (la reserva sigue en Clases).
 - Ajustes generales tiene la casilla "Mandarme un correo cuando una caja se
   cierre sola sin corte". El aviso dentro de la app no cambia.
 - Pruebas: 86 en `caja_correo_test.mjs`.
+
+## 2026-10-28 — Secciones del staff y ajustes del turno
+
+**Pedido del dueño:**
+- Mientras no todo está al 100, el staff solo ve Inicio, Turno de hoy, Mi
+  asistencia, Muro, QRs y Spraywall; las demás se activan poco a poco.
+- En Turno de hoy, la bitácora del turno anterior solo muestra lo escrito,
+  no lo que no se hizo.
+- Al checar en Mi asistencia se marca el "Llegué".
+- Los turnos de lunes a viernes empiezan a las 3:30 pm.
+- Barrer todo diario; trapear recepción lunes y jueves, y colchoneta y área
+  azul (área de entrenamiento) martes y viernes.
+
+**Hecho:**
+- `src/supabase/erp_staff_secciones.sql`:
+  - `erp_settings.staff_sections`, con las 6 secciones por defecto.
+  - `admin_set_staff_sections` (limpia duplicados y valores raros; bitácora).
+- `src/lib/staffSections.ts`: catálogo de secciones por ruta, `sectionOf`,
+  `useStaffSections` (cache compartido) y `useCanSee`. Si la columna no
+  existe, usa la lista por defecto.
+- StaffLayout:
+  - El staff solo ve en el menú las secciones activas.
+  - Una ruta de sección apagada (o solo de admin) muestra "Esta sección
+    todavía no está activa".
+  - `useProfile` ahora devuelve `loaded`, para no mostrar nada mientras
+    carga.
+- Inicio: los botones a secciones apagadas se ocultan y los renglones se
+  muestran sin link.
+- Empleados: tarjeta "Secciones que ve el staff" con casillas.
+- `src/supabase/erp_turno_ajustes.sql`:
+  - Bloques de lunes a viernes de 3:30 a 5:00. Solo cambian los que seguían
+    con la hora original, también en los días abiertos ya generados. La
+    regla del texto dice "entrada 3:30 pm".
+  - Trigger AFTER INSERT en `attendance_punches`: una entrada marca el
+    "Llegué" del día, con la nota "Desde Mi asistencia". Nunca bloquea la
+    asistencia.
+  - Barrido y trapeado por día, como pidió el dueño.
+- ChecklistPage: el turno anterior ya no muestra "No se hizo" ni "no se
+  cerró", y si no hay nada escrito no sale la tarjeta.
+- Pruebas: `secciones_test.mjs` (5), `turno_test.mjs` (14) y
+  `checklist_test.mjs` siguen OK. También en el navegador con el servidor
+  falso (staff y admin).
+
+**Nota:** es un filtro del panel; las funciones de la base siguen
+permitiendo al staff lo de antes.

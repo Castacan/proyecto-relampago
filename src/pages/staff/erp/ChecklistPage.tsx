@@ -100,7 +100,7 @@ export default function ChecklistPage() {
             {day.cash_open_other_day && <Msg text="Hay una caja abierta de otro día. Ciérrala en Caja antes de contar el fondo de hoy." />}
 
             {/* Bitácora anterior + reglas */}
-            {isToday && day.prev && <PrevLog prev={day.prev} />}
+            {isToday && day.prev && (day.prev.log || day.prev.notes.length > 0) && <PrevLog prev={day.prev} />}
             <details className="bg-superficie rounded-2xl border border-zinc-800/80 p-4">
               <summary className="text-texto-principal font-semibold text-sm cursor-pointer">Reglas del turno</summary>
               <ul className="mt-2 space-y-1.5 text-zinc-300 text-sm list-disc pl-5">{day.rules.split('\n').filter(Boolean).map((r, i) => <li key={i}>{r}</li>)}</ul>
@@ -373,7 +373,6 @@ function PrevLog({ prev }: { prev: NonNullable<ChecklistDay['prev']> }) {
     <details open className="bg-superficie rounded-2xl border border-zinc-800/80 p-4">
       <summary className="text-texto-principal font-semibold text-sm cursor-pointer">Bitácora del turno anterior · {DOW_LONG[new Date(prev.date + 'T12:00:00').getDay() || 7]} {fmtDate(prev.date)}</summary>
       <div className="mt-2 space-y-2 text-sm">
-        {prev.status !== 'closed' && <p className="text-alerta font-semibold">Ese turno no se cerró.</p>}
         {prev.log && (
           <>
             <p><span className="text-zinc-500">Qué pasó:</span> <span className="text-zinc-200">{prev.log.happened}</span></p>
@@ -382,7 +381,6 @@ function PrevLog({ prev }: { prev: NonNullable<ChecklistDay['prev']> }) {
           </>
         )}
         {prev.notes.length > 0 && <div><p className="text-zinc-500">Reportes:</p><ul className="list-disc pl-5 text-zinc-200">{prev.notes.map((n, i) => <li key={i}>{n}</li>)}</ul></div>}
-        {prev.not_done.length > 0 && <div><p className="text-zinc-500">No se hizo:</p><ul className="list-disc pl-5 text-amarillo-suave">{prev.not_done.map((n, i) => <li key={i}>{n.text}{n.reason ? ` — ${n.reason}` : ''}</li>)}</ul></div>}
       </div>
     </details>
   )
