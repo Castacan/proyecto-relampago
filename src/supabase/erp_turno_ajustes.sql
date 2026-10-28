@@ -4,7 +4,8 @@
 --
 --   Inge:
 --   · Los turnos de lunes a viernes empiezan a las 3:30 pm (antes 3:00). La
---     preparación se acomoda en la hora y media antes de abrir a las 5:00.
+--     preparación se acomoda en la hora y media antes de abrir a las 5:00, y
+--     el Área de boulder va justo después de la Llegada (lo primero que hacen).
 --     Solo cambia bloques que sigan con la hora original (si el admin ya los
 --     editó, se respetan). También los días ya generados que siguen abiertos.
 --   · Al checar entrada en "Mi asistencia" se marca solo el "Llegué" del
@@ -17,22 +18,34 @@
 -- ------------------------------------------------------------
 -- Turno de lunes a viernes desde las 3:30 pm
 -- ------------------------------------------------------------
-UPDATE public.checklist_blocks b SET start_time = h.s1, end_time = h.e1
+UPDATE public.checklist_blocks b SET start_time = h.s1, end_time = h.e1, position = h.pos
 FROM (VALUES
-  ('Llegada',             '15:00'::time, '15:10'::time, '15:30'::time, '15:35'::time),
-  ('Pisos y área social', '15:10', '15:40', '15:35', '16:00'),
-  ('Baños',               '15:40', '16:05', '16:00', '16:20'),
-  ('Área de boulder',     '16:05', '16:20', '16:20', '16:30'),
-  ('Tarea del día',       '16:20', '16:50', '16:30', '16:50')) AS h(title, s0, e0, s1, e1)
+  -- desde el horario original (3:00)
+  ('Llegada',             '15:00'::time, '15:10'::time, '15:30'::time, '15:35'::time, 10),
+  ('Área de boulder',     '16:05', '16:20', '15:35', '15:45', 15),
+  ('Pisos y área social', '15:10', '15:40', '15:45', '16:10', 20),
+  ('Baños',               '15:40', '16:05', '16:10', '16:30', 30),
+  ('Tarea del día',       '16:20', '16:50', '16:30', '16:50', 50),
+  -- desde la primera versión de este archivo (3:30 con boulder después de baños)
+  ('Área de boulder',     '16:20', '16:30', '15:35', '15:45', 15),
+  ('Pisos y área social', '15:35', '16:00', '15:45', '16:10', 20),
+  ('Baños',               '16:00', '16:20', '16:10', '16:30', 30),
+  ('Tarea del día',       '16:30', '16:50', '16:30', '16:50', 50)) AS h(title, s0, e0, s1, e1, pos)
 WHERE b.title = h.title AND b.start_time = h.s0 AND b.end_time = h.e0;
 
-UPDATE public.checklist_day_tasks t SET block_start = h.s1, block_end = h.e1
+UPDATE public.checklist_day_tasks t SET block_start = h.s1, block_end = h.e1, block_position = h.pos
 FROM (VALUES
-  ('Llegada',             '15:00'::time, '15:10'::time, '15:30'::time, '15:35'::time),
-  ('Pisos y área social', '15:10', '15:40', '15:35', '16:00'),
-  ('Baños',               '15:40', '16:05', '16:00', '16:20'),
-  ('Área de boulder',     '16:05', '16:20', '16:20', '16:30'),
-  ('Tarea del día',       '16:20', '16:50', '16:30', '16:50')) AS h(title, s0, e0, s1, e1), public.checklist_days d
+  -- desde el horario original (3:00)
+  ('Llegada',             '15:00'::time, '15:10'::time, '15:30'::time, '15:35'::time, 10),
+  ('Área de boulder',     '16:05', '16:20', '15:35', '15:45', 15),
+  ('Pisos y área social', '15:10', '15:40', '15:45', '16:10', 20),
+  ('Baños',               '15:40', '16:05', '16:10', '16:30', 30),
+  ('Tarea del día',       '16:20', '16:50', '16:30', '16:50', 50),
+  -- desde la primera versión de este archivo (3:30 con boulder después de baños)
+  ('Área de boulder',     '16:20', '16:30', '15:35', '15:45', 15),
+  ('Pisos y área social', '15:35', '16:00', '15:45', '16:10', 20),
+  ('Baños',               '16:00', '16:20', '16:10', '16:30', 30),
+  ('Tarea del día',       '16:30', '16:50', '16:30', '16:50', 50)) AS h(title, s0, e0, s1, e1, pos), public.checklist_days d
 WHERE t.block_title = h.title AND t.block_start = h.s0 AND t.block_end = h.e0
   AND d.day_date = t.day_date AND d.status = 'open' AND t.day_date >= erp_today();
 

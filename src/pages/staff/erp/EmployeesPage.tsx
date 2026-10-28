@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { call, erpError, money, toCents, toPesos, fmtDate, todayMx, EXPENSE_METHODS, PAID_FROM } from '../../../lib/erp'
-import { Page, Card, Badge, Empty, Spinner, Msg, input, label, btnPrimary, btnGhost, MoneyField } from '../../../components/erp/ui'
+import { Page, Card, Badge, Empty, Spinner, Msg, input, label, btnPrimary, btnGhost, btnSmall, MoneyField } from '../../../components/erp/ui'
 import { FilesBox } from './PersonExtras'
 import { supabase } from '../../../lib/supabase'
 import { STAFF_SECTIONS, useStaffSections, setStaffSectionsCache } from '../../../lib/staffSections'
@@ -10,7 +10,7 @@ import { STAFF_SECTIONS, useStaffSections, setStaffSectionsCache } from '../../.
 interface Employee {
   id: string; full_name: string; position: string | null; profile_id: string | null; phone: string | null; email: string | null
   birth_date: string | null; address: string | null; curp: string | null; rfc: string | null; nss: string | null
-  hire_date: string | null; end_date: string | null; status: 'active' | 'inactive'; pay_scheme: string | null; pay_rate_cents: number | null
+  hire_date: string | null; end_date: string | null; status: 'active' | 'inactive'; pay_scheme: string | null; pay_rate_cents: number | null; pay_every?: string | null
   bank_name: string | null; bank_account: string | null; emergency_name: string | null; emergency_phone: string | null; notes: string | null
   login_name?: string | null; login_role?: string | null; paid_this_month?: number
 }
@@ -22,7 +22,21 @@ interface Detail {
   sales_month: { count: number; total_cents: number } | null
 }
 
-const PAY_SCHEMES: Record<string, string> = { weekly: 'Semanal', biweekly: 'Quincenal', monthly: 'Mensual', per_class: 'Por clase', hourly: 'Por hora', per_job: 'Por trabajo (armado, etc.)' }
+// Cómo se calcula el pago y cada cuánto se paga (erp_nomina.sql). "Sueldo fijo" se guarda como weekly/biweekly/monthly.
+const PAY_CALC: Record<string, string> = { daily: 'Por día', hourly: 'Por hora', per_class: 'Por clase', per_job: 'Por trabajo (armado, etc.)', fixed: 'Sueldo fijo' }
+const PAY_EVERY: Record<string, string> = { weekly: 'Cada semana', biweekly: 'Cada quincena', monthly: 'Cada mes' }
+const RATE_LABEL: Record<string, string> = { daily: 'Tarifa por día', hourly: 'Tarifa por hora', per_class: 'Pago por clase', per_job: 'Pago por trabajo', fixed: 'Sueldo de cada pago' }
+const isFixed = (s: string | null | undefined) => s === 'weekly' || s === 'biweekly' || s === 'monthly'
+const calcOf = (s: string | null | undefined) => (isFixed(s) ? 'fixed' : s ?? '')
+const everyOf = (e: Pick<Employee, 'pay_scheme' | 'pay_every'>) => e.pay_every ?? (isFixed(e.pay_scheme) ? e.pay_scheme : null)
+function payText(e: Employee): string | null {
+  if (!e.pay_scheme) return null
+  const calc = calcOf(e.pay_scheme)
+  const every = everyOf(e)
+  const rate = e.pay_rate_cents ? money(e.pay_rate_cents) : ''
+  const base = calc === 'fixed' ? `Sueldo fijo ${rate}` : `${PAY_CALC[calc]} ${rate}`.trim()
+  return `${base}${every ? ` · ${PAY_EVERY[every].toLowerCase()}` : ''}`
+}
 
 export default function EmployeesPage() {
   const [list, setList] = useState<List | null>(null)
@@ -51,11 +65,11 @@ export default function EmployeesPage() {
               <button onClick={() => setSelected(selected === e.id ? null : e.id)} className="w-full text-left px-4 py-3 hover:bg-superficie-alta flex items-center justify-between gap-3">
                 <div className="min-w-0">
                   <p className={`font-bold ${e.status === 'active' ? 'text-texto-principal' : 'text-zinc-500'}`}>{e.full_name} {e.status === 'inactive' && <Badge>Baja</Badge>}</p>
-                  <p className="text-zinc-500 text-xs">{e.position ?? 'Sin puesto'}{e.pay_scheme ? ` · ${PAY_SCHEMES[e.pay_scheme]}${e.pay_rate_cents ? ` ${money(e.pay_rate_cents)}` : ''}` : ''}{e.login_name ? ` · usuario del panel: ${e.login_name} (${e.login_role})` : ''}</p>
+                  <p className="text-zinc-500 text-xs">{e.position ?? 'Sin puesto'}{payText(e) ? ` · ${payText(e)}` : ''}{e.login_name ? ` · usuario del panel: ${e.login_name} (${e.login_role})` : ''}</p>
                 </div>
                 <span className="text-zinc-400 text-xs shrink-0">pagado este mes <span className="text-texto-principal font-bold">{money(e.paid_this_month ?? 0)}</span></span>
               </button>
-              {selected === e.id && <EmployeeDetail id={e.id} logins={list.staff_logins} onChanged={load} />}
+              {selected === e.id && <EmployeeDetail id={e.id} logins={list.staff_logins} others={list.employees.filter(x => x.id !== e.id && x.status === 'active')} onChanged={load} />}
             </div>
           ))}
         </div>
@@ -204,7 +218,7 @@ function StaffAccessCard({ onChanged }: { onChanged: () => void }) {
   )
 }
 
-function EmployeeDetail({ id, logins, onChanged }: { id: string; logins: List['staff_logins']; onChanged: () => void }) {
+function EmployeeDetail({ id, logins, others, onChanged }: { id: string; logins: List['staff_logins']; others: { id: string; full_name: string }[]; onChanged: () => void }) {
   const [d, setD] = useState<Detail | null>(null)
   const [editing, setEditing] = useState(false)
   const [paying, setPaying] = useState(false)
@@ -228,7 +242,7 @@ function EmployeeDetail({ id, logins, onChanged }: { id: string; logins: List['s
               {row('Puesto', e.position)}{row('Celular', e.phone)}{row('Correo', e.email)}{row('Nacimiento', e.birth_date ? fmtDate(e.birth_date) : null)}
               {row('Domicilio', e.address)}{row('CURP', e.curp)}{row('RFC', e.rfc)}{row('NSS', e.nss)}
               {row('Ingreso', e.hire_date ? fmtDate(e.hire_date) : null)}{row('Baja', e.end_date ? fmtDate(e.end_date) : null)}
-              {row('Pago', e.pay_scheme ? `${PAY_SCHEMES[e.pay_scheme]}${e.pay_rate_cents ? ` · ${money(e.pay_rate_cents)}` : ''}` : null)}
+              {row('Pago', payText(e))}
               {row('Banco', e.bank_name ? `${e.bank_name}${e.bank_account ? ` · ${e.bank_account}` : ''}` : e.bank_account)}
               {row('Emergencia', e.emergency_name ? `${e.emergency_name} · ${e.emergency_phone ?? ''}` : null)}
               {row('Notas', e.notes)}
@@ -249,7 +263,7 @@ function EmployeeDetail({ id, logins, onChanged }: { id: string; logins: List['s
           </Card>
         </div>
       )}
-      <ScheduleCard employeeId={e.id} />
+      <ScheduleCard employeeId={e.id} others={others} />
       <Card title="Documentos (contrato, INE, comprobantes…)">
         <FilesBox ownerKind="employee" ownerId={e.id} files={d.files} canDelete onChanged={load} />
       </Card>
@@ -259,36 +273,66 @@ function EmployeeDetail({ id, logins, onChanged }: { id: string; logins: List['s
 
 // Horario semanal: de aquí salen los retardos y faltas de Asistencia.
 const DAYS = ['', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo']
-function ScheduleCard({ employeeId }: { employeeId: string }) {
-  const [rows, setRows] = useState<{ dow: number; start_time: string; end_time: string }[] | null>(null)
+interface SchedRow { dow: number; works: boolean; start_time: string; end_time: string }
+type SchedApi = { schedule: { dow: number; start_time: string; end_time: string | null }[] }
+const toRows = (got: SchedApi['schedule']): SchedRow[] => [1, 2, 3, 4, 5, 6, 7].map(dow => {
+  const r = got.find(x => x.dow === dow)
+  return { dow, works: !!r, start_time: r?.start_time.slice(0, 5) ?? '', end_time: r?.end_time?.slice(0, 5) ?? '' }
+})
+function ScheduleCard({ employeeId, others }: { employeeId: string; others: { id: string; full_name: string }[] }) {
+  const [rows, setRows] = useState<SchedRow[] | null>(null)
   const [msg, setMsg] = useState<{ text: string; tone: 'ok' | 'error' } | null>(null)
   useEffect(() => {
-    call<{ schedule: { dow: number; start_time: string; end_time: string | null }[] }>('get_employee_schedule', { p_employee_id: employeeId }).then(({ data }) => {
-      const got = data?.schedule ?? []
-      setRows([1, 2, 3, 4, 5, 6, 7].map(dow => {
-        const r = got.find(x => x.dow === dow)
-        return { dow, start_time: r?.start_time.slice(0, 5) ?? '', end_time: r?.end_time?.slice(0, 5) ?? '' }
-      }))
-    })
+    call<SchedApi>('get_employee_schedule', { p_employee_id: employeeId }).then(({ data }) => setRows(toRows(data?.schedule ?? [])))
   }, [employeeId])
   if (!rows) return <Card title="Horario"><Spinner /></Card>
-  const set = (dow: number, x: Partial<{ start_time: string; end_time: string }>) => { setRows(rows.map(r => r.dow === dow ? { ...r, ...x } : r)); setMsg(null) }
+  const set = (dow: number, x: Partial<SchedRow>) => { setRows(rows.map(r => r.dow === dow ? { ...r, ...x } : r)); setMsg(null) }
+  // Copia la hora de un día a los demás días que trabaja (si no trabaja ningún otro, de lunes a viernes).
+  const copyFrom = (src: SchedRow) => {
+    const targets = rows.some(r => r.works && r.dow !== src.dow) ? rows.filter(r => r.works) : rows.filter(r => r.dow <= 5 || r.dow === src.dow)
+    setRows(rows.map(r => targets.some(t => t.dow === r.dow) ? { ...r, works: true, start_time: src.start_time, end_time: src.end_time } : r))
+    setMsg({ text: `Copiado a ${targets.filter(t => t.dow !== src.dow).map(t => DAYS[t.dow]).join(', ') || 'ningún otro día'}. Falta guardar.`, tone: 'ok' })
+  }
+  const toggle = (r: SchedRow) => {
+    if (r.works) { set(r.dow, { works: false }); return }
+    const model = rows.find(x => x.works && x.start_time)
+    set(r.dow, { works: true, start_time: r.start_time || model?.start_time || '', end_time: r.end_time || model?.end_time || '' })
+  }
+  const copyOther = async (id: string) => {
+    if (!id) return
+    const { data } = await call<SchedApi>('get_employee_schedule', { p_employee_id: id })
+    const got = data?.schedule ?? []
+    if (got.length === 0) { setMsg({ text: 'Esa persona no tiene horario.', tone: 'error' }); return }
+    setRows(toRows(got))
+    setMsg({ text: `Copiado el horario de ${others.find(o => o.id === id)?.full_name}. Falta guardar.`, tone: 'ok' })
+  }
   const save = async () => {
-    const { error } = await call('admin_save_employee_schedule', { p_employee_id: employeeId, p: rows.filter(r => r.start_time) })
+    if (rows.some(r => r.works && !r.start_time)) { setMsg({ text: 'Falta la hora de entrada en algún día que trabaja.', tone: 'error' }); return }
+    const { error } = await call('admin_save_employee_schedule', { p_employee_id: employeeId, p: rows.filter(r => r.works && r.start_time).map(({ dow, start_time, end_time }) => ({ dow, start_time, end_time })) })
     setMsg(error ? { text: error === 'bad_times' ? 'La hora de salida debe ser después de la de entrada.' : erpError(error), tone: 'error' } : { text: 'Horario guardado.', tone: 'ok' })
   }
   return (
-    <Card title="Horario (para retardos y faltas)">
+    <Card title="Horario (para retardos y faltas)" actions={others.length > 0 ? (
+      <select defaultValue="" onChange={e => { copyOther(e.target.value); e.target.value = '' }} className={`${input.replace('w-full ', '')} py-1.5 text-xs`} aria-label="Copiar horario de">
+        <option value="">Copiar el horario de…</option>
+        {others.map(o => <option key={o.id} value={o.id}>{o.full_name}</option>)}
+      </select>) : undefined}>
       <div className="space-y-1.5">
         {rows.map(r => (
-          <div key={r.dow} className="grid grid-cols-[6rem_1fr_1fr] gap-2 items-center text-sm">
-            <span className={r.start_time ? 'text-texto-principal font-semibold' : 'text-zinc-500'}>{DAYS[r.dow]}</span>
-            <input type="time" value={r.start_time} onChange={x => set(r.dow, { start_time: x.target.value })} className={input} aria-label={`Entrada ${DAYS[r.dow]}`} />
-            <input type="time" value={r.end_time} onChange={x => set(r.dow, { end_time: x.target.value })} disabled={!r.start_time} className={input} aria-label={`Salida ${DAYS[r.dow]}`} />
+          <div key={r.dow} className="grid grid-cols-[7rem_1fr_1fr_auto] gap-2 items-center text-sm">
+            <label className="flex items-center gap-2">
+              <input type="checkbox" checked={r.works} onChange={() => toggle(r)} className="accent-primario w-4 h-4" />
+              <span className={r.works ? 'text-texto-principal font-semibold' : 'text-zinc-500'}>{DAYS[r.dow]}</span>
+            </label>
+            {r.works ? <>
+              <input type="time" value={r.start_time} onChange={x => set(r.dow, { start_time: x.target.value })} className={input} aria-label={`Entrada ${DAYS[r.dow]}`} />
+              <input type="time" value={r.end_time} onChange={x => set(r.dow, { end_time: x.target.value })} className={input} aria-label={`Salida ${DAYS[r.dow]}`} />
+              <button onClick={() => copyFrom(r)} disabled={!r.start_time} className={btnSmall} title="Poner esta misma hora en los demás días que trabaja">Copiar a los demás</button>
+            </> : <span className="text-zinc-500 text-xs col-span-3">Descansa</span>}
           </div>
         ))}
       </div>
-      <p className="text-zinc-500 text-xs mt-2">Deja la entrada vacía en los días que descansa.</p>
+      <p className="text-zinc-500 text-xs mt-2">Marca los días que trabaja, pon la hora una vez y toca "Copiar a los demás".</p>
       {msg && <div className="mt-2"><Msg text={msg.text} tone={msg.tone} /></div>}
       <button onClick={save} className={`${btnPrimary} mt-3`}>Guardar horario</button>
     </Card>
@@ -299,7 +343,7 @@ function EmployeeForm({ e, logins, onSaved }: { e?: Employee; logins: List['staf
   const [f, setF] = useState({
     full_name: e?.full_name ?? '', position: e?.position ?? '', profile_id: e?.profile_id ?? '', phone: e?.phone ?? '', email: e?.email ?? '',
     birth_date: e?.birth_date ?? '', address: e?.address ?? '', curp: e?.curp ?? '', rfc: e?.rfc ?? '', nss: e?.nss ?? '',
-    hire_date: e?.hire_date ?? '', end_date: e?.end_date ?? '', status: e?.status ?? 'active', pay_scheme: e?.pay_scheme ?? '',
+    hire_date: e?.hire_date ?? '', end_date: e?.end_date ?? '', status: e?.status ?? 'active', pay_calc: calcOf(e?.pay_scheme), pay_every: e ? everyOf(e) ?? '' : '',
     pay_rate: toPesos(e?.pay_rate_cents ?? null), bank_name: e?.bank_name ?? '', bank_account: e?.bank_account ?? '',
     emergency_name: e?.emergency_name ?? '', emergency_phone: e?.emergency_phone ?? '', notes: e?.notes ?? '',
   })
@@ -311,7 +355,9 @@ function EmployeeForm({ e, logins, onSaved }: { e?: Employee; logins: List['staf
   const set = (x: Partial<typeof f>) => { setF(v => ({ ...v, ...x })); setError(null) }
   const save = async () => {
     setBusy(true)
-    const { pay_rate, ...rest } = f
+    const { pay_rate, pay_calc, pay_every, ...rest } = f
+    if (pay_calc && !pay_every) { setBusy(false); setError('Elige cada cuánto se le paga.'); return }
+    const pay_scheme = pay_calc === 'fixed' ? pay_every : pay_calc
     let profile_id = access === 'existing' ? rest.profile_id : ''
     if (access === 'new') {
       if (!rest.full_name.trim()) { setBusy(false); setError('Escribe el nombre completo.'); return }
@@ -320,7 +366,11 @@ function EmployeeForm({ e, logins, onSaved }: { e?: Employee; logins: List['staf
       if (r.error || !r.data?.id) { setBusy(false); setError(r.error ?? 'No se pudo dar el acceso.'); return }
       profile_id = r.data.id
     }
-    const { data, error } = await call<{ id: string }>('admin_save_employee', { p: { id: e?.id ?? null, ...rest, profile_id, pay_rate_cents: pay_rate === '' ? '' : toCents(pay_rate) } })
+    const { data, error } = await call<{ id: string }>('admin_save_employee', { p: { id: e?.id ?? null, ...rest, profile_id, pay_scheme, pay_rate_cents: pay_rate === '' ? '' : toCents(pay_rate) } })
+    if (!error && data) {
+      const r = await call('admin_set_employee_pay_every', { p_employee_id: data.id, p_every: pay_calc ? pay_every : '' })
+      if (r.error) { setBusy(false); setError(r.error === 'server' ? 'Se guardó, pero falta correr erp_nomina.sql para guardar cada cuánto se le paga.' : erpError(r.error)); return }
+    }
     setBusy(false)
     if (error || !data) { setError(erpError(error ?? undefined)); return }
     onSaved(data.id)
@@ -362,11 +412,15 @@ function EmployeeForm({ e, logins, onSaved }: { e?: Employee; logins: List['staf
           <select value={f.status} onChange={x => set({ status: x.target.value as 'active' | 'inactive' })} className={input}>
             <option value="active">Activo</option><option value="inactive">Baja</option>
           </select></div>
-        <div><label className={label}>Esquema de pago</label>
-          <select value={f.pay_scheme} onChange={x => set({ pay_scheme: x.target.value })} className={input}>
-            <option value="">—</option>{Object.entries(PAY_SCHEMES).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+        <div><label className={label}>Cómo se calcula su pago</label>
+          <select value={f.pay_calc} onChange={x => set({ pay_calc: x.target.value })} className={input}>
+            <option value="">—</option>{Object.entries(PAY_CALC).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
           </select></div>
-        <MoneyField id={`emp-rate-${e?.id ?? 'new'}`} label="Monto por periodo / clase / hora" value={f.pay_rate} onChange={v => set({ pay_rate: v })} />
+        <MoneyField id={`emp-rate-${e?.id ?? 'new'}`} label={RATE_LABEL[f.pay_calc] ?? 'Monto'} value={f.pay_rate} onChange={v => set({ pay_rate: v })} />
+        <div><label className={label}>Se le paga</label>
+          <select value={f.pay_every} onChange={x => set({ pay_every: x.target.value })} disabled={!f.pay_calc} className={input}>
+            <option value="">—</option>{Object.entries(PAY_EVERY).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+          </select></div>
         {txt('bank_name', 'Banco')}
         {txt('bank_account', 'CLABE / cuenta')}{txt('emergency_name', 'Contacto de emergencia')}{txt('emergency_phone', 'Tel. de emergencia')}
       </div>
@@ -377,22 +431,80 @@ function EmployeeForm({ e, logins, onSaved }: { e?: Employee; logins: List['staf
   )
 }
 
+// Periodo de pago que contiene una fecha, según cada cuánto se le paga.
+const addDays = (d: string, n: number) => { const x = new Date(d + 'T12:00:00Z'); x.setUTCDate(x.getUTCDate() + n); return x.toISOString().slice(0, 10) }
+const lastOfMonth = (d: string) => { const x = new Date(d.slice(0, 8) + '01T12:00:00Z'); x.setUTCMonth(x.getUTCMonth() + 1); x.setUTCDate(0); return x.toISOString().slice(0, 10) }
+function periodOf(every: string | null, day: string): { from: string; to: string } {
+  if (every === 'weekly') {
+    const dow = new Date(day + 'T12:00:00Z').getUTCDay() || 7
+    const from = addDays(day, 1 - dow)
+    return { from, to: addDays(from, 6) }
+  }
+  if (every === 'monthly') return { from: day.slice(0, 8) + '01', to: lastOfMonth(day) }
+  return Number(day.slice(8)) <= 15 ? { from: day.slice(0, 8) + '01', to: day.slice(0, 8) + '15' } : { from: day.slice(0, 8) + '16', to: lastOfMonth(day) }
+}
+const shortDate = (d: string) => new Date(d + 'T12:00:00Z').toLocaleDateString('es-MX', { day: 'numeric', month: 'short', timeZone: 'UTC' })
+
+interface Suggestion {
+  scheme: string | null; rate_cents: number | null; scheduled_days: number; worked_days: number; hours: number
+  lates: number; absences: number; late_absences: number; excused: number; lates_per_absence: number; has_attendance: boolean
+  basis: 'asistencia' | 'horario' | 'fijo' | 'manual'; units: number | null; suggested_cents: number | null
+}
+
 function PayForm({ employee, onDone }: { employee: Employee; onDone: () => void }) {
   const t = todayMx()
-  const [f, setF] = useState({ amount: toPesos(employee.pay_rate_cents), description: `Nómina ${employee.full_name}`, paid_on: t, period_month: t.slice(0, 7), method: 'transfer', paid_from: 'bank', notes: '' })
+  const every = everyOf(employee)
+  const [period, setPeriod] = useState(() => periodOf(every, t))
+  const [sug, setSug] = useState<Suggestion | null | undefined>(undefined)
+  const [touched, setTouched] = useState(false)
+  const [f, setF] = useState({ amount: toPesos(employee.pay_rate_cents), description: `Nómina ${employee.full_name}`, paid_on: t, method: 'transfer', paid_from: 'bank', notes: '' })
   const [error, setError] = useState<string | null>(null)
+  useEffect(() => {
+    setSug(undefined)
+    call<Suggestion>('get_payroll_suggestion', { p_employee_id: employee.id, p_from: period.from, p_to: period.to }).then(({ data }) => {
+      setSug(data)
+      setF(v => ({ ...v, description: `Nómina ${employee.full_name} · ${shortDate(period.from)} al ${shortDate(period.to)}`,
+        amount: !touched && data?.suggested_cents != null ? toPesos(data.suggested_cents) : v.amount }))
+    })
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [employee.id, period.from, period.to])
+  const move = (dir: 1 | -1) => { setTouched(false); setPeriod(periodOf(every, dir === 1 ? addDays(period.to, 1) : addDays(period.from, -1))) }
   const save = async () => {
-    const { error } = await call('admin_pay_employee', { p_employee_id: employee.id, p: { amount_cents: toCents(f.amount), description: f.description, paid_on: f.paid_on, period_month: `${f.period_month}-01`, method: f.method, paid_from: f.paid_from, notes: f.notes } })
+    const { error } = await call('admin_pay_employee', { p_employee_id: employee.id, p: { amount_cents: toCents(f.amount), description: f.description, paid_on: f.paid_on,
+      period_month: period.from.slice(0, 8) + '01', method: f.method, paid_from: f.paid_from, notes: f.notes } })
     if (error) { setError(erpError(error)); return }
     onDone()
   }
+  const rate = sug?.rate_cents ?? employee.pay_rate_cents
   return (
     <div className="space-y-3">
+      <div className="flex flex-wrap items-center gap-2">
+        <button onClick={() => move(-1)} className={btnSmall}>←</button>
+        <span className="text-texto-principal font-bold">Periodo: {shortDate(period.from)} al {shortDate(period.to)}</span>
+        <button onClick={() => move(1)} className={btnSmall}>→</button>
+        <span className="text-zinc-500 text-xs">{every ? PAY_EVERY[every] : 'Sin frecuencia de pago (edita sus datos)'}</span>
+      </div>
+      {sug === undefined ? <Spinner /> : sug === null ? <p className="text-zinc-500 text-xs">No se pudo calcular (¿ya se corrió erp_nomina.sql?). Escribe el monto.</p> : (
+        <div className="rounded-xl bg-fondo/60 p-3 text-sm space-y-1">
+          {sug.basis === 'asistencia' && sug.scheme === 'daily' && <p className="text-zinc-200">Vino <b>{sug.worked_days}</b> {sug.worked_days === 1 ? 'día' : 'días'} (según Mi asistencia) × {money(rate)} = <b className="text-texto-principal">{money(sug.suggested_cents)}</b></p>}
+          {sug.basis === 'horario' && <p className="text-zinc-200">Tiene <b>{sug.scheduled_days}</b> días en su horario × {money(rate)} = <b className="text-texto-principal">{money(sug.suggested_cents)}</b> <span className="text-zinc-500">(todavía no checa en Mi asistencia, así que se toma su horario)</span></p>}
+          {sug.basis === 'asistencia' && sug.scheme === 'hourly' && <p className="text-zinc-200"><b>{sug.hours}</b> horas (según Mi asistencia) × {money(rate)} = <b className="text-texto-principal">{money(sug.suggested_cents)}</b></p>}
+          {sug.basis === 'fijo' && <p className="text-zinc-200">Sueldo fijo: <b className="text-texto-principal">{money(sug.suggested_cents)}</b></p>}
+          {sug.basis === 'manual' && sug.scheme && <p className="text-zinc-400">Se paga {sug.scheme === 'per_class' ? 'por clase' : 'por trabajo'}: escribe el monto.</p>}
+          {!sug.scheme && <p className="text-amarillo-suave">No tiene forma de pago. Ponla en "Editar datos" para que se calcule sola.</p>}
+          {sug.has_attendance && (sug.lates > 0 || sug.absences > 0 || sug.excused > 0) && (
+            <p className="text-zinc-400 text-xs">
+              En el periodo: {sug.lates} {sug.lates === 1 ? 'retardo' : 'retardos'} · {sug.absences} {sug.absences === 1 ? 'falta' : 'faltas'}
+              {sug.late_absences > 0 && ` (${sug.late_absences} por llegar tarde)`}{sug.excused > 0 && ` · ${sug.excused} justificadas`}.
+              {' '}Cada {sug.lates_per_absence} retardos al mes cuentan como una falta: si descuentas, ajusta el monto.
+            </p>
+          )}
+        </div>
+      )}
       <div className="grid sm:grid-cols-3 gap-3">
-        <MoneyField id={`pay-${employee.id}`} label="Monto" value={f.amount} onChange={v => setF({ ...f, amount: v })} />
+        <MoneyField id={`pay-${employee.id}`} label="Monto a pagar" value={f.amount} onChange={v => { setTouched(true); setF({ ...f, amount: v }) }} />
         <div className="sm:col-span-2"><label className={label}>Concepto</label><input value={f.description} onChange={e => setF({ ...f, description: e.target.value })} className={input} /></div>
         <div><label className={label}>Fecha de pago</label><input type="date" value={f.paid_on} onChange={e => setF({ ...f, paid_on: e.target.value })} className={input} /></div>
-        <div><label className={label}>Corresponde al mes</label><input type="month" value={f.period_month} onChange={e => setF({ ...f, period_month: e.target.value })} className={input} /></div>
         <div><label className={label}>Forma</label>
           <select value={f.method} onChange={e => setF({ ...f, method: e.target.value, paid_from: e.target.value === 'cash' ? f.paid_from : 'bank' })} className={input}>
             {Object.entries(EXPENSE_METHODS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}

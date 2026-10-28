@@ -851,3 +851,36 @@ de la semana (la reserva sigue en Clases).
 
 **Nota:** es un filtro del panel; las funciones de la base siguen
 permitiendo al staff lo de antes.
+
+## 2026-10-28 — Horario fácil de copiar, nómina por día y boulder primero
+
+**Pedido del dueño:**
+- En el horario de empleados no se puede copiar y pegar.
+- Puso "Quincenal $320" a Erick, pero los $320 son por día.
+- En el checklist, el Área de boulder va justo después de la Llegada.
+
+**Hecho:**
+- Horario: cada día tiene la casilla "trabaja" y el botón "Copiar a los
+  demás" (copia a los días que trabaja; si no hay otro, de lunes a viernes),
+  más "Copiar el horario de…" otro empleado.
+- `src/supabase/erp_nomina.sql`:
+  - `pay_scheme` acepta `daily` y hay columna nueva `pay_every` (semana,
+    quincena o mes). El sueldo fijo sigue como weekly/biweekly/monthly.
+  - Corrige a Erick: daily y biweekly.
+  - `admin_set_employee_pay_every` y `get_payroll_suggestion`: días con
+    horario, días que vino (Mi asistencia), horas, retardos y faltas, más el
+    monto sugerido (por día: días que vino, o días del horario si aún no
+    checa; por hora: horas; fijo: sueldo; por clase o trabajo: manual).
+- Ficha del empleado:
+  - "Cómo se calcula su pago", la tarifa y "Se le paga". La lista muestra
+    "Por día $320 · cada quincena".
+  - Registrar pago: periodo según la frecuencia (con flechas), desglose,
+    monto y concepto prellenados y editables.
+- `erp_turno_ajustes.sql`: Área de boulder en la posición 15:
+  - Llegada 3:30, Boulder 3:35, Pisos 3:45, Baños 4:10, Tarea 4:30 y
+    Preparar 4:50.
+  - Funciona desde el horario original o desde la primera versión de este
+    archivo.
+- Pruebas: `nomina_test.mjs` (7) y `turno_test.mjs` (17), más el navegador
+  con el servidor falso (copiar horario y la sugerencia de $3,520 para el
+  16–31 oct).
