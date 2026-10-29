@@ -938,3 +938,6 @@ permitiendo al staff lo de antes.
     "Erick Heli…" si es la única que empieza así.
 - Pruebas: `unicos_test.mjs` (10). `asist_test` y `nomina_test` pasan con el
   archivo cargado.
+- En producción las dos fichas de Erick tenían el MISMO usuario. El freno pedía
+  que solo una tuviera usuario y frenó el Run. Ahora solo frena si son usuarios
+  distintos. La prueba reproduce el caso real.

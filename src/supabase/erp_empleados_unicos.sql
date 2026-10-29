@@ -70,8 +70,9 @@ BEGIN
   SELECT id INTO v_keep FROM employees e WHERE full_name ILIKE 'Erick%' AND status = 'active'
     ORDER BY EXISTS (SELECT 1 FROM employee_schedules s WHERE s.employee_id = e.id) DESC, (pay_rate_cents IS NOT NULL) DESC, created_at LIMIT 1;
   SELECT id INTO v_drop FROM employees WHERE full_name ILIKE 'Erick%' AND status = 'active' AND id <> v_keep;
-  IF (SELECT profile_id FROM employees WHERE id = v_keep) IS NOT NULL AND (SELECT profile_id FROM employees WHERE id = v_drop) IS NOT NULL THEN
-    RAISE EXCEPTION 'Las dos fichas de Erick tienen usuario; revisar a mano';
+  -- Solo frena si son dos usuarios distintos (si es el mismo usuario, es la misma persona).
+  IF (SELECT profile_id FROM employees WHERE id = v_keep) <> (SELECT profile_id FROM employees WHERE id = v_drop) THEN
+    RAISE EXCEPTION 'Las dos fichas de Erick tienen usuarios distintos; revisar a mano';
   END IF;
 
   PERFORM erp_merge_employees(v_keep, v_drop);
