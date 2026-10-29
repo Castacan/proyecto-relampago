@@ -1,5 +1,5 @@
-import { useEffect, useState, useRef } from 'react'
-import { useParams, Link } from 'react-router-dom'
+import { useCallback, useEffect, useState, useRef } from 'react'
+import { useParams, Link, useNavigate } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../lib/auth'
 import { useClimber } from '../../hooks/useClimber'
@@ -11,6 +11,7 @@ import VoteButtons from '../../components/VoteButtons'
 import SendButton from '../../components/SendButton'
 import LoginBanner from '../../components/LoginBanner'
 import ClimberAuthSheet from '../../components/ClimberAuthSheet'
+import RouteQrScanner from '../../components/RouteQrScanner'
 import type { Route } from '../../types'
 
 interface RouteData {
@@ -36,8 +37,14 @@ interface QrData {
   routes: RouteData | null
 }
 
+// key = qrId: al escanear otra ruta desde aquí la página empieza de cero.
 export default function PublicRoutePage() {
   const { qrId } = useParams<{ qrId: string }>()
+  return <PublicRouteView key={qrId} qrId={qrId} />
+}
+
+function PublicRouteView({ qrId }: { qrId: string | undefined }) {
+  const navigate = useNavigate()
   const { session } = useAuth()
   const { climber, loading: climberLoading, refetch: refetchClimber } = useClimber()
   const [qr, setQr] = useState<QrData | null>(null)
@@ -45,6 +52,11 @@ export default function PublicRoutePage() {
   const [notFound, setNotFound] = useState(false)
   const [authSheetOpen, setAuthSheetOpen] = useState(false)
   const [startAtSetup, setStartAtSetup] = useState(false)
+  const [scannerOpen, setScannerOpen] = useState(false)
+  const handleScanned = useCallback((id: string) => {
+    setScannerOpen(false)
+    navigate(`/q/${encodeURIComponent(id)}`)
+  }, [navigate])
 
   // Auto-abrir onboarding si hay sesión pero el climber todavía no
   // completó su perfil (marcado explícitamente al mandar el magic
@@ -234,6 +246,14 @@ export default function PublicRoutePage() {
           onNeedOnboarding={handleNeedOnboarding}
         />
 
+        {/* Escanear otra ruta sin salir de aquí */}
+        <button
+          onClick={() => setScannerOpen(true)}
+          className="-mt-3 mb-7 w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl bg-superficie-alta border border-zinc-700/60 text-texto-principal font-bold text-sm hover:bg-superficie-alta-hover active:scale-95 transition-all"
+        >
+          📷 Escanear otra ruta
+        </button>
+
         {/* Vote section */}
         <div className="mt-auto">
           <p className="text-zinc-500 text-xs font-semibold text-center mb-4 uppercase tracking-widest">¿Qué te pareció?</p>
@@ -255,6 +275,8 @@ export default function PublicRoutePage() {
         onDone={handleAuthDone}
         startAtSetup={startAtSetup}
       />
+
+      {scannerOpen && <RouteQrScanner onDetected={handleScanned} onClose={() => setScannerOpen(false)} />}
     </div>
   )
 }

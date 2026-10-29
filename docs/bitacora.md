@@ -910,3 +910,8 @@ permitiendo al staff lo de antes.
   - Antes del parche, otra ruta daba `no_recent_scan`.
   - Después, otra ruta da `success`.
   - Un escaneo de hace 31 min sigue pidiendo escanear.
+- `/q/:qrId` tiene el botón "📷 Escanear otra ruta":
+  - Abre `RouteQrScanner`, que lee el QR de cualquier ruta y lleva a su `/q/`.
+  - Esa página registra el escaneo como siempre.
+  - La página se monta con `key={qrId}` para empezar limpia en cada ruta.
+  - Revisado en local con `fake_qr.mjs`: el botón se ve y el escáner abre. La cámara real queda por probar en el celular.
