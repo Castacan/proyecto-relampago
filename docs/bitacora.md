@@ -915,3 +915,26 @@ permitiendo al staff lo de antes.
   - Esa página registra el escaneo como siempre.
   - La página se monta con `key={qrId}` para empezar limpia en cada ruta.
   - Revisado en local con `fake_qr.mjs`: el botón se ve y el escáner abre. La cámara real queda por probar en el celular.
+
+### 2026-10-28 — Erick duplicado; una sola ficha por persona
+
+- Asistencia mostraba dos fichas de Erick:
+  - La que Inge dio de alta tenía horario y su pago de $320 por día.
+  - La que se creó sola al darle acceso al panel tenía su usuario.
+- `erp_empleados_unicos.sql` (correr después de crm/asistencia/nómina):
+  - `erp_merge_employees(queda, se_va)` pasa a la ficha que queda las
+    checadas, el aviso firmado, las justificaciones, los archivos, el usuario
+    y los datos que le falten. Luego borra la otra.
+  - El bloque de Erick deja la ficha con horario. Si ya hay una sola, no hace nada.
+  - Índice único: un usuario del panel solo puede estar en una ficha.
+  - `admin_save_employee`:
+    - Si el usuario ya tiene ficha, se guarda en ella. Es el caso de
+      "Nuevo empleado" con acceso: el usuario se crea primero y su ficha
+      sale sola.
+    - Si se liga un usuario que ya estaba en otra ficha, las une.
+    - Una ficha nueva con el nombre o correo de una activa da
+      `employee_exists`.
+  - `erp_ensure_employee`: el usuario "Erick" se liga a la ficha
+    "Erick Heli…" si es la única que empieza así.
+- Pruebas: `unicos_test.mjs` (10). `asist_test` y `nomina_test` pasan con el
+  archivo cargado.

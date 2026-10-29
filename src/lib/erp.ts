@@ -112,6 +112,7 @@ export const ERP_ERRORS: Record<string, string> = {
   invalid_date: 'Revisa la fecha.',
   charge_in_progress: 'Hay un cobro en curso; intenta en unos minutos.',
   name_taken: 'Ya existe uno con ese nombre.',
+  employee_exists: 'Ya hay una ficha con ese nombre o correo. Búscala en la lista y edítala en lugar de crear otra.',
   invalid_name: 'Revisa el nombre.',
   invalid_phone: 'El celular debe tener 10 dígitos.',
   invalid_email: 'Revisa el correo.',
