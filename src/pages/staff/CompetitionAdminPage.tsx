@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Navigate } from 'react-router-dom'
+import { Link, Navigate } from 'react-router-dom'
 import { useProfile } from '../../hooks/useProfile'
 import { supabase } from '../../lib/supabase'
 import {
@@ -44,6 +44,7 @@ interface AdminRegistration {
   checked_in_at: string | null
   created_at: string
   is_minor: boolean
+  bib?: number | null     // número de competidor (competencia_jueces.sql)
 }
 
 type Action = 'mark_paid' | 'resolve_attention' | 'cancel' | 'mark_refunded' | 'edit' | 'extend_hold' | 'check_in' | 'undo_check_in' | 'apply_courtesy'
@@ -306,9 +307,9 @@ export default function CompetitionAdminPage() {
 
   const exportCsv = () => {
     const esc = (v: string | null) => `"${(v ?? '').replace(/"/g, '""')}"`
-    const header = 'Folio,Nombre,Fecha de nacimiento,Menor,Correo,Celular,Categoría,Talla,Estado,Método de pago,Fecha de pago,Check-in,Inscrito el\n'
+    const header = 'Número,Folio,Nombre,Fecha de nacimiento,Menor,Correo,Celular,Categoría,Talla,Estado,Método de pago,Fecha de pago,Check-in,Inscrito el\n'
     const rows = regs.map(r => [
-      r.folio, r.full_name, r.birth_date, r.is_minor ? 'Sí' : 'No', r.email, r.phone,
+      r.bib != null ? String(r.bib) : '', r.folio, r.full_name, r.birth_date, r.is_minor ? 'Sí' : 'No', r.email, r.phone,
       categoryName(r.category_id), r.shirt_size, STATUS_LABELS[displayStatus(r)],
       paymentText(r),
       r.paid_at ? fmtDateTime(r.paid_at) : '', r.checked_in_at ? fmtDateTime(r.checked_in_at) : '',
@@ -333,6 +334,7 @@ export default function CompetitionAdminPage() {
           <p className="text-zinc-400 text-xs truncate">{comp?.name ?? 'Inscripciones'}</p>
         </div>
         <div className="flex gap-2 shrink-0">
+          <Link to="/staff/competencia/puntos" className={smallBtn}>Puntos y jueces</Link>
           <button onClick={() => setShowCourtesy(v => !v)} className={smallBtn}>
             {showCourtesy ? 'Cerrar' : 'Cortesías'}
           </button>
@@ -453,6 +455,7 @@ export default function CompetitionAdminPage() {
                     <div key={r.id} className="px-4 py-3">
                       <button onClick={() => setOpenId(openId === r.id ? null : r.id)} className="w-full text-left">
                         <div className="flex items-center gap-2 flex-wrap">
+                          {r.bib != null && <span className="text-primario font-mono font-black text-sm">#{r.bib}</span>}
                           <span className="text-texto-principal font-bold text-sm">{r.full_name}</span>
                           <span className={`text-[9px] font-bold uppercase px-1.5 py-0.5 rounded ${STATUS_STYLE[shown]}`}>{STATUS_LABELS[shown]}</span>
                           {r.is_minor && <span className="text-[9px] font-bold uppercase px-1.5 py-0.5 rounded text-texto-en-acento bg-amarillo-suave">Menor</span>}

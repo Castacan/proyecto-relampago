@@ -25,6 +25,8 @@ import DisplayAdminPage from './pages/staff/DisplayAdminPage'
 import CompetitionPage from './pages/public/CompetitionPage'
 import CompetitionLookupPage from './pages/public/CompetitionLookupPage'
 import CompetitionAdminPage from './pages/staff/CompetitionAdminPage'
+import CompetitionScoringPage from './pages/staff/CompetitionScoringPage'
+import JudgePage from './pages/public/JudgePage'
 import ClassesPage from './pages/public/ClassesPage'
 import ClassesAdminPage from './pages/staff/ClassesAdminPage'
 import HomePage from './pages/staff/erp/HomePage'
@@ -77,6 +79,7 @@ export default function App() {
         <Route path="/spraywall/:routeId" element={<SpraywallRoutePage />} />
         <Route path="/competencia" element={<CompetitionPage />} />
         <Route path="/competencia/consulta" element={<CompetitionLookupPage />} />
+        <Route path="/juez" element={<JudgePage />} />
         <Route path="/clases" element={<ClassesPage />} />
         <Route path="/domiciliacion/:token" element={<SubscriptionSetupPage />} />
         <Route path="/firmar" element={<MyDocumentsPage />} />
@@ -101,6 +104,7 @@ export default function App() {
           <Route path="spraywall" element={<ErrorBoundary label="Spraywall"><SpraywallPage /></ErrorBoundary>} />
           <Route path="display" element={<ErrorBoundary label="Display"><DisplayAdminPage /></ErrorBoundary>} />
           <Route path="competencia" element={<ErrorBoundary label="Competencia"><CompetitionAdminPage /></ErrorBoundary>} />
+          <Route path="competencia/puntos" element={<ErrorBoundary label="Puntos"><CompetitionScoringPage /></ErrorBoundary>} />
           <Route path="clases" element={<ErrorBoundary label="Clases"><ClassesAdminPage /></ErrorBoundary>} />
           <Route path="inicio" element={<ErrorBoundary label="Inicio"><HomePage /></ErrorBoundary>} />
           <Route path="personas" element={<ErrorBoundary label="Personas"><PeoplePage /></ErrorBoundary>} />

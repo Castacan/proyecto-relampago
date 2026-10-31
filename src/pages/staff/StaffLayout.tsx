@@ -114,7 +114,8 @@ export default function StaffLayout() {
     ] },
     { id: 'eventos', label: 'Pantalla y eventos', icon: 'tv', items: [
       { to: '/staff/display', label: 'Pantalla (TV)', icon: 'tv', show: isAdmin },
-      { to: '/staff/competencia', label: 'Competencia', icon: 'trophy', show: isAdmin },
+      { to: '/staff/competencia', label: 'Competencia', icon: 'trophy', show: isAdmin, end: true },
+      { to: '/staff/competencia/puntos', label: 'Puntos y jueces', icon: 'chart', show: isAdmin },
     ] },
     { id: 'config', label: 'Configuración', icon: 'settings', items: [
       { to: '/staff/config/productos', label: 'Productos y servicios', icon: 'box', show: isAdmin },

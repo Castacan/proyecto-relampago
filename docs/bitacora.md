@@ -941,3 +941,41 @@ permitiendo al staff lo de antes.
 - En producción las dos fichas de Erick tenían el MISMO usuario. El freno pedía
   que solo una tuviera usuario y frenó el Run. Ahora solo frena si son usuarios
   distintos. La prueba reproduce el caso real.
+
+## 2026-10-30 — Conteo de puntos de la competencia (jueces con celular)
+- Reglas definidas por el dueño con el armador:
+  - Top 10, zona 4, cada intento que no es top resta 0.01, aunque no saque
+    nada en la ruta. Los tres valores se cambian en Ajustes.
+  - Cada categoría tiene su lista de rutas (pueden encimarse). Se pueden
+    juntar categorías (ej. Básico mixto).
+  - Bloques por categoría, sin final, premios 1º a 3º.
+  - Subir a alguien de categoría lo deja en cero: cada intento guarda la
+    categoría que tenía la persona y solo cuentan los de la actual.
+  - Desempate: puntos → más tops → más flashes → la ruta más difícil
+    encadenada (número más alto) → quien hizo antes su último intento →
+    lugar compartido.
+- `src/supabase/competencia_jueces.sql` (falta Run en producción):
+  - Número de competidor (`bib`), asignado solo al quedar pagado, incluidas
+    las inscripciones del mismo día. Los pagados de antes reciben número por
+    orden de pago.
+  - Jueces con código (`competition_judges`), sin contraseña.
+  - `competition_attempts`: un intento por renglón. Los errores se anulan,
+    no se borran. `client_id` evita duplicados si se corta la señal.
+  - Ranking calculado en `competition_ranking`.
+  - `get_competition_ranking_public` deja el ranking listo para la TV.
+    Solo responde si se activa "Ranking visible" en Ajustes.
+  - Aviso para reubicar, provisional mientras llega la fórmula del armador:
+    flash o top en todas las rutas de la categoría, o flash en el 80 %.
+- `/juez`: el juez escribe su código y captura número de competidor →
+  ruta → Top / Zona / No completó. Avisa si la ruta no es de la categoría o
+  si ya tenía top. Puede deshacer lo suyo en los primeros 30 min. Si no hay
+  señal, ofrece "Reintentar" sin duplicar.
+- `/staff/competencia/puntos` tiene cinco pestañas:
+  - Ranking por categoría con detalle por ruta, cambiar de categoría,
+    cambiar número y CSV.
+  - Intentos: anular o capturar a mano.
+  - Rutas por categoría.
+  - Jueces.
+  - Ajustes.
+- Pruebas locales con PGlite (puntos, desempates, reubicación, juntar
+  categorías, duplicados) y en el navegador con un Supabase falso.
