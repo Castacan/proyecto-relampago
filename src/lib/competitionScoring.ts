@@ -47,13 +47,14 @@ export interface RankingRow {
   routes_tried: number
   topped_routes: number[]
   last_at: string | null
+  achieved_at: string | null   // cuándo consiguió sus últimos puntos (desempate)
   place: number
   routes: RouteResult[]
   promotion_hint: string | null
 }
 
 export const SCORING_ERRORS: Record<string, string> = {
-  invalid_code: 'Ese código de juez no existe o está desactivado.',
+  invalid_code: 'Esa palabra de juez no existe o está desactivada.',
   bib_not_found: 'No hay ningún competidor con ese número.',
   not_paid: 'Ese competidor no tiene la inscripción pagada.',
   invalid_route: 'Revisa el número de ruta.',
@@ -66,7 +67,8 @@ export const SCORING_ERRORS: Record<string, string> = {
   invalid_value: 'Revisa los valores: la zona debe valer menos que el top y la resta debe ser entre 0 y 1.',
   invalid_merge: 'No se puede juntar así: la categoría destino no puede estar juntada con otra.',
   invalid_name: 'Escribe el nombre (2 a 60 letras).',
-  code_taken: 'Ese código ya existe. Elige otro.',
+  code_taken: 'Esa palabra ya la tiene otro juez. Elige otra.',
+  has_attempts: 'Ya hay intentos capturados: ya no se puede numerar de nuevo. Cambia números uno por uno.',
   bib_taken: 'Ese número ya lo tiene otro competidor.',
   invalid_bib: 'El número debe ser entre 1 y 9999.',
 }

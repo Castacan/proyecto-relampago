@@ -6,7 +6,7 @@ import {
 } from '../../lib/competitionScoring'
 import logoHorizontal from '../../assets/logo-horizontal.png'
 
-// Pantalla del juez (/juez). Entra con su código (sin contraseña) y
+// Pantalla del juez (/juez). Entra con su palabra clave (sin contraseña) y
 // captura cada intento: número de competidor → ruta → Top / Zona / No completó.
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -84,9 +84,9 @@ export default function JudgePage() {
         {!judge ? (
           <form onSubmit={e => { e.preventDefault(); if (code.trim()) login(code.trim()) }} className="space-y-4 pt-6">
             <h1 className="text-texto-principal font-black text-2xl tracking-tight">Juez de la competencia</h1>
-            <p className="text-zinc-300 text-sm">Escribe el código de juez que te dieron. Se queda guardado en este celular.</p>
+            <p className="text-zinc-300 text-sm">Escribe tu palabra de juez. Se queda guardada en este celular.</p>
             <input value={code} onChange={e => setCode(e.target.value.toUpperCase())} autoCapitalize="characters"
-              autoComplete="off" placeholder="Código de juez" className={`${inputClass} font-mono`} />
+              autoComplete="off" placeholder="Palabra de juez" className={`${inputClass} font-mono`} />
             {loginError && <p className="text-alerta text-sm font-semibold">{loginError}</p>}
             <button type="submit" disabled={checking || !code.trim()}
               className="w-full py-4 rounded-2xl bg-primario hover:bg-primario-hover text-texto-en-acento font-black text-lg disabled:opacity-50">

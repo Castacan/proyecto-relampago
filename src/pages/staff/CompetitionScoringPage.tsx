@@ -116,9 +116,19 @@ function RankingTab({ data, auto, setAuto, onChanged }: { data: ScoringData; aut
   const groups = useGroups(data.categories)
   const [groupId, setGroupId] = useState(groups[0]?.id ?? '')
   const [openId, setOpenId] = useState<string | null>(null)
+  const [confirmRenumber, setConfirmRenumber] = useState(false)
+  const [renumberMsg, setRenumberMsg] = useState<string | null>(null)
   const rows = data.ranking.filter(r => r.effective_category_id === groupId)
   const hints = data.ranking.filter(r => r.promotion_hint)
   const catName = (id: string) => data.categories.find(c => c.id === id)?.name ?? ''
+
+  const renumber = async () => {
+    setConfirmRenumber(false)
+    const { data: res, error } = await db.rpc('admin_renumber_bibs', { p_slug: COMPETITION_SLUG })
+    if (error || !res || res.error) { setRenumberMsg(scoringError(res?.error)); return }
+    setRenumberMsg(`Listo: ${res.count} competidores numerados por categoría y nombre.`)
+    onChanged()
+  }
 
   const exportCsv = () => {
     const lines = [['Categoría', 'Lugar', 'Número', 'Nombre', 'Puntos', 'Tops', 'Zonas', 'Flashes', 'Intentos']]
@@ -154,7 +164,17 @@ function RankingTab({ data, auto, setAuto, onChanged }: { data: ScoringData; aut
           Actualizar solo (15 s)
         </label>
         <button onClick={exportCsv} className={smallBtn}>CSV</button>
+        {confirmRenumber ? (
+          <>
+            <button onClick={renumber} className={primaryBtn}>Sí, numerar de nuevo</button>
+            <button onClick={() => setConfirmRenumber(false)} className={smallBtn}>Cancelar</button>
+          </>
+        ) : (
+          <button onClick={() => { setConfirmRenumber(true); setRenumberMsg(null) }} className={smallBtn}>Numerar por categoría y nombre</button>
+        )}
       </div>
+      {confirmRenumber && <p className="text-atencion text-xs">Cambia el número de TODOS los pagados (categoría y luego orden alfabético). Hazlo antes de imprimir los números; ya no se puede cuando hay intentos capturados.</p>}
+      {renumberMsg && <p className="text-zinc-200 text-xs">{renumberMsg}</p>}
 
       {rows.length === 0 ? <p className="text-zinc-400 text-xs">Nadie pagado en esta categoría.</p> : (
         <div className={`${card} divide-y divide-zinc-800/60`}>
@@ -181,7 +201,7 @@ function RankingTab({ data, auto, setAuto, onChanged }: { data: ScoringData; aut
         </div>
       )}
       <p className="text-zinc-500 text-[11px]">
-        Desempate: puntos → más tops → más flashes → la ruta más difícil encadenada → quien hizo antes su último intento.
+        Desempate: puntos → más tops → más flashes → más zonas → quien consiguió antes sus últimos puntos.
         Mismo lugar = empate total.
       </p>
     </div>
@@ -394,17 +414,18 @@ function JudgesTab({ data, onChanged }: { data: ScoringData; onChanged: () => vo
   return (
     <div className="space-y-3">
       <div className={`${card} p-4 space-y-1`}>
-        <p className="text-zinc-300 text-xs">Los jueces abren esta página en su celular y escriben su código:</p>
+        <p className="text-zinc-300 text-xs">Los jueces abren esta página en su celular y escriben su palabra:</p>
         <p className="text-primario font-mono font-bold text-sm break-all">{judgeUrl}</p>
       </div>
       <div className={`${card} p-4 space-y-2`}>
         <p className="text-texto-principal text-sm font-bold">Nuevo juez</p>
         <div className="grid sm:grid-cols-2 gap-2">
           <input value={name} onChange={e => setName(e.target.value)} placeholder="Nombre" className={inputClass} />
-          <input value={code} onChange={e => setCode(e.target.value.toUpperCase())} placeholder="Código (opcional, se crea solo)" className={`${inputClass} font-mono`} />
+          <input value={code} onChange={e => setCode(e.target.value.toUpperCase().replace(/\s/g, ''))} placeholder="Palabra para entrar (ej. TIBURON)" className={`${inputClass} font-mono`} />
         </div>
         <button onClick={async () => { if (await act('create', null, { name, code })) { setName(''); setCode('') } }}
-          disabled={busy || name.trim().length < 2} className={primaryBtn}>Crear juez</button>
+          disabled={busy || name.trim().length < 2 || code.length < 4} className={primaryBtn}>Crear juez</button>
+        <p className="text-zinc-500 text-[11px]">Una palabra de 4 a 20 letras, sin espacios. Mejor una que no sea el nombre del juez: cualquiera que la adivine podría capturar intentos.</p>
         {msg && <p className="text-alerta text-xs">{msg}</p>}
       </div>
       <div className={`${card} divide-y divide-zinc-800/60`}>

@@ -979,3 +979,14 @@ permitiendo al staff lo de antes.
   - Ajustes.
 - Pruebas locales con PGlite (puntos, desempates, reubicación, juntar
   categorías, duplicados) y en el navegador con un Supabase falso.
+- Ajustes del dueño (mismo día, antes del Run):
+  - Desempate: puntos → más tops → más flashes → más zonas → quien
+    consiguió antes sus últimos puntos (`achieved_at`: primer top de la
+    ruta, o primera zona si no hizo top; cuenta el más reciente). Se quitó
+    "la ruta más difícil" porque no se sabe con certeza cuál es más difícil.
+  - Números: por categoría (en su orden) y luego alfabético, sin que los
+    acentos cambien el orden. Botón "Numerar por categoría y nombre" en
+    Ranking; se niega si ya hay intentos. Los del mismo día reciben el
+    siguiente número.
+  - Jueces: el admin les da una palabra (ej. TIBURON) desde antes. No
+    importan mayúsculas, espacios ni acentos.

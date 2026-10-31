@@ -15,11 +15,12 @@
 --   * Al subir a alguien de categoría empieza de cero: cada intento guarda
 --     la categoría que tenía la persona en ese momento y solo cuentan los
 --     de su categoría actual (los anteriores quedan guardados).
---   * Desempate: puntos → más tops → más flashes → la ruta más difícil
---     encadenada (número más alto, luego la siguiente…) → quien hizo
---     antes su último intento → lugar compartido.
+--   * Desempate: puntos → más tops → más flashes → más zonas → quien
+--     consiguió antes sus últimos puntos (la hora en que logró su mejor
+--     resultado más reciente: top, o zona si no hizo top) → lugar compartido.
 --
--- Jueces: entran a /juez con un código (sin contraseña). Todas sus
+-- Jueces: entran a /juez con una palabra clave que les da el admin
+-- (sin contraseña). Todas sus
 -- funciones reciben ese código; las tablas no tienen policies.
 -- ============================================================
 
@@ -45,7 +46,7 @@ CREATE TABLE IF NOT EXISTS public.competition_judges (
   id             UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   competition_id UUID NOT NULL REFERENCES public.competitions(id),
   name           TEXT NOT NULL,
-  code           TEXT NOT NULL UNIQUE,      -- en mayúsculas
+  code           TEXT NOT NULL UNIQUE,      -- palabra clave, en mayúsculas
   active         BOOLEAN NOT NULL DEFAULT true,
   created_at     TIMESTAMPTZ NOT NULL DEFAULT now()
 );
@@ -78,8 +79,10 @@ ALTER TABLE public.competition_attempts ENABLE ROW LEVEL SECURITY;
 REVOKE ALL ON public.competition_judges, public.competition_attempts FROM anon, authenticated;
 
 -- ------------------------------------------------------------
--- Números de competidor: quien queda pagado recibe el siguiente número
--- (también las inscripciones del mismo día). Se puede cambiar a mano.
+-- Números de competidor: por categoría y luego alfabético
+-- (admin_renumber_bibs, antes del evento). Quien queda pagado después
+-- (las inscripciones del mismo día) recibe el siguiente número libre.
+-- Se puede cambiar a mano.
 -- ------------------------------------------------------------
 CREATE OR REPLACE FUNCTION public.competition_assign_bib()
 RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $function$
@@ -98,15 +101,36 @@ CREATE TRIGGER competition_registrations_bib
   BEFORE INSERT OR UPDATE OF status ON public.competition_registrations
   FOR EACH ROW EXECUTE FUNCTION public.competition_assign_bib();
 
--- Los pagados que ya existen: números por orden de pago.
-WITH todo AS (
-  SELECT r.id, r.competition_id,
-         (SELECT coalesce(max(x.bib), 0) FROM competition_registrations x WHERE x.competition_id = r.competition_id)
-         + row_number() OVER (PARTITION BY r.competition_id ORDER BY r.paid_at NULLS LAST, r.created_at) AS n
-  FROM competition_registrations r
-  WHERE r.status = 'paid' AND r.bib IS NULL
-)
-UPDATE competition_registrations r SET bib = todo.n FROM todo WHERE r.id = todo.id;
+-- Orden alfabético sin que los acentos muevan a nadie de lugar.
+CREATE OR REPLACE FUNCTION public.competition_sort_name(p_name TEXT)
+RETURNS TEXT LANGUAGE sql IMMUTABLE AS $function$
+  SELECT translate(lower(p_name), 'áéíóúüàèìòùñ', 'aeiouuaeioun');
+$function$;
+
+-- Numera de nuevo a todos los pagados: categoría (en su orden) y luego
+-- nombre. Se niega si ya hay intentos capturados, para no cambiarle el
+-- número a nadie a media competencia.
+CREATE OR REPLACE FUNCTION public.competition_renumber_bibs(p_competition_id UUID)
+RETURNS INT LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $function$
+DECLARE
+  v_count INT;
+BEGIN
+  PERFORM pg_advisory_xact_lock(hashtext('competition_bib:' || p_competition_id::text));
+  UPDATE competition_registrations SET bib = NULL WHERE competition_id = p_competition_id;
+  WITH todo AS (
+    SELECT r.id, row_number() OVER (ORDER BY cc.sort_order, cc.name, competition_sort_name(r.full_name), r.created_at) AS n
+    FROM competition_registrations r JOIN competition_categories cc ON cc.id = r.category_id
+    WHERE r.competition_id = p_competition_id AND r.status = 'paid'
+  )
+  UPDATE competition_registrations r SET bib = todo.n FROM todo WHERE r.id = todo.id;
+  GET DIAGNOSTICS v_count = ROW_COUNT;
+  RETURN v_count;
+END;
+$function$;
+
+-- Primera vez: numerar a los pagados que ya existen.
+SELECT competition_renumber_bibs(c.id) FROM competitions c
+WHERE NOT EXISTS (SELECT 1 FROM competition_registrations r WHERE r.competition_id = c.id AND r.bib IS NOT NULL);
 
 -- ------------------------------------------------------------
 -- Cálculo (interno)
@@ -118,6 +142,11 @@ RETURNS UUID LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $f
   SELECT coalesce(cc.merge_into, cc.id) FROM competition_categories cc WHERE cc.id = p_category_id;
 $function$;
 
+-- Las columnas de estas dos cambiaron durante el desarrollo: se borran
+-- antes para que CREATE OR REPLACE no falle.
+DROP FUNCTION IF EXISTS public.competition_ranking(UUID);
+DROP FUNCTION IF EXISTS public.competition_route_results(UUID);
+
 -- Resumen por persona y ruta, solo con intentos que cuentan: no anulados,
 -- hechos en su categoría actual y en una ruta de la lista de su categoría
 -- (si la lista está vacía, cuentan todas).
@@ -125,7 +154,7 @@ CREATE OR REPLACE FUNCTION public.competition_route_results(p_competition_id UUI
 RETURNS TABLE (
   registration_id UUID, route_number INT, attempts INT, fails INT,
   topped BOOLEAN, zoned BOOLEAN, flash BOOLEAN, zone_first BOOLEAN,
-  points NUMERIC, last_at TIMESTAMPTZ
+  points NUMERIC, last_at TIMESTAMPTZ, achieved_at TIMESTAMPTZ
 )
 LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $function$
   WITH c AS (SELECT * FROM competitions WHERE id = p_competition_id),
@@ -151,7 +180,9 @@ LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $function$
          (CASE WHEN bool_or(a.result = 'top') THEN max(c.score_top)
                WHEN bool_or(a.result = 'zone') THEN max(c.score_zone) ELSE 0 END)
            - count(*) FILTER (WHERE a.result <> 'top') * max(c.score_attempt_penalty),
-         max(a.created_at)
+         max(a.created_at),
+         -- Cuándo logró su mejor resultado en esta ruta (primer top; si no, primera zona).
+         coalesce(min(a.created_at) FILTER (WHERE a.result = 'top'), min(a.created_at) FILTER (WHERE a.result = 'zone'))
   FROM a CROSS JOIN c
   GROUP BY a.registration_id, a.route_number;
 $function$;
@@ -162,7 +193,7 @@ CREATE OR REPLACE FUNCTION public.competition_ranking(p_competition_id UUID)
 RETURNS TABLE (
   registration_id UUID, bib INT, full_name TEXT, category_id UUID, effective_category_id UUID,
   points NUMERIC, tops INT, zones INT, flashes INT, attempts INT, routes_tried INT,
-  topped_routes INT[], last_at TIMESTAMPTZ, place INT
+  topped_routes INT[], last_at TIMESTAMPTZ, achieved_at TIMESTAMPTZ, place INT
 )
 LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $function$
   WITH rr AS (SELECT * FROM competition_route_results(p_competition_id)),
@@ -176,7 +207,8 @@ LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $function$
            coalesce(sum(rr.attempts), 0)::int AS attempts,
            count(rr.route_number)::int AS routes_tried,
            coalesce(array_agg(rr.route_number ORDER BY rr.route_number DESC) FILTER (WHERE rr.topped), '{}') AS topped_routes,
-           max(rr.last_at) AS last_at
+           max(rr.last_at) AS last_at,
+           max(rr.achieved_at) AS achieved_at
     FROM competition_registrations r
     JOIN competition_categories cc ON cc.id = r.category_id
     LEFT JOIN rr ON rr.registration_id = r.id
@@ -185,10 +217,10 @@ LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $function$
   )
   SELECT per.id, per.bib, per.full_name, per.category_id, per.eff,
          per.points, per.tops, per.zones, per.flashes, per.attempts, per.routes_tried,
-         per.topped_routes, per.last_at,
+         per.topped_routes, per.last_at, per.achieved_at,
          rank() OVER (PARTITION BY per.eff
                       ORDER BY per.points DESC, per.tops DESC, per.flashes DESC,
-                               per.topped_routes DESC, per.last_at ASC NULLS LAST)::int
+                               per.zones DESC, per.achieved_at ASC NULLS LAST)::int
   FROM per;
 $function$;
 
@@ -205,11 +237,18 @@ RETURNS TEXT LANGUAGE sql IMMUTABLE AS $function$
   END;
 $function$;
 
--- Juez activo por código (NULL si no existe o está desactivado).
+-- Palabra del juez normalizada: mayúsculas, sin espacios ni acentos
+-- ("tiburón" = "TIBURON").
+CREATE OR REPLACE FUNCTION public.competition_judge_code(p_code TEXT)
+RETURNS TEXT LANGUAGE sql IMMUTABLE AS $function$
+  SELECT translate(upper(regexp_replace(coalesce(p_code, ''), '\s', '', 'g')), 'ÁÉÍÓÚÜ', 'AEIOUU');
+$function$;
+
+-- Juez activo por su palabra (NULL si no existe o está desactivado).
 CREATE OR REPLACE FUNCTION public.competition_judge_by_code(p_code TEXT)
 RETURNS public.competition_judges LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $function$
   SELECT j.* FROM competition_judges j
-  WHERE j.code = upper(btrim(coalesce(p_code, ''))) AND j.active;
+  WHERE j.code = competition_judge_code(p_code) AND j.active;
 $function$;
 
 -- Lo que ve el juez de un competidor: datos, rutas y cómo va en cada una.
@@ -236,6 +275,7 @@ RETURNS JSONB LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $
 $function$;
 
 REVOKE ALL ON FUNCTION public.competition_assign_bib() FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION public.competition_renumber_bibs(UUID) FROM PUBLIC, anon, authenticated;
 REVOKE ALL ON FUNCTION public.competition_effective_category(UUID) FROM PUBLIC, anon, authenticated;
 REVOKE ALL ON FUNCTION public.competition_route_results(UUID) FROM PUBLIC, anon, authenticated;
 REVOKE ALL ON FUNCTION public.competition_ranking(UUID) FROM PUBLIC, anon, authenticated;
@@ -481,13 +521,15 @@ BEGIN
 END;
 $function$;
 
--- Jueces. p_action: 'create' {name, code?} | 'deactivate' | 'activate'.
+-- Jueces. p_action: 'create' {name, code} | 'deactivate' | 'activate'.
+-- code = la palabra clave que el admin le da al juez (si llega vacía se
+-- genera una).
 CREATE OR REPLACE FUNCTION public.admin_manage_judge(p_slug TEXT, p_action TEXT, p_judge_id UUID DEFAULT NULL, p_payload JSONB DEFAULT '{}'::jsonb)
 RETURNS JSONB LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $function$
 DECLARE
   v_comp competitions%ROWTYPE;
   v_name TEXT := btrim(coalesce(p_payload->>'name', ''));
-  v_code TEXT := upper(btrim(coalesce(p_payload->>'code', '')));
+  v_code TEXT := competition_judge_code(p_payload->>'code');
   v_id   UUID;
 BEGIN
   IF NOT competition_is_admin() THEN RETURN jsonb_build_object('error', 'forbidden'); END IF;
@@ -503,7 +545,7 @@ BEGIN
                             FROM generate_series(1, 5));
         EXIT WHEN NOT EXISTS (SELECT 1 FROM competition_judges j WHERE j.code = v_code);
       END LOOP;
-    ELSIF v_code !~ '^[A-Z0-9-]{4,20}$' THEN
+    ELSIF v_code !~ '^[A-ZÑ0-9-]{4,20}$' THEN
       RETURN jsonb_build_object('error', 'invalid_code');
     ELSIF EXISTS (SELECT 1 FROM competition_judges j WHERE j.code = v_code) THEN
       RETURN jsonb_build_object('error', 'code_taken');
@@ -590,6 +632,26 @@ BEGIN
 END;
 $function$;
 
+-- Botón "Numerar por categoría y nombre" del panel.
+CREATE OR REPLACE FUNCTION public.admin_renumber_bibs(p_slug TEXT)
+RETURNS JSONB LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $function$
+DECLARE
+  v_comp  competitions%ROWTYPE;
+  v_count INT;
+BEGIN
+  IF NOT competition_is_admin() THEN RETURN jsonb_build_object('error', 'forbidden'); END IF;
+  SELECT c.* INTO v_comp FROM competitions c WHERE c.slug = p_slug FOR UPDATE;
+  IF NOT FOUND THEN RETURN jsonb_build_object('error', 'not_found'); END IF;
+  IF EXISTS (SELECT 1 FROM competition_attempts at WHERE at.competition_id = v_comp.id AND at.voided_at IS NULL) THEN
+    RETURN jsonb_build_object('error', 'has_attempts');
+  END IF;
+  v_count := competition_renumber_bibs(v_comp.id);
+  INSERT INTO competition_audit_log (actor_id, action, competition_id, after)
+  VALUES (auth.uid(), 'renumber_bibs', v_comp.id, jsonb_build_object('count', v_count));
+  RETURN jsonb_build_object('success', true, 'count', v_count);
+END;
+$function$;
+
 -- ------------------------------------------------------------
 -- Pública (para la TV): solo si el admin la activa (ranking_public).
 -- ------------------------------------------------------------
@@ -634,6 +696,7 @@ REVOKE ALL ON FUNCTION public.admin_manage_judge(TEXT, TEXT, UUID, JSONB) FROM P
 REVOKE ALL ON FUNCTION public.admin_void_attempt(UUID, TEXT) FROM PUBLIC, anon;
 REVOKE ALL ON FUNCTION public.admin_add_attempt(TEXT, INT, INT, TEXT, TEXT) FROM PUBLIC, anon;
 REVOKE ALL ON FUNCTION public.admin_set_bib(UUID, INT) FROM PUBLIC, anon;
+REVOKE ALL ON FUNCTION public.admin_renumber_bibs(TEXT) FROM PUBLIC, anon;
 REVOKE ALL ON FUNCTION public.get_competition_ranking_public(TEXT) FROM PUBLIC;
 
 GRANT EXECUTE ON FUNCTION public.judge_login(TEXT) TO anon, authenticated;
@@ -648,4 +711,5 @@ GRANT EXECUTE ON FUNCTION public.admin_manage_judge(TEXT, TEXT, UUID, JSONB) TO 
 GRANT EXECUTE ON FUNCTION public.admin_void_attempt(UUID, TEXT) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.admin_add_attempt(TEXT, INT, INT, TEXT, TEXT) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.admin_set_bib(UUID, INT) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.admin_renumber_bibs(TEXT) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.get_competition_ranking_public(TEXT) TO anon, authenticated;
