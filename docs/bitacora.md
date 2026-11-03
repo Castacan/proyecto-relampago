@@ -1036,3 +1036,10 @@ permitiendo al staff lo de antes.
   cambia el número que se muestra y entra en el siguiente Run.
 - Revisión en producción: de los SQL desde el 23-oct solo faltaba
   `competencia_jueces.sql`. Quedó pegado para Run.
+
+## 2026-11-03 — TV: rutas por categoría para la competencia
+
+- Del 3 al 7 de noviembre (inclusive, hora de México) `/leaderboard/display` ya no muestra el leaderboard ni slides: muestra solo las rutas de cada categoría (Básico / Intermedio / Avanzado × Femenil / Varonil), con los horarios de los bloques arriba.
+- Los números están en `src/lib/competitionDisplay.ts`. **Ahora son de ejemplo** (aleatorios 1–30); el viernes el dueño da los reales y se cambian ahí (solo push, sin SQL).
+- El 8 de noviembre a las 00:00 la TV regresa sola al leaderboard. Después se puede borrar el archivo y su uso.
+- Verificado: `competencia_jueces.sql` ya está corrido en producción (`jueces_corrido = true`, 28 con número).

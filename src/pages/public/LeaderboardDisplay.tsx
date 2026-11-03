@@ -8,6 +8,7 @@ import { getColorHex } from '../../lib/colors'
 import { nowMX } from '../../lib/timezone'
 import { MONTHS_ES, DAYS_ES } from '../../lib/dates'
 import { SPECIAL_PERIOD, isSpecialPeriodActive } from '../../lib/specialPeriod'
+import { COMPETITION_DISPLAY, isCompetitionDisplayActive } from '../../lib/competitionDisplay'
 import SponsorBanner from '../../components/SponsorBanner'
 import DisplaySlide from '../../components/DisplaySlide'
 import type { LeaderboardEntry, Sponsorship, SponsorPeriod } from '../../types'
@@ -68,6 +69,11 @@ export default function LeaderboardDisplay() {
   // TEMPORAL: se reevalúa con el reloj de cada minuto, así que el 1 de
   // noviembre a las 00:00 regresa solo a HOY / SEMANA / MES.
   const specialActive = isSpecialPeriodActive()
+
+  // TEMPORAL (lib/competitionDisplay.ts): del 3 al 7 de noviembre la TV solo
+  // muestra las rutas de cada categoría. Se reevalúa con el reloj de cada
+  // minuto, así que el 8 de noviembre regresa sola al leaderboard.
+  if (isCompetitionDisplayActive()) return <CompetitionRoutesDisplay />
 
   if (loading) {
     return (
@@ -158,6 +164,60 @@ export default function LeaderboardDisplay() {
         style={{ opacity: slideVisible ? 1 : 0, transitionDuration: `${settings.fade_duration_ms}ms` }}
       >
         <DisplaySlide slide={currentSlide} />
+      </div>
+    </div>
+  )
+}
+
+// Pantalla de la competencia: 3 columnas (Básico / Intermedio / Avanzado),
+// cada una con Femenil y Varonil y sus números de ruta en círculos grandes.
+// Tamaños en vh/vw para que quepa igual en la TV de la Pi que en una laptop.
+function CompetitionRoutesDisplay() {
+  const c = COMPETITION_DISPLAY
+  return (
+    <div className="w-screen h-screen bg-fondo overflow-hidden font-sans select-none flex flex-col">
+      <div className="shrink-0 px-[3vw] pt-[3vh] pb-[2vh] border-b border-zinc-800 flex items-end justify-between gap-6">
+        <div>
+          <h1 className="font-black tracking-tight text-primario" style={{ fontSize: '5.5vh', lineHeight: 1 }}>
+            {c.title}
+          </h1>
+          <p className="text-zinc-300 font-bold mt-[1vh]" style={{ fontSize: '2.8vh' }}>{c.subtitle}</p>
+        </div>
+        <p className="text-zinc-300 font-semibold text-right" style={{ fontSize: '2.4vh' }}>{c.schedule}</p>
+      </div>
+
+      <div className="flex-1 min-h-0 grid grid-cols-3">
+        {c.levels.map((level, i) => (
+          <div
+            key={level.name}
+            className={`min-h-0 flex flex-col px-[2vw] py-[2.5vh] gap-[2.5vh] ${i < c.levels.length - 1 ? 'border-r border-zinc-800' : ''} ${i === 1 ? 'bg-white/5' : ''}`}
+          >
+            <h2 className="font-black tracking-tight text-texto-principal text-center" style={{ fontSize: '4.5vh', lineHeight: 1 }}>
+              {level.name}
+            </h2>
+            {level.categories.map(cat => (
+              <div key={cat.name} className="flex-1 min-h-0 flex flex-col rounded-3xl bg-superficie border border-zinc-800 px-[1.5vw] py-[2vh]">
+                <div className="flex items-baseline justify-between gap-3 mb-[1.5vh]">
+                  <p className="font-black text-zinc-100" style={{ fontSize: '3.2vh' }}>{cat.name}</p>
+                  <p className="font-bold text-primario shrink-0" style={{ fontSize: '2.6vh' }}>
+                    {cat.routes.length} {cat.routes.length === 1 ? 'ruta' : 'rutas'}
+                  </p>
+                </div>
+                <div className="flex-1 grid grid-cols-5 content-center gap-[1vh]">
+                  {cat.routes.map(n => (
+                    <div
+                      key={n}
+                      className="aspect-square max-h-[9vh] mx-auto w-full rounded-full bg-fondo border-2 border-primario/60 flex items-center justify-center font-black text-texto-principal"
+                      style={{ fontSize: '3.8vh', maxWidth: '9vh' }}
+                    >
+                      {n}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        ))}
       </div>
     </div>
   )
