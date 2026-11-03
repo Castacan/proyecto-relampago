@@ -3,7 +3,8 @@ import { Link, useSearchParams } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import { fmtDateOnly } from '../../lib/dates'
 import {
-  COMPETITION_SLUG, LAST_REGISTRATION_KEY, MINOR_NOTICE, isUnlimitedCapacity, formatPrice, formatDeadline, refreshOnlinePayment, type RegistrationLookup,
+  COMPETITION_SLUG, LAST_REGISTRATION_KEY, MINOR_NOTICE, SLOT_ERRORS, isUnlimitedCapacity, formatPrice, formatDeadline, refreshOnlinePayment,
+  type RegistrationLookup, type RegistrationSlot,
 } from '../../lib/competition'
 import CompetitionPayButton from '../../components/CompetitionPayButton'
 import logoHorizontal from '../../assets/logo-horizontal.png'
@@ -20,6 +21,8 @@ export default function CompetitionLookupPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [reg, setReg] = useState<RegistrationLookup | null>(null)
+  // Horario de la inscripción (null = el SQL de horarios aún no está).
+  const [slot, setSlot] = useState<RegistrationSlot | null>(null)
 
   // Con cupo sin límite no se habla de reserva ni de fecha límite.
   const [unlimited, setUnlimited] = useState(false)
@@ -49,14 +52,20 @@ export default function CompetitionLookupPage() {
     return data as RegistrationLookup
   }
 
+  const fetchSlot = async (f: string, e: string) => {
+    const { data, error } = await db.rpc('get_registration_slot', { p_folio: f, p_email: e })
+    setSlot(error || !data || data.error ? null : data as RegistrationSlot)
+  }
+
   const lookup = async (f: string, e: string) => {
     setLoading(true)
     setError(null)
     let result = await fetchStatus(f, e)
     setLoading(false)
     if (result === 'error') { setError('No se pudo consultar. Intenta de nuevo.'); return }
-    if (result === 'not_found') { setReg(null); setError('No encontramos una inscripción con ese folio y correo. Revisa que estén bien escritos.'); return }
+    if (result === 'not_found') { setReg(null); setSlot(null); setError('No encontramos una inscripción con ese folio y correo. Revisa que estén bien escritos.'); return }
     setReg(result)
+    fetchSlot(f, e)
 
     // Sigue pendiente: se le pide al servidor que revise con Clip (por si
     // el aviso automático no llegó). Si viene de pagar, se insiste unos
@@ -75,8 +84,17 @@ export default function CompetitionLookupPage() {
     setConfirming(false)
   }
 
-  // Precarga el último folio creado en este dispositivo.
+  // Precarga el folio del link del correo (?folio=&email=) o, si no hay,
+  // el último folio creado en este dispositivo.
   useEffect(() => {
+    const qFolio = searchParams.get('folio')
+    const qEmail = searchParams.get('email')
+    if (qFolio && qEmail) {
+      setFolio(qFolio.toUpperCase())
+      setEmail(qEmail)
+      lookup(qFolio, qEmail)
+      return
+    }
     try {
       const last = JSON.parse(localStorage.getItem(LAST_REGISTRATION_KEY) ?? 'null')
       if (last?.folio && last?.email) {
@@ -134,13 +152,73 @@ export default function CompetitionLookupPage() {
             El pago no se completó. No se te cobró; puedes intentarlo de nuevo.
           </p>
         )}
-        {reg && <RegistrationCard reg={reg} email={email} unlimited={unlimited} />}
+        {reg && slot && slot.time_slot_id === null && slot.can_choose && slot.slots && slot.slots.length > 0 && (
+          <SlotChooser folio={reg.folio} email={email} slots={slot.slots} onChosen={() => fetchSlot(reg.folio, email)} />
+        )}
+        {reg && <RegistrationCard reg={reg} email={email} unlimited={unlimited} slotLabel={slot?.time_slot_label ?? null} />}
       </div>
     </div>
   )
 }
 
-function RegistrationCard({ reg, email, unlimited }: { reg: RegistrationLookup; email: string; unlimited: boolean }) {
+// La persona elige su horario una sola vez; después solo el staff lo cambia.
+function SlotChooser({ folio, email, slots, onChosen }: {
+  folio: string; email: string; slots: NonNullable<RegistrationSlot['slots']>; onChosen: () => void
+}) {
+  const [slotId, setSlotId] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  const save = async () => {
+    if (!slotId) { setError('Elige un horario.'); return }
+    setBusy(true)
+    setError(null)
+    const { data, error } = await db.rpc('competition_choose_slot', { p_folio: folio, p_email: email, p_time_slot_id: slotId })
+    setBusy(false)
+    if (error || !data) { setError('No se pudo guardar. Intenta de nuevo.'); return }
+    if (data.error) {
+      setError(SLOT_ERRORS[data.error] ?? 'No se pudo guardar. Intenta de nuevo.')
+      if (data.error === 'slot_full' || data.error === 'already_chosen') onChosen()
+      return
+    }
+    onChosen()
+  }
+
+  return (
+    <div className="bg-superficie rounded-2xl border-2 border-primario p-5 space-y-3">
+      <div>
+        <p className="text-texto-principal font-black text-lg">Elige tu horario para competir</p>
+        <p className="text-zinc-300 text-sm mt-1">
+          Cada horario dura 2 horas y mezcla todas las categorías. La premiación es para todos a las 5:30 pm.
+          Ya que lo elijas, solo nosotros podemos cambiarlo.
+        </p>
+      </div>
+      <div className="space-y-2">
+        {slots.map(t => {
+          const selected = slotId === t.id
+          return (
+            <label key={t.id}
+              className={`flex items-center gap-3 p-3.5 rounded-xl border transition-all ${
+                t.is_full ? 'opacity-50 border-zinc-800/60 bg-superficie'
+                  : selected ? 'border-primario bg-superficie-alta cursor-pointer'
+                  : 'border-zinc-700/50 bg-superficie hover:bg-superficie-alta cursor-pointer'}`}>
+              <input type="radio" name="slot" value={t.id} checked={selected} disabled={t.is_full}
+                onChange={() => { setSlotId(t.id); setError(null) }} className="accent-primario" />
+              <span className="text-texto-principal text-sm font-bold">{t.label}{t.is_full && ' · lleno'}</span>
+            </label>
+          )
+        })}
+      </div>
+      {error && <p role="alert" className="text-alerta text-sm font-semibold">{error}</p>}
+      <button onClick={save} disabled={busy || !slotId}
+        className="w-full py-3.5 rounded-2xl bg-primario hover:bg-primario-hover text-texto-en-acento font-black text-sm transition-all disabled:opacity-50 active:scale-95">
+        {busy ? 'Guardando...' : 'Guardar mi horario'}
+      </button>
+    </div>
+  )
+}
+
+function RegistrationCard({ reg, email, unlimited, slotLabel }: { reg: RegistrationLookup; email: string; unlimited: boolean; slotLabel: string | null }) {
   const unpaid = reg.status === 'pending_payment'
 
   const headline =
@@ -162,6 +240,7 @@ function RegistrationCard({ reg, email, unlimited }: { reg: RegistrationLookup; 
           <Row label="Nombre" value={reg.full_name} />
           <Row label="Categoría" value={reg.category_name} />
           <Row label="Talla" value={reg.shirt_size} />
+          {slotLabel && <Row label="Horario" value={<span className="font-bold">{slotLabel}</span>} />}
           <Row label="Competencia" value={`${reg.competition_name} · ${fmtDateOnly(reg.event_date)}${reg.event_time_text ? ` · ${reg.event_time_text}` : ''}`} />
           {reg.place && <Row label="Lugar" value={reg.place} />}
         </dl>

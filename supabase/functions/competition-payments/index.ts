@@ -1,11 +1,12 @@
 // Cobro en línea de inscripciones a la competencia con Clip.
-// Una sola función con siete entradas:
+// Una sola función con ocho entradas:
 //   POST {action:'pay', folio, email}       → link de pago de Clip para esa inscripción
 //   POST {action:'check', folio, email}     → consulta en Clip los links abiertos de esa inscripción
 //   POST {action:'reconcile'}               → (solo admin) consulta TODOS los links abiertos
 //   POST {action:'remind'}                  → manda los recordatorios de pago que toquen (lo llama pg_cron)
 //   POST {action:'courtesy', ...formulario, code} → inscripción con código de cortesía (sin Clip)
 //   POST {action:'courtesy_apply', registration_id, code} → (solo admin) aplica cortesía a una inscripción ya hecha
+//   POST {action:'slot_invite'}             → (solo admin) correo "elige tu horario" a los inscritos sin horario
 //   POST ?wh=<payment_id>&s=<firma>         → webhook de Clip
 //
 // Reglas (ver src/supabase/competencia_pagos.sql):
@@ -79,6 +80,11 @@ async function clip(url: string, init: RequestInit = {}): Promise<{ ok: boolean;
 
 const MESES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre']
 
+// Link a "Consulta tu inscripción" con el folio y el correo ya puestos.
+function lookupUrl(folio: string, email: string): string {
+  return `${APP_URL}/competencia/consulta?folio=${encodeURIComponent(folio)}&email=${encodeURIComponent(email)}`
+}
+
 function esc(v: unknown): string {
   return String(v ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c] as string))
 }
@@ -102,7 +108,7 @@ async function sendConfirmationEmail(source: { providerPaymentId: string } | { c
       pay = data
     }
     const regQuery = db.from('competition_registrations')
-      .select('folio, full_name, email, shirt_size, birth_date, category_id, competition_id')
+      .select('folio, full_name, email, shirt_size, birth_date, category_id, competition_id, time_slot_id')
     const { data: reg } = pay
       ? await regQuery.eq('id', pay.registration_id).maybeSingle()
       : await regQuery.eq('folio', (source as { courtesyFolio: string }).courtesyFolio).maybeSingle()
@@ -112,6 +118,12 @@ async function sendConfirmationEmail(source: { providerPaymentId: string } | { c
       .select('name, event_date, event_time_text, place').eq('id', reg.competition_id).maybeSingle()
     if (!comp) return
     to = reg.email
+    // Horario (competencia_horarios.sql). Sin horario se le invita a elegirlo.
+    let slotLabel: string | null = null
+    if (reg.time_slot_id) {
+      const { data: slot } = await db.from('competition_time_slots').select('label').eq('id', reg.time_slot_id).maybeSingle()
+      slotLabel = slot?.label ?? null
+    }
 
     const [ey, em, ed] = String(comp.event_date).split('-').map(Number)
     const [by, bm, bd] = String(reg.birth_date).split('-').map(Number)
@@ -137,12 +149,13 @@ ${row('Nombre', esc(reg.full_name))}
 ${row('Categoría', esc(cat?.name ?? ''))}
 ${row('Talla', esc(reg.shirt_size))}
 ${row('Cuándo', esc(fecha))}
+${slotLabel ? row('Tu horario', esc(slotLabel)) : ''}
 ${comp.place ? row('Dónde', esc(comp.place)) : ''}
 ${pay ? row('Pagaste', esc(monto) + (pay.receipt_no ? ` · recibo Clip ${esc(pay.receipt_no)}` : '')) : row('Inscripción', 'Cortesía')}
 </table>
 ${isMinor ? `<p style="margin:18px 0 0;padding:12px 14px;border:1px solid #ffd260;border-radius:12px;color:#ffd260;font-size:14px;font-weight:600">Eres menor de edad: el día del evento debes llegar con un mayor de edad para firmar tu registro.</p>` : ''}
-<p style="margin:18px 0 0;color:#cfe3ea;font-size:14px;line-height:1.5">El día del evento da tu nombre o tu folio en el registro. Puedes revisar tu inscripción cuando quieras:</p>
-<p style="margin:14px 0 0"><a href="${APP_URL}/competencia/consulta" style="display:inline-block;background:#ff4d15;color:#1a1a1a;font-weight:800;font-size:14px;text-decoration:none;padding:12px 20px;border-radius:12px">Consultar mi inscripción</a></p>
+<p style="margin:18px 0 0;color:#cfe3ea;font-size:14px;line-height:1.5">${slotLabel ? 'El día del evento da tu nombre o tu folio en el registro. Puedes revisar tu inscripción cuando quieras:' : 'Falta que elijas tu horario para competir. Entra aquí y elígelo:'}</p>
+<p style="margin:14px 0 0"><a href="${lookupUrl(reg.folio, reg.email)}" style="display:inline-block;background:#ff4d15;color:#1a1a1a;font-weight:800;font-size:14px;text-decoration:none;padding:12px 20px;border-radius:12px">${slotLabel ? 'Consultar mi inscripción' : 'Elegir mi horario'}</a></p>
 </td></tr>
 <tr><td align="center" style="padding-top:18px;color:#7fa9b7;font-size:12px">Jaibamuro · Instagram @jaibamuro</td></tr>
 </table></td></tr></table></body></html>`
@@ -207,7 +220,7 @@ ${row('Cuándo', esc(fecha))}
 ${row('Por pagar', esc(monto))}
 </table>
 <p style="margin:18px 0 0;color:#cfe3ea;font-size:14px;line-height:1.5">Para pagar, entra con tu folio y este correo:</p>
-<p style="margin:14px 0 0"><a href="${APP_URL}/competencia/consulta" style="display:inline-block;background:#ff4d15;color:#1a1a1a;font-weight:800;font-size:14px;text-decoration:none;padding:12px 20px;border-radius:12px">Pagar mi inscripción</a></p>
+<p style="margin:14px 0 0"><a href="${lookupUrl(r.folio, r.email)}" style="display:inline-block;background:#ff4d15;color:#1a1a1a;font-weight:800;font-size:14px;text-decoration:none;padding:12px 20px;border-radius:12px">Pagar mi inscripción</a></p>
 <p style="margin:18px 0 0;color:#9fc3cf;font-size:13px;line-height:1.5">Si ya pagaste, no hagas caso a este correo.</p>
 </td></tr>
 <tr><td align="center" style="padding-top:18px;color:#7fa9b7;font-size:12px">Jaibamuro · Instagram @jaibamuro</td></tr>
@@ -229,6 +242,58 @@ ${row('Por pagar', esc(monto))}
     return res.status === 429 || res.status >= 500 ? 'retry' : 'failed'
   } catch (e) {
     await log('reminder_error', { message: String((e as Error)?.message ?? e) })
+    return 'retry'
+  }
+}
+
+// Correo de "elige tu horario" para quien se inscribió antes de que
+// hubiera horarios. Mismo esquema de resultado que el recordatorio.
+type SlotInvite = {
+  registration_id: string; folio: string; full_name: string; email: string; category_name: string | null
+  status: string; competition_name: string; event_date: string
+}
+async function sendSlotInviteEmail(r: SlotInvite): Promise<'sent' | 'retry' | 'failed'> {
+  const log = (kind: string, payload: Record<string, unknown>) => db.rpc('competition_record_payment_event', {
+    p_provider_payment_id: null, p_source: 'email', p_kind: kind, p_payload: { folio: r.folio, to: r.email, ...payload },
+  })
+  try {
+    const [ey, em, ed] = String(r.event_date).split('-').map(Number)
+    const fecha = `${ed} de ${MESES[em - 1]} de ${ey}`
+    const html = `<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"></head><body style="margin:0;padding:0;background:#013a4b;font-family:Inter,Arial,Helvetica,sans-serif">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#013a4b;padding:32px 16px"><tr><td align="center">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:480px">
+<tr><td align="center" style="padding-bottom:24px"><img src="https://jaibamuro.com/logo-email.png" alt="Jaibamuro" height="36" style="height:36px;width:auto"></td></tr>
+<tr><td style="background:#015169;border-radius:16px;padding:28px 24px">
+<p style="margin:0 0 6px;color:#ffd260;font-size:14px;font-weight:700">Elige tu horario</p>
+<h1 style="margin:0 0 14px;color:#f4f4f3;font-size:22px;line-height:1.25">${esc(String(r.full_name).split(' ')[0])}, ya puedes elegir a qué hora compites en ${esc(r.competition_name)}.</h1>
+<p style="margin:0 0 14px;color:#cfe3ea;font-size:14px;line-height:1.5">El ${esc(fecha)} vamos a competir en tres horarios de 2 horas, con todas las categorías mezcladas:</p>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#013a4b;border-radius:12px;margin-bottom:14px"><tr><td style="padding:14px 16px;color:#f4f4f3;font-size:15px;font-weight:700;line-height:1.9">
+10:00 am a 12:00 pm<br>12:30 a 2:30 pm<br>3:00 a 5:00 pm
+</td></tr></table>
+<p style="margin:0 0 14px;color:#cfe3ea;font-size:14px;line-height:1.5">La premiación es para todos a las 5:30 pm. Cada horario tiene lugares limitados: elige el tuyo pronto. Ya que lo elijas, solo nosotros podemos cambiarlo.</p>
+<p style="margin:0 0 4px;color:#9fc3cf;font-size:13px">Folio <span style="color:#ff4d15;font-weight:800;font-family:'JetBrains Mono',Consolas,monospace">${esc(r.folio)}</span>${r.category_name ? ` · ${esc(r.category_name)}` : ''}</p>
+<p style="margin:16px 0 0"><a href="${lookupUrl(r.folio, r.email)}" style="display:inline-block;background:#ff4d15;color:#1a1a1a;font-weight:800;font-size:14px;text-decoration:none;padding:12px 20px;border-radius:12px">Elegir mi horario</a></p>
+${r.status === 'pending_payment' ? `<p style="margin:16px 0 0;color:#ffd260;font-size:13px;line-height:1.5">Ojo: aún falta tu pago. En la misma página puedes pagar.</p>` : ''}
+</td></tr>
+<tr><td align="center" style="padding-top:18px;color:#7fa9b7;font-size:12px">Jaibamuro · Instagram @jaibamuro</td></tr>
+</table></td></tr></table></body></html>`
+
+    const res = await fetch(RESEND_API, {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${RESEND_API_KEY}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        from: EMAIL_FROM, to: [r.email],
+        subject: `Elige tu horario · ${r.competition_name} · Folio ${r.folio}`,
+        html,
+      }),
+      signal: AbortSignal.timeout(10_000),
+    })
+    const text = await res.text()
+    await log(res.ok ? 'slot_invite_sent' : 'slot_invite_error', { http: res.status, body: text.slice(0, 500) })
+    if (res.ok) return 'sent'
+    return res.status === 429 || res.status >= 500 ? 'retry' : 'failed'
+  } catch (e) {
+    await log('slot_invite_error', { message: String((e as Error)?.message ?? e) })
     return 'retry'
   }
 }
@@ -341,7 +406,9 @@ async function handlePay(folio: string, email: string): Promise<Response> {
 async function handleCourtesy(body: Record<string, unknown>): Promise<Response> {
   const code = String(body.code ?? '').trim()
   if (!code) return json({ error: 'invalid_code' })
-  const { data, error } = await db.rpc('competition_register_courtesy', {
+  const slotId = body.time_slot_id ? String(body.time_slot_id) : null
+  const { data, error } = await db.rpc(slotId ? 'competition_register_courtesy_slot' : 'competition_register_courtesy', {
+    ...(slotId ? { p_time_slot_id: slotId } : {}),
     p_slug: String(body.slug ?? ''),
     p_full_name: String(body.full_name ?? ''),
     p_birth_date: body.birth_date ? String(body.birth_date) : null,
@@ -429,6 +496,33 @@ async function handleRemind(): Promise<Response> {
   return json({ sent, skipped, errors })
 }
 
+// Correo "elige tu horario" a los inscritos sin horario (solo admin).
+// Cada inscripción se aparta al leerla: dos clics no duplican correos.
+async function handleSlotInvite(req: Request): Promise<Response> {
+  if (!RESEND_API_KEY) return json({ error: 'not_configured' })
+  const caller = createClient(SUPABASE_URL, ANON_KEY, {
+    auth: { persistSession: false },
+    global: { headers: { Authorization: req.headers.get('Authorization') ?? '' } },
+  })
+  const { data: isAdmin } = await caller.rpc('competition_is_admin')
+  if (isAdmin !== true) return json({ error: 'forbidden' })
+
+  const { data, error } = await db.rpc('competition_claim_slot_invites', { p_slug: 'competencia-2026', p_limit: 100 })
+  if (error) return json({ error: 'server_error' })
+  let sent = 0, errors = 0
+  for (const r of (data ?? []) as SlotInvite[]) {
+    const result = await sendSlotInviteEmail(r)
+    if (result === 'sent') sent++
+    else {
+      errors++
+      await db.rpc('competition_release_slot_invite', { p_registration_id: r.registration_id })
+    }
+    // Resend permite pocas peticiones por segundo.
+    await new Promise(res => setTimeout(res, 600))
+  }
+  return json({ sent, errors })
+}
+
 async function handleWebhook(req: Request, url: URL): Promise<Response> {
   const paymentId = url.searchParams.get('wh') ?? ''
   const sig = url.searchParams.get('s') ?? ''
@@ -483,6 +577,8 @@ Deno.serve(async (req) => {
       return handleCourtesy(body)
     case 'courtesy_apply':
       return handleCourtesyApply(req, body)
+    case 'slot_invite':
+      return handleSlotInvite(req)
     default:
       return json({ error: 'bad_request' }, 400)
   }

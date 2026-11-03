@@ -45,9 +45,20 @@ interface AdminRegistration {
   created_at: string
   is_minor: boolean
   bib?: number | null     // número de competidor (competencia_jueces.sql)
+  time_slot_id?: string | null  // horario (competencia_horarios.sql)
 }
 
-type Action = 'mark_paid' | 'resolve_attention' | 'cancel' | 'mark_refunded' | 'edit' | 'extend_hold' | 'check_in' | 'undo_check_in' | 'apply_courtesy'
+interface AdminSlot { id: string; label: string; is_full: boolean; taken: number }
+interface SlotsInfo {
+  slots: AdminSlot[]
+  capacity: number        // cupo vigente de cada horario (sube solo)
+  base: number
+  step: number
+  unassigned: number      // activos sin horario
+  invite_pending: number  // de ellos, a cuántos se les puede mandar el correo
+}
+
+type Action = 'mark_paid' | 'resolve_attention' | 'cancel' | 'mark_refunded' | 'edit' | 'extend_hold' | 'check_in' | 'undo_check_in' | 'apply_courtesy' | 'set_slot'
 
 const ACTION_LABELS: Record<Action, string> = {
   mark_paid: 'Marcar pagado',
@@ -59,6 +70,7 @@ const ACTION_LABELS: Record<Action, string> = {
   check_in: 'Check-in',
   undo_check_in: 'Quitar check-in',
   apply_courtesy: 'Aplicar cortesía',
+  set_slot: 'Horario',
 }
 
 // 'clip' lo pone el sistema cuando el pago en línea se confirma; no es
@@ -165,10 +177,10 @@ const STATUS_STYLE: Record<RegistrationStatus, string> = {
 
 function actionsFor(r: AdminRegistration): Action[] {
   switch (r.status) {
-    case 'pending_payment': return ['mark_paid', 'extend_hold', 'edit', 'apply_courtesy', 'cancel']
+    case 'pending_payment': return ['mark_paid', 'extend_hold', 'set_slot', 'edit', 'apply_courtesy', 'cancel']
     case 'expired': return ['mark_paid', 'extend_hold', 'apply_courtesy', 'cancel']
-    case 'paid': return [r.checked_in_at ? 'undo_check_in' : 'check_in', 'edit', 'mark_refunded']
-    case 'needs_attention': return ['resolve_attention', 'mark_refunded', 'edit']
+    case 'paid': return [r.checked_in_at ? 'undo_check_in' : 'check_in', 'set_slot', 'edit', 'mark_refunded']
+    case 'needs_attention': return ['resolve_attention', 'set_slot', 'mark_refunded', 'edit']
     default: return []
   }
 }
@@ -192,6 +204,8 @@ export default function CompetitionAdminPage() {
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState<RegistrationStatus | 'all'>('all')
   const [categoryFilter, setCategoryFilter] = useState('all')
+  const [slotFilter, setSlotFilter] = useState('all')   // 'all' | 'none' | id del horario
+  const [slotsInfo, setSlotsInfo] = useState<SlotsInfo | null>(null)
   const [minorsOnly, setMinorsOnly] = useState(false)
   const [openId, setOpenId] = useState<string | null>(null)
   const [showSettings, setShowSettings] = useState(false)
@@ -218,6 +232,11 @@ export default function CompetitionAdminPage() {
           setRegs(data.registrations)
         }
         setLoading(false)
+      })
+    db.rpc('get_competition_slots_admin', { p_slug: COMPETITION_SLUG })
+      .then(({ data, error }: { data: (SlotsInfo & { error?: string }) | null; error: unknown }) => {
+        // Sin el SQL de horarios el panel sigue igual, sin esta sección.
+        setSlotsInfo(!error && data && !data.error && data.slots.length > 0 ? data : null)
       })
     db.rpc('get_competition_payments_admin', { p_slug: COMPETITION_SLUG })
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -283,12 +302,19 @@ export default function CompetitionAdminPage() {
     return regs.filter(r => {
       if (statusFilter !== 'all' && displayStatus(r) !== statusFilter) return false
       if (categoryFilter !== 'all' && r.category_id !== categoryFilter) return false
+      if (slotFilter === 'none' && r.time_slot_id) return false
+      if (slotFilter !== 'all' && slotFilter !== 'none' && r.time_slot_id !== slotFilter) return false
       if (minorsOnly && !r.is_minor) return false
       if (!q) return true
       return r.full_name.toLowerCase().includes(q) || r.folio.toLowerCase().includes(q)
         || (r.email ?? '').includes(q) || (r.phone ?? '').includes(q)
     })
-  }, [regs, search, statusFilter, categoryFilter, minorsOnly])
+  }, [regs, search, statusFilter, categoryFilter, slotFilter, minorsOnly])
+
+  const slotName = useMemo(() => {
+    const map = new Map((slotsInfo?.slots ?? []).map(t => [t.id, t.label]))
+    return (id: string | null | undefined) => (id ? map.get(id) ?? '—' : '')
+  }, [slotsInfo])
 
   if (profile === null) return (
     <div className="flex justify-center items-center h-full bg-fondo">
@@ -307,10 +333,10 @@ export default function CompetitionAdminPage() {
 
   const exportCsv = () => {
     const esc = (v: string | null) => `"${(v ?? '').replace(/"/g, '""')}"`
-    const header = 'Número,Folio,Nombre,Fecha de nacimiento,Menor,Correo,Celular,Categoría,Talla,Estado,Método de pago,Fecha de pago,Check-in,Inscrito el\n'
+    const header = 'Número,Folio,Nombre,Fecha de nacimiento,Menor,Correo,Celular,Categoría,Horario,Talla,Estado,Método de pago,Fecha de pago,Check-in,Inscrito el\n'
     const rows = regs.map(r => [
       r.bib != null ? String(r.bib) : '', r.folio, r.full_name, r.birth_date, r.is_minor ? 'Sí' : 'No', r.email, r.phone,
-      categoryName(r.category_id), r.shirt_size, STATUS_LABELS[displayStatus(r)],
+      categoryName(r.category_id), slotName(r.time_slot_id), r.shirt_size, STATUS_LABELS[displayStatus(r)],
       paymentText(r),
       r.paid_at ? fmtDateTime(r.paid_at) : '', r.checked_in_at ? fmtDateTime(r.checked_in_at) : '',
       fmtDateTime(r.created_at),
@@ -355,7 +381,7 @@ export default function CompetitionAdminPage() {
         </div>
       ) : comp && (
         <>
-          {showManual && <ManualRegistrationForm categories={categories} onDone={fetchAll} />}
+          {showManual && <ManualRegistrationForm categories={categories} slots={slotsInfo?.slots ?? []} onDone={fetchAll} />}
           {showCourtesy && <CourtesyCodesPanel competitionName={comp.name} />}
 
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-3">
@@ -392,6 +418,8 @@ export default function CompetitionAdminPage() {
             </div>
             {showSettings && <SettingsForm comp={comp} onSaved={fetchAll} />}
           </div>
+
+          {slotsInfo && <SlotsPanel info={slotsInfo} onChanged={fetchAll} />}
 
           {payments && (
             <div className={`bg-superficie rounded-2xl border px-4 py-3 mb-4 ${payments.review.length > 0 || payments.unknown_events > 0 ? 'border-alerta' : 'border-zinc-800/80'}`}>
@@ -436,6 +464,14 @@ export default function CompetitionAdminPage() {
                 <option value="all">Todas las categorías</option>
                 {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
               </select>
+              {slotsInfo && (
+                <select value={slotFilter} onChange={e => setSlotFilter(e.target.value)}
+                  aria-label="Filtrar por horario" className={`${inputClass} w-auto flex-1 min-w-[9rem]`}>
+                  <option value="all">Todos los horarios</option>
+                  {slotsInfo.slots.map(t => <option key={t.id} value={t.id}>{t.label}</option>)}
+                  <option value="none">Sin horario</option>
+                </select>
+              )}
               <label className="flex items-center gap-2 text-zinc-200 text-xs font-semibold px-3 py-2 rounded-xl bg-superficie-alta/80 border border-zinc-700/50 cursor-pointer">
                 <input type="checkbox" checked={minorsOnly} onChange={e => setMinorsOnly(e.target.checked)} className="accent-primario" />
                 Solo menores
@@ -463,6 +499,9 @@ export default function CompetitionAdminPage() {
                         </div>
                         <div className="text-zinc-300 text-xs mt-0.5">
                           <span className="font-mono font-bold">{r.folio}</span> · {categoryName(r.category_id)} · talla {r.shirt_size}
+                          {slotsInfo && (r.time_slot_id
+                            ? <> · <span className="text-texto-principal font-semibold">{slotName(r.time_slot_id)}</span></>
+                            : ['paid', 'pending_payment', 'needs_attention'].includes(shown) && <> · <span className="text-amarillo-suave font-semibold">Sin horario</span></>)}
                         </div>
                         <div className="text-zinc-400 text-xs truncate">{[r.email, r.phone].filter(Boolean).join(' · ') || 'Sin correo ni celular'}</div>
                         <div className="text-zinc-400 text-[10px] mt-0.5">
@@ -472,7 +511,7 @@ export default function CompetitionAdminPage() {
                         </div>
                       </button>
                       {openId === r.id && (
-                        <ActionPanel reg={r} categories={categories} onDone={() => { setOpenId(null); fetchAll() }} />
+                        <ActionPanel reg={r} categories={categories} slots={slotsInfo?.slots ?? []} onDone={() => { setOpenId(null); fetchAll() }} />
                       )}
                     </div>
                   )
@@ -570,7 +609,8 @@ function SettingsForm({ comp, onSaved }: { comp: AdminCompetition; onSaved: () =
   )
 }
 
-function ActionPanel({ reg, categories, onDone }: { reg: AdminRegistration; categories: AdminCategory[]; onDone: () => void }) {
+function ActionPanel({ reg, categories, slots, onDone }: { reg: AdminRegistration; categories: AdminCategory[]; slots: AdminSlot[]; onDone: () => void }) {
+  const [slotId, setSlotId] = useState(reg.time_slot_id ?? '')
   const [action, setAction] = useState<Action | null>(null)
   const [reason, setReason] = useState('')
   const [method, setMethod] = useState('cash')
@@ -583,8 +623,25 @@ function ActionPanel({ reg, categories, onDone }: { reg: AdminRegistration; cate
   const [error, setError] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
 
-  const available = actionsFor(reg)
-  const needsReason = action !== null && action !== 'check_in' && action !== 'undo_check_in' && action !== 'apply_courtesy'
+  // Sin horarios configurados no se ofrece el botón de horario.
+  const available = actionsFor(reg).filter(a => a !== 'set_slot' || slots.length > 0)
+  const needsReason = action !== null && action !== 'check_in' && action !== 'undo_check_in' && action !== 'apply_courtesy' && action !== 'set_slot'
+
+  // El staff puede mandar a alguien a un horario lleno (queda avisado).
+  const saveSlot = async () => {
+    setBusy(true)
+    setError(null)
+    const { data, error } = await db.rpc('admin_set_registration_slot', {
+      p_folio: reg.folio, p_time_slot_id: slotId || null, p_reason: reason.trim() || null,
+    })
+    setBusy(false)
+    if (error || !data || data.error) { setError('No se pudo cambiar el horario.'); return }
+    if (data.over_capacity) {
+      setNotice('Horario guardado. Ese horario ya estaba lleno: quedó con más gente que el cupo.')
+      return
+    }
+    onDone()
+  }
 
   // Pasa por la Edge Function para que, además, le llegue el correo de
   // confirmación (si la inscripción tiene correo).
@@ -684,6 +741,25 @@ function ActionPanel({ reg, categories, onDone }: { reg: AdminRegistration; cate
         </div>
       )}
 
+      {action === 'set_slot' && (
+        <div className="space-y-2">
+          <label htmlFor={`slot-${reg.id}`} className="block text-zinc-300 text-xs font-bold">Horario</label>
+          <select id={`slot-${reg.id}`} value={slotId} onChange={e => setSlotId(e.target.value)} className={inputClass}>
+            <option value="">Sin horario</option>
+            {slots.map(t => <option key={t.id} value={t.id}>{t.label} · {t.taken} {t.taken === 1 ? 'inscrito' : 'inscritos'}{t.is_full ? ' (lleno)' : ''}</option>)}
+          </select>
+          <input aria-label="Motivo (opcional)" value={reason} onChange={e => setReason(e.target.value)}
+            placeholder="Motivo (opcional), ej. lo pidió por WhatsApp" className={inputClass} />
+          <div className="flex items-center gap-3">
+            <button onClick={saveSlot} disabled={busy || slotId === (reg.time_slot_id ?? '')}
+              className="text-xs font-bold px-4 py-2 rounded-xl bg-primario hover:bg-primario-hover text-texto-en-acento disabled:opacity-50">
+              {busy ? '...' : 'Guardar horario'}
+            </button>
+            <button onClick={() => { setAction(null); setError(null) }} className="text-zinc-400 hover:text-zinc-200 text-xs">Volver</button>
+          </div>
+        </div>
+      )}
+
       {action === 'edit' && (
         <div className="space-y-2">
           <input aria-label="Nombre completo" value={edit.full_name} onChange={e => setEdit({ ...edit, full_name: e.target.value })} className={inputClass} />
@@ -757,15 +833,126 @@ function PaymentReviewRow({ review, onDone }: { review: PaymentReview; onDone: (
   )
 }
 
+// Horarios: cuánta gente hay en cada uno, el cupo vigente (sube solo
+// cuando todos se llenan), el correo para que los inscritos sin horario
+// elijan, y los ajustes del cupo.
+function SlotsPanel({ info, onChanged }: { info: SlotsInfo; onChanged: () => void }) {
+  const [showSettings, setShowSettings] = useState(false)
+  const [base, setBase] = useState(String(info.base))
+  const [step, setStep] = useState(String(info.step))
+  const [busy, setBusy] = useState(false)
+  const [msg, setMsg] = useState<string | null>(null)
+  const [confirmInvite, setConfirmInvite] = useState(false)
+
+  const saveCapacity = async () => {
+    setBusy(true)
+    setMsg(null)
+    const { data, error } = await db.rpc('admin_update_slot_capacity', {
+      p_slug: COMPETITION_SLUG, p_base: Number(base), p_step: Number(step),
+    })
+    setBusy(false)
+    if (error || !data || data.error) { setMsg('Revisa los números: cupo de 1 en adelante y aumento de 0 en adelante.'); return }
+    setShowSettings(false)
+    onChanged()
+  }
+
+  const sendInvites = async () => {
+    setBusy(true)
+    setMsg(null)
+    setConfirmInvite(false)
+    const { data, error } = await supabase.functions.invoke('competition-payments', { body: { action: 'slot_invite' } })
+    setBusy(false)
+    if (error || !data || data.error) {
+      setMsg(data?.error === 'not_configured' ? 'El correo no está configurado.' : 'No se pudieron mandar los correos. Intenta de nuevo.')
+      return
+    }
+    setMsg(`Correos enviados: ${data.sent}` + (data.errors > 0 ? ` · ${data.errors} fallaron (vuelve a presionar para reintentar)` : '') + '.')
+    onChanged()
+  }
+
+  return (
+    <div className="bg-superficie rounded-2xl border border-zinc-800/80 px-4 py-3 mb-4 space-y-3">
+      <div className="flex items-center justify-between gap-3">
+        <div className="min-w-0">
+          <p className="text-texto-principal text-sm font-bold">Horarios</p>
+          <p className="text-zinc-400 text-xs">
+            Cupo de cada horario: {info.capacity}
+            {info.step > 0 ? ` · cuando todos se llenan, sube ${info.step}` : ' · no sube solo'}
+          </p>
+        </div>
+        <button onClick={() => setShowSettings(v => !v)} className={smallBtn}>{showSettings ? 'Cerrar' : 'Cupo'}</button>
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+        {info.slots.map(t => (
+          <div key={t.id} className={`rounded-xl border px-3 py-2 ${t.is_full ? 'border-amarillo-suave/60' : 'border-zinc-700/50'}`}>
+            <p className="text-zinc-300 text-xs font-semibold">{t.label}</p>
+            <p className="text-texto-principal font-black text-xl tabular-nums leading-tight">
+              {t.taken}<span className="text-zinc-400 text-sm font-semibold"> / {info.capacity}</span>
+            </p>
+            {t.is_full && <p className="text-amarillo-suave text-[10px] font-bold">Lleno por ahora</p>}
+          </div>
+        ))}
+      </div>
+
+      {info.unassigned > 0 && (
+        <div className="rounded-xl bg-superficie-alta/60 border border-amarillo-suave/40 px-3 py-2 space-y-2">
+          <p className="text-texto-principal text-xs">
+            <span className="font-bold text-amarillo-suave">{info.unassigned} {info.unassigned === 1 ? 'inscrito' : 'inscritos'} sin horario.</span>
+            {info.invite_pending > 0
+              ? ` A ${info.invite_pending} ${info.invite_pending === 1 ? 'se le puede' : 'se les puede'} mandar un correo con un link para que elijan.`
+              : ' Ya se les mandó el correo (o no tienen correo): asígnalos a mano desde la lista.'}
+          </p>
+          {info.invite_pending > 0 && (confirmInvite ? (
+            <div className="flex items-center gap-3">
+              <button onClick={sendInvites} disabled={busy}
+                className="text-xs font-bold px-4 py-2 rounded-xl bg-primario hover:bg-primario-hover text-texto-en-acento disabled:opacity-50">
+                {busy ? 'Enviando...' : `Sí, mandar ${info.invite_pending} ${info.invite_pending === 1 ? 'correo' : 'correos'}`}
+              </button>
+              <button onClick={() => setConfirmInvite(false)} className="text-zinc-400 hover:text-zinc-200 text-xs">Cancelar</button>
+            </div>
+          ) : (
+            <button onClick={() => setConfirmInvite(true)} disabled={busy} className={smallBtn}>
+              Mandar correo para elegir horario
+            </button>
+          ))}
+        </div>
+      )}
+
+      {showSettings && (
+        <div className="pt-2 border-t border-zinc-800/60 space-y-2">
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <label htmlFor="slot-base" className="block text-zinc-300 text-xs font-bold mb-1">Cupo inicial por horario</label>
+              <input id="slot-base" type="number" min={1} value={base} onChange={e => setBase(e.target.value)} className={inputClass} />
+            </div>
+            <div>
+              <label htmlFor="slot-step" className="block text-zinc-300 text-xs font-bold mb-1">Sube cuando todos se llenan</label>
+              <input id="slot-step" type="number" min={0} value={step} onChange={e => setStep(e.target.value)} className={inputClass} />
+            </div>
+          </div>
+          <p className="text-zinc-400 text-xs">Ej. 15 y 5: los tres horarios aceptan 15; cuando los tres llegan a 15, todos aceptan 20, luego 25… Con 0 nunca sube.</p>
+          <button onClick={saveCapacity} disabled={busy}
+            className="text-xs font-bold px-4 py-2 rounded-xl bg-primario hover:bg-primario-hover text-texto-en-acento disabled:opacity-50">
+            {busy ? '...' : 'Guardar cupo'}
+          </button>
+        </div>
+      )}
+
+      {msg && <p role="status" className="text-zinc-200 text-xs">{msg}</p>}
+    </div>
+  )
+}
+
 // Inscripción de mostrador: alguien llega al gym y paga en efectivo (u otro
 // medio fuera de la app). Queda PAGADA de inmediato. Correo y celular son
 // opcionales; a estas inscripciones no se les manda correo de confirmación.
-function ManualRegistrationForm({ categories, onDone }: { categories: AdminCategory[]; onDone: () => void }) {
-  const empty = { full_name: '', birth_date: '', category_id: '', shirt_size: '' as ShirtSize | '', method: 'cash', phone: '', email: '', note: '' }
+function ManualRegistrationForm({ categories, slots, onDone }: { categories: AdminCategory[]; slots: AdminSlot[]; onDone: () => void }) {
+  const empty = { full_name: '', birth_date: '', category_id: '', time_slot_id: '', shirt_size: '' as ShirtSize | '', method: 'cash', phone: '', email: '', note: '' }
   const [form, setForm] = useState(empty)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [done, setDone] = useState<{ folio: string; full_name: string; category_name: string; is_minor: boolean } | null>(null)
+  const [done, setDone] = useState<{ folio: string; full_name: string; category_name: string; is_minor: boolean; slot_label?: string; slot_error?: boolean } | null>(null)
 
   const set = (patch: Partial<typeof empty>) => { setForm(f => ({ ...f, ...patch })); setError(null) }
 
@@ -793,7 +980,17 @@ function ManualRegistrationForm({ categories, onDone }: { categories: AdminCateg
       setError(ACTION_ERRORS[data?.error] ?? 'No se pudo inscribir. Intenta de nuevo.')
       return
     }
-    setDone(data)
+    // El horario se guarda aparte (el staff puede pasarse del cupo).
+    let slotInfo: { slot_label?: string; slot_error?: boolean } = {}
+    if (form.time_slot_id) {
+      const res = await db.rpc('admin_set_registration_slot', {
+        p_folio: data.folio, p_time_slot_id: form.time_slot_id, p_reason: 'Inscripción en el gym',
+      })
+      slotInfo = res.error || !res.data || res.data.error
+        ? { slot_error: true }
+        : { slot_label: slots.find(t => t.id === form.time_slot_id)?.label }
+    }
+    setDone({ ...data, ...slotInfo })
     setForm(empty)
     onDone()
   }
@@ -811,6 +1008,8 @@ function ManualRegistrationForm({ categories, onDone }: { categories: AdminCateg
         <p role="status" className="rounded-xl bg-superficie-alta border border-exito/50 px-3 py-2 text-texto-principal text-sm">
           Inscrito: <span className="font-bold">{done.full_name}</span> · {done.category_name} · folio{' '}
           <span className="font-mono font-black text-primario">{done.folio}</span>
+          {done.slot_label && <span className="block text-xs mt-1">Horario: <span className="font-bold">{done.slot_label}</span></span>}
+          {done.slot_error && <span className="block text-alerta text-xs font-semibold mt-1">No se pudo guardar el horario: asígnalo desde la lista.</span>}
           {done.is_minor && <span className="block text-amarillo-suave text-xs font-semibold mt-1">Es menor: debe firmar un mayor de edad.</span>}
         </p>
       )}
@@ -831,6 +1030,15 @@ function ManualRegistrationForm({ categories, onDone }: { categories: AdminCateg
             {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
           </select>
         </div>
+        {slots.length > 0 && (
+          <div>
+            <label htmlFor="man-slot" className={fieldLabel}>Horario</label>
+            <select id="man-slot" value={form.time_slot_id} onChange={e => set({ time_slot_id: e.target.value })} className={inputClass}>
+              <option value="">Sin horario por ahora</option>
+              {slots.map(t => <option key={t.id} value={t.id}>{t.label} · {t.taken} {t.taken === 1 ? 'inscrito' : 'inscritos'}{t.is_full ? ' (lleno)' : ''}</option>)}
+            </select>
+          </div>
+        )}
         <div className="grid grid-cols-2 gap-3">
           <div>
             <label htmlFor="man-size" className={fieldLabel}>Talla</label>

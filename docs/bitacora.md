@@ -990,3 +990,42 @@ permitiendo al staff lo de antes.
     siguiente número.
   - Jueces: el admin les da una palabra (ej. TIBURON) desde antes. No
     importan mayúsculas, espacios ni acentos.
+
+## 2026-11-03 — Competencia: horarios que mezclan categorías
+- Cambio del dueño: ya no hay horarios por categoría. Tres bloques de 2 h
+  con categorías mezcladas: 10:00–12:00, 12:30–2:30 y 3:00–5:00.
+  Clausura y premiación 5:30–6:00.
+- Decisiones del dueño:
+  - Cupo de 15 por bloque. Cuando los tres se llenan, todos suben 5 solos
+    (15 → 20 → 25…). Se cambia en el panel (Horarios → Cupo).
+  - Los que ya estaban inscritos reciben un correo con un link para elegir.
+  - Ya elegido, solo el staff lo cambia.
+- `src/supabase/competencia_horarios.sql`:
+  - Tabla `competition_time_slots` con los tres bloques.
+  - `time_slot_id` y `slot_invite_sent_at` en las inscripciones.
+  - `slot_capacity` y `slot_capacity_step` en la competencia.
+  - Las RPC nuevas envuelven a las viejas en la misma transacción y no
+    las modifican: `register_for_competition_slot`,
+    `competition_register_courtesy_slot`, `competition_choose_slot`,
+    `get_registration_slot` y `admin_set_registration_slot` (el staff
+    puede pasarse del cupo; queda avisado).
+  - Si un bloque está lleno no se crea nada y el código de cortesía no se
+    gasta.
+- Edge Function `competition-payments`:
+  - Acción `slot_invite` (solo admin): correo "Elige tu horario". Cada
+    inscripción se marca al enviarse, así un doble clic no repite correos.
+  - Las cortesías reciben `time_slot_id`.
+  - El correo de confirmación muestra el horario; si no tiene, invita a
+    elegirlo.
+  - Los links del correo ya llevan folio y correo (`?folio=&email=`).
+- Pantallas:
+  - /competencia: elegir horario en el formulario (los llenos salen como
+    "lleno").
+  - /competencia/consulta: tarjeta para elegir horario si no tiene.
+  - Panel: bloques con su ocupación, filtro por horario, columna en el CSV,
+    botón "Horario" en cada inscripción y en la inscripción manual.
+  - Sin el SQL corrido, todo funciona como antes.
+- Pruebas: 32 con PGlite (cupo que sube, vencidos liberan lugar, cortesía,
+  staff sobre cupo, invitaciones sin repetir). También se probó en el
+  navegador con un Supabase falso: inscribir, elegir desde el link y
+  asignar en el panel.

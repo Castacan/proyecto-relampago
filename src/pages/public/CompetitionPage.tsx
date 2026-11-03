@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import { fmtDateOnly } from '../../lib/dates'
 import {
-  COMPETITION_SLUG, CATEGORY_NOTICE, isUnlimitedCapacity, LAST_REGISTRATION_KEY, SHIRT_SIZES, SPOTS_NOTICE_THRESHOLD, MINOR_NOTICE, REGISTER_ERRORS, formatPrice, formatDeadline,
+  COMPETITION_SLUG, CATEGORY_NOTICE, fetchTimeSlots, type TimeSlot, isUnlimitedCapacity, LAST_REGISTRATION_KEY, SHIRT_SIZES, SPOTS_NOTICE_THRESHOLD, MINOR_NOTICE, REGISTER_ERRORS, formatPrice, formatDeadline,
   type PublicCompetition, type RegistrationResult, type ShirtSize,
 } from '../../lib/competition'
 import CompetitionPayButton from '../../components/CompetitionPayButton'
@@ -36,6 +36,10 @@ export default function CompetitionPage() {
   const [emailConfirm, setEmailConfirm] = useState('')
   const [phone, setPhone] = useState('')
   const [categoryId, setCategoryId] = useState('')
+  // Horarios: si el SQL de horarios aún no está, la lista llega vacía y el
+  // formulario funciona como antes (sin horario).
+  const [slots, setSlots] = useState<TimeSlot[]>([])
+  const [slotId, setSlotId] = useState('')
   const [shirtSize, setShirtSize] = useState<ShirtSize | ''>('')
   const [acceptPrivacy, setAcceptPrivacy] = useState(false)
   const [acceptWaiver, setAcceptWaiver] = useState(false)
@@ -50,6 +54,11 @@ export default function CompetitionPage() {
         if (error || !data || data.error) { setLoadError(true); return }
         setComp(data)
       })
+    fetchTimeSlots().then(list => {
+      setSlots(list)
+      // Si el horario elegido se llenó mientras llenaba el formulario.
+      setSlotId(cur => (list.some(t => t.id === cur && !t.is_full) ? cur : ''))
+    })
   }
 
   useEffect(loadCompetition, [])
@@ -83,6 +92,7 @@ export default function CompetitionPage() {
     if (emailNorm !== emailConfirm.trim().toLowerCase()) return 'Los dos correos no coinciden.'
     if (phoneDigits.length !== 10) return 'El celular debe tener 10 dígitos.'
     if (!categoryId) return 'Elige una categoría.'
+    if (slots.length > 0 && !slotId) return 'Elige tu horario.'
     if (!shirtSize) return 'Elige una talla de playera.'
     if (!acceptPrivacy) return 'Debes aceptar el aviso de privacidad.'
     if (comp.waiver_text && !acceptWaiver) return 'Debes aceptar las reglas y el deslinde de responsabilidad.'
@@ -104,9 +114,10 @@ export default function CompetitionPage() {
             action: 'courtesy', code, slug: COMPETITION_SLUG, full_name: fullName, birth_date: birthDate,
             email: emailNorm, phone: phoneDigits, category_id: categoryId, shirt_size: shirtSize,
             accept_privacy: acceptPrivacy, accept_waiver: acceptWaiver,
+            ...(slotId ? { time_slot_id: slotId } : {}),
           },
         })
-      : await db.rpc('register_for_competition', {
+      : await db.rpc(slotId ? 'register_for_competition_slot' : 'register_for_competition', {
           p_slug: COMPETITION_SLUG,
           p_full_name: fullName,
           p_birth_date: birthDate,
@@ -116,13 +127,14 @@ export default function CompetitionPage() {
           p_shirt_size: shirtSize,
           p_accept_privacy: acceptPrivacy,
           p_accept_waiver: acceptWaiver,
+          ...(slotId ? { p_time_slot_id: slotId } : {}),
         })
     setSubmitting(false)
     if (error || !data) { setFormError('No se pudo completar la inscripción. Intenta de nuevo.'); return }
     if (data.error) {
       setFormError(REGISTER_ERRORS[data.error] ?? 'No se pudo completar la inscripción. Intenta de nuevo.')
       // El cupo o el estado pudo cambiar mientras llenaba el formulario.
-      if (['closed', 'full', 'category_full'].includes(data.error)) loadCompetition()
+      if (['closed', 'full', 'category_full', 'slot_full', 'invalid_slot'].includes(data.error)) loadCompetition()
       return
     }
     try {
@@ -245,6 +257,33 @@ export default function CompetitionPage() {
                   </div>
                 </fieldset>
 
+                {slots.length > 0 && (
+                  <fieldset>
+                    <legend className={labelClass}>Tu horario para competir</legend>
+                    <p className="text-zinc-300 text-xs leading-relaxed mb-2.5">
+                      Cada horario dura 2 horas y mezcla todas las categorías. La premiación es para todos a las 5:30 pm.
+                    </p>
+                    <div className="space-y-2">
+                      {slots.map(t => {
+                        const selected = slotId === t.id
+                        return (
+                          <label key={t.id}
+                            className={`flex items-center gap-3 p-3.5 rounded-xl border transition-all ${
+                              t.is_full ? 'opacity-50 border-zinc-800/60 bg-superficie'
+                                : selected ? 'border-primario bg-superficie-alta cursor-pointer'
+                                : 'border-zinc-700/50 bg-superficie hover:bg-superficie-alta cursor-pointer'}`}>
+                            <input type="radio" name="slot" value={t.id} checked={selected} disabled={t.is_full}
+                              onChange={() => setSlotId(t.id)} className="accent-primario" />
+                            <span className="text-texto-principal text-sm font-bold">
+                              {t.label}{t.is_full && ' · lleno'}
+                            </span>
+                          </label>
+                        )
+                      })}
+                    </div>
+                  </fieldset>
+                )}
+
                 <fieldset>
                   <legend className={labelClass}>Talla de playera</legend>
                   <div className="grid grid-cols-4 gap-2">
@@ -337,6 +376,9 @@ function RegistrationDone({ result, email, unlimited }: { result: RegistrationRe
         <p className="text-zinc-300 text-sm mt-1">
           {result.full_name} · {result.category_name} · talla {result.shirt_size}
         </p>
+        {result.time_slot_label && (
+          <p className="text-texto-principal text-sm font-bold mt-1">Horario: {result.time_slot_label}</p>
+        )}
       </div>
 
       <div className="bg-superficie rounded-2xl border border-primario/30 p-5 text-center">
@@ -381,6 +423,9 @@ function CourtesyDone({ result, email }: { result: RegistrationResult; email: st
         <p className="text-zinc-300 text-sm mt-1">
           {result.full_name} · {result.category_name} · talla {result.shirt_size}
         </p>
+        {result.time_slot_label && (
+          <p className="text-texto-principal text-sm font-bold mt-1">Horario: {result.time_slot_label}</p>
+        )}
       </div>
 
       <div className="bg-superficie rounded-2xl border border-primario/30 p-5 text-center">

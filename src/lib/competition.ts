@@ -68,6 +68,39 @@ export interface RegistrationResult {
   payment_instructions: string | null
   is_minor: boolean
   courtesy?: boolean        // inscrita con código de cortesía: ya confirmada, sin pago
+  time_slot_label?: string  // horario elegido (competencia_horarios.sql)
+}
+
+// ---- Horarios (bloques que mezclan categorías) ----
+// src/supabase/competencia_horarios.sql. El cupo de cada bloque sube solo
+// cuando todos se llenan; la persona elige una vez y después solo staff
+// lo cambia.
+export interface TimeSlot {
+  id: string
+  label: string
+  is_full: boolean
+}
+
+export interface RegistrationSlot {
+  time_slot_id: string | null
+  time_slot_label?: string
+  can_choose?: boolean
+  slots?: TimeSlot[]
+}
+
+export const SLOT_ERRORS: Record<string, string> = {
+  invalid_slot: 'Elige un horario.',
+  slot_full: 'Ese horario se acaba de llenar. Elige otro.',
+  already_chosen: 'Ya tienes un horario. Si necesitas cambiarlo, escríbenos.',
+  not_active: 'Esta inscripción ya no está activa.',
+  not_found: 'No encontramos tu inscripción.',
+}
+
+export async function fetchTimeSlots(): Promise<TimeSlot[]> {
+  const { data, error } = await (supabase as unknown as { rpc: (f: string, a: object) => Promise<{ data: { slots?: TimeSlot[] } | null; error: unknown }> })
+    .rpc('get_competition_slots_public', { p_slug: COMPETITION_SLUG })
+  if (error || !data?.slots) return []
+  return data.slots
 }
 
 export interface RegistrationLookup {
@@ -124,6 +157,8 @@ export const REGISTER_ERRORS: Record<string, string> = {
   too_many_pending: 'Ya hay varias inscripciones pendientes de pago con este correo. Paga alguna antes de crear otra.',
   invalid_code: 'Ese código promocional no es válido. Revísalo o déjalo vacío para pagar.',
   code_used_up: 'Ese código promocional ya se usó.',
+  invalid_slot: 'Elige un horario.',
+  slot_full: 'Ese horario se acaba de llenar. Elige otro.',
 }
 
 export const STATUS_LABELS: Record<RegistrationStatus, string> = {
