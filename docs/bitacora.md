@@ -1029,3 +1029,10 @@ permitiendo al staff lo de antes.
   staff sobre cupo, invitaciones sin repetir). También se probó en el
   navegador con un Supabase falso: inscribir, elegir desde el link y
   asignar en el panel.
+- 2026-11-03 (tarde): el dueño corrió el SQL y desplegó la función. Se
+  mandaron 31 correos "Elige tu horario" desde el panel, sin errores. El
+  contador del panel decía 35 porque contaba pendientes vencidos (a ellos
+  no se les manda). Ya está corregido en `competencia_horarios.sql`; solo
+  cambia el número que se muestra y entra en el siguiente Run.
+- Revisión en producción: de los SQL desde el 23-oct solo faltaba
+  `competencia_jueces.sql`. Quedó pegado para Run.

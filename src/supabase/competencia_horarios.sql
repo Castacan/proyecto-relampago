@@ -313,7 +313,8 @@ BEGIN
     'invite_pending', (SELECT count(*) FROM competition_registrations r
                        WHERE r.competition_id = v_comp.id AND r.time_slot_id IS NULL
                          AND r.email IS NOT NULL AND r.slot_invite_sent_at IS NULL
-                         AND r.status IN ('paid','needs_attention','pending_payment'))
+                         AND (r.status IN ('paid','needs_attention')
+                              OR (r.status = 'pending_payment' AND r.hold_expires_at > now())))
   );
 END;
 $function$;
