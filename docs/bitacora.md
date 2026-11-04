@@ -1043,3 +1043,10 @@ permitiendo al staff lo de antes.
 - Los números están en `src/lib/competitionDisplay.ts`. **Ahora son de ejemplo** (aleatorios 1–30); el viernes el dueño da los reales y se cambian ahí (solo push, sin SQL).
 - El 8 de noviembre a las 00:00 la TV regresa sola al leaderboard. Después se puede borrar el archivo y su uso.
 - Verificado: `competencia_jueces.sql` ya está corrido en producción (`jueces_corrido = true`, 28 con número).
+
+## 2026-11-04 — Competencia: inscritos por categoría en el panel
+
+- /staff/competencia tiene, debajo de los contadores, un cuadro "Por categoría": una tarjeta por categoría con los inscritos (pagados + pendientes con lugar + por atender) y el desglose.
+- Tocar una tarjeta filtra la lista por esa categoría; tocarla otra vez quita el filtro.
+- Si la categoría tiene cupo propio, se muestra "N / cupo".
+- Solo frontend; sin SQL.

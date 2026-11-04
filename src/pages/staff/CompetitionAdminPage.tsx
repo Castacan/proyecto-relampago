@@ -297,6 +297,14 @@ export default function CompetitionAdminPage() {
     }
   }, [regs])
 
+  // Inscritos por categoría: los que ocupan lugar (pagados, pendientes vigentes y por atender).
+  const byCategory = useMemo(() => categories.map(c => {
+    const mine = regs.filter(r => r.category_id === c.id)
+    const n = (s: RegistrationStatus) => mine.filter(r => displayStatus(r) === s).length
+    const paid = n('paid'), pending = n('pending_payment'), attention = n('needs_attention')
+    return { id: c.id, name: c.name, capacity: c.capacity, paid, pending, attention, taken: paid + pending + attention }
+  }), [categories, regs])
+
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase()
     return regs.filter(r => {
@@ -392,6 +400,35 @@ export default function CompetitionAdminPage() {
             {comp.capacity_total >= UNLIMITED_CAPACITY
               ? <Counter label="Lugares ocupados" value={counts.taken} sub="sin límite de cupo" />
               : <Counter label="Cupo libre" value={Math.max(comp.capacity_total - counts.taken, 0)} sub={`de ${comp.capacity_total}`} />}
+          </div>
+
+          <div className="bg-superficie rounded-2xl border border-zinc-800/80 px-4 py-3 mb-3">
+            <div className="flex items-baseline justify-between gap-3 mb-2">
+              <p className="text-texto-principal text-sm font-bold">Por categoría</p>
+              <p className="text-zinc-400 text-[11px]">Inscritos = pagados + pendientes con lugar · toca una para filtrar</p>
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+              {byCategory.map(c => {
+                const active = categoryFilter === c.id
+                return (
+                  <button key={c.id} type="button"
+                    onClick={() => { setCategoryFilter(active ? 'all' : c.id); setOpenId(null) }}
+                    aria-pressed={active}
+                    className={`text-left rounded-xl border px-3 py-2 transition-all ${active ? 'border-primario bg-primario/10' : 'border-zinc-800 bg-superficie-alta/60 hover:border-zinc-600'}`}>
+                    <p className="text-zinc-300 text-xs font-semibold truncate">{c.name}</p>
+                    <p className="font-black text-2xl leading-tight tabular-nums text-texto-principal">
+                      {c.taken}
+                      {c.capacity != null && c.capacity < UNLIMITED_CAPACITY && <span className="text-zinc-500 text-sm font-bold"> / {c.capacity}</span>}
+                    </p>
+                    <p className="text-zinc-400 text-[10px] truncate">
+                      {c.paid} {c.paid === 1 ? 'pagado' : 'pagados'}
+                      {c.pending > 0 && ` · ${c.pending} ${c.pending === 1 ? 'pendiente' : 'pendientes'}`}
+                      {c.attention > 0 && ` · ${c.attention} por atender`}
+                    </p>
+                  </button>
+                )
+              })}
+            </div>
           </div>
 
           <div className="bg-superficie rounded-2xl border border-zinc-800/80 px-4 py-3 mb-3 flex flex-wrap items-center gap-x-5 gap-y-1 text-xs">
