@@ -1060,3 +1060,15 @@ permitiendo al staff lo de antes.
   - Un premio por persona: índice único sobre el ganador.
 - Pantalla `/staff/competencia/rifa` con pantalla completa para anunciar al ganador.
 - SQL pegado en el SQL Editor junto con el arreglo del contador `invite_pending` (0990eb4). Falta el Run del dueño.
+
+## 2026-11-04 — Competencia: nuevas reglas de puntuación (acordadas, sin programar)
+
+- La logística cambió: 3 horarios de 20 personas, 24 bloques para todos y la categoría final se decide por resultados.
+- Reglas acordadas en `docs/competencia-reglas.md`:
+  - Valor del bloque de 1 a 24; zona = mitad.
+  - Cuentan los 5 bloques que más puntos den; −0.01 por intento.
+  - Top cerrado.
+  - Se sube o se baja según el top más difícil.
+  - Desempates.
+  - Todas las zonas dan boleto para la rifa.
+- Pendiente: visto bueno del armador y programarlo.
