@@ -369,6 +369,7 @@ export default function CompetitionAdminPage() {
         </div>
         <div className="flex gap-2 shrink-0">
           <Link to="/staff/competencia/puntos" className={smallBtn}>Puntos y jueces</Link>
+          <Link to="/staff/competencia/rifa" className={smallBtn}>Rifa</Link>
           <button onClick={() => setShowCourtesy(v => !v)} className={smallBtn}>
             {showCourtesy ? 'Cerrar' : 'Cortesías'}
           </button>

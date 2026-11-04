@@ -26,9 +26,21 @@ Pedido del dueño (2026-11-04):
 
 Total: 13 premios. Cada magnesia, clase y sudadera se rifa por separado.
 
-## Por definir con el dueño
+## Decisiones del dueño (2026-11-04)
 
-- ¿Un top también cuenta como zona? (Para llegar al top se pasa por la zona.)
-- ¿En qué orden se rifan los premios? Por ejemplo, de menor a mayor, para dejar el hangboard al final.
-- ¿Hay que estar presente para ganar? Si el ganador no está, ¿se saca otro boleto?
-- ¿El staff y los jueces quedan fuera de la rifa?
+- El top cuenta como zona: 1 boleto por cada ruta en la que llegó a zona o a top.
+- El hangboard va al final. El resto lo ordené de menor a mayor; se puede cambiar en "Editar premios".
+- No hay que estar presente para ganar.
+- El staff no participa: se saca con "Sacar de la rifa".
+
+## Cómo funciona (programado)
+
+- Pantalla: /staff/competencia/rifa (solo admin). También hay botón "Rifa" en Inscripciones y link en Puntos.
+- Base de datos: `src/supabase/competencia_rifa.sql`.
+- Boletos: los mismos intentos que cuentan para el ranking (no anulados, de su categoría y de sus rutas).
+- Participan solo los pagados, incluidas las cortesías.
+- "Sortear": el servidor elige al azar entre todos los boletos (cada boleto pesa igual). Quien gana sale de la tómbola.
+- Se abre una pantalla completa para anunciar: los nombres pasan rápido y se detienen en el ganador. Se puede proyectar.
+- "Deshacer" regresa a la persona a la tómbola, pide un motivo y queda en la bitácora.
+- "Editar premios": agregar, renombrar, cambiar el orden y quitar los que no se han sorteado.
+- Probado con PGlite (22 comprobaciones; también el peso por boletos con 400 sorteos) y la pantalla con datos falsos.

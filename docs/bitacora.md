@@ -1050,3 +1050,13 @@ permitiendo al staff lo de antes.
 - Tocar una tarjeta filtra la lista por esa categoría; tocarla otra vez quita el filtro.
 - Si la categoría tiene cupo propio, se muestra "N / cupo".
 - Solo frontend; sin SQL.
+
+## 2026-11-04 — Competencia: rifa de premios
+
+- Reglas y lista de premios: `docs/competencia-rifa.md`.
+- `src/supabase/competencia_rifa.sql`:
+  - Tabla `competition_raffle_prizes` (13 premios sembrados) y columna `raffle_excluded`.
+  - Funciones: boletos, tómbola, panel, sortear, deshacer, editar premios y excluir.
+  - Un premio por persona: índice único sobre el ganador.
+- Pantalla `/staff/competencia/rifa` con pantalla completa para anunciar al ganador.
+- SQL pegado en el SQL Editor junto con el arreglo del contador `invite_pending` (0990eb4). Falta el Run del dueño.

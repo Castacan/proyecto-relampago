@@ -74,6 +74,7 @@ export default function CompetitionScoringPage() {
           <h1 className="text-texto-principal font-black text-2xl tracking-tight">Puntos de la competencia</h1>
           <p className="text-zinc-400 text-xs truncate">
             {data?.competition.name ?? ''} · <Link to="/staff/competencia" className="text-primario font-bold">Inscripciones</Link>
+            {' · '}<Link to="/staff/competencia/rifa" className="text-primario font-bold">Rifa</Link>
           </p>
         </div>
         <button onClick={fetchAll} className={smallBtn}>Actualizar</button>
