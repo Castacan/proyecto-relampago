@@ -1,12 +1,14 @@
 # Reglas de puntuación — JAM (7 de noviembre de 2026)
 
-Acordadas con el dueño el 2026-11-04. Reemplazan la idea del armador (10 por top, 5 por zona). Con esa idea, flashear los 5 bloques más fáciles valía lo mismo que los 5 más difíciles. **Todavía no están programadas.**
+Acordadas con el dueño el 2026-11-04. Reemplazan la idea del armador (10 por top, 5 por zona). Con esa idea, flashear los 5 bloques más fáciles valía lo mismo que los 5 más difíciles.
+
+**Programadas el 2026-11-04** en `src/supabase/competencia_bloques.sql`. Falta el Run en Supabase.
 
 ## Logística
 
 - 3 horarios de 2 h, máximo 20 personas por horario, todas las categorías revueltas.
 - 24 bloques numerados. Cada quien intenta los que quiera.
-- Solo el staff sabe qué tan difícil es cada bloque y a qué categoría pertenece. Supuesto: 1–8 básico, 9–16 intermedio, 17–24 avanzado (por confirmar).
+- Solo el staff sabe qué tan difícil es cada bloque y a qué categoría pertenece. Los números físicos se reparten revueltos para que nadie adivine el orden.
 - La categoría en la que se inscribieron no importa: el staff decide la categoría final según los resultados.
 
 ## Puntos
@@ -31,8 +33,9 @@ Acordadas con el dueño el 2026-11-04. Reemplazan la idea del armador (10 por to
   - Top en algún bloque intermedio → intermedio.
   - Solo tops de básico → básico.
 - Se puede subir y también bajar.
-- Femenil y varonil siguen separados (supuesto, por confirmar).
-- Por definir: categoría de quien no hizo ningún top (solo zonas o nada).
+- Femenil y varonil siguen separados (confirmado).
+- Sin ningún top (solo zonas o nada) → básico (confirmado).
+- El admin puede fijar el nivel de alguien a mano, con motivo.
 
 ## Desempate
 
@@ -45,15 +48,25 @@ Acordadas con el dueño el 2026-11-04. Reemplazan la idea del armador (10 por to
 ## Rifa
 
 - **Todas** las zonas cuentan para la rifa, en cualquier bloque y de cualquier categoría. Es 1 boleto por bloque con zona o top.
-- Hoy el SQL de la rifa solo cuenta los bloques de su categoría, así que hay que cambiarlo.
+- Ya programado: en modo bloques la rifa cuenta las zonas de todos los bloques.
 
-## Qué hay que cambiar en el sistema (cuando se programe)
+## Cómo se usa (programado)
 
-- `judge_record_attempt`:
-  - Aceptar cualquier bloque del 1 al 24 (hoy rechaza los que no son de su categoría).
-  - Rechazar intentos en un bloque que ya tiene top (`already_topped`), con aviso en la pantalla del juez.
-- Asignar dificultad y nivel a cada bloque (1–24), solo visible para el staff.
-- Ranking nuevo con las reglas de arriba y la categoría final calculada.
-- Rifa: contar zonas de todos los bloques.
-- TV (`src/lib/competitionDisplay.ts`): ya no puede mostrar los bloques por categoría porque es secreto. Falta decidir qué muestra.
-- Cupo: 20 fijos por horario (hoy es 15 y sube de 5 en 5).
+- **Puntos → Bloques** (/staff/competencia/puntos): escribir los números de bloque del más fácil al más difícil, separados por comas, y los cortes de nivel (por defecto básico 1–8 e intermedio hasta 16). El valor de cada bloque es su lugar en la lista.
+  - Se puede corregir en cualquier momento, también al final, y el ranking se recalcula solo.
+  - "Quitar bloques" regresa al modo anterior (rutas por categoría).
+- Mientras no haya bloques guardados, todo funciona como antes.
+- **Juez** (/juez):
+  - Ve los bloques por número, sin puntos ni nivel, porque el competidor podría ver la pantalla.
+  - Los bloques con top salen en verde y bloqueados.
+  - Si intenta capturar uno con top, el sistema le avisa y no lo guarda.
+  - Tampoco acepta números que no son bloque.
+- **Ranking**:
+  - Muestra a cada quien en su categoría final (género + nivel) con su bloque más difícil.
+  - Hay un cuadro "Compiten en otra categoría".
+  - En el detalle se ve el valor de cada bloque; los que no suman salen transparentes.
+  - Ahí mismo se puede fijar el nivel a mano.
+- **Ajustes**: bloques que cuentan (5), zona = valor × 0.5 y resta por intento (0.01).
+- **TV** (hasta el 7-nov): 24 bloques, horarios y "cómo se juega". Ya no muestra rutas por categoría.
+- **Cupo**: sin cambios; se va ajustando desde el panel.
+- **Pruebas**: PGlite con 31 comprobaciones (puntos, desempates, subir/bajar, juez, rifa, corregir el orden). Las pantallas se probaron con datos falsos.

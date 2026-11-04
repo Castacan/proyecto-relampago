@@ -37,7 +37,7 @@ Total: 13 premios. Cada magnesia, clase y sudadera se rifa por separado.
 
 - Pantalla: /staff/competencia/rifa (solo admin). También hay botón "Rifa" en Inscripciones y link en Puntos.
 - Base de datos: `src/supabase/competencia_rifa.sql`.
-- Boletos: los mismos intentos que cuentan para el ranking (no anulados, de su categoría y de sus rutas).
+- Boletos: 1 por bloque con zona o top. Con las reglas por bloques (2026-11-04) cuentan las zonas de **todos** los bloques, de cualquier nivel.
 - Participan solo los pagados, incluidas las cortesías.
 - "Sortear": el servidor elige al azar entre todos los boletos (cada boleto pesa igual). Quien gana sale de la tómbola.
 - Se abre una pantalla completa para anunciar: los nombres pasan rápido y se detienen en el ganador. Se puede proyectar.

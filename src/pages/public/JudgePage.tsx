@@ -152,6 +152,12 @@ function JudgeConsole({ code, onInvalid }: { code: string; onInvalid: () => void
       setConfirm({ pending: { ...p, force: true }, message: `La ruta ${p.route} no es de ${card?.category_name ?? 'su categoría'}. Si la guardas, NO le cuenta puntos.` })
       return
     }
+    if (data.error === 'already_topped_final') {
+      if (data.card) setCard(data.card)
+      setRoute(null); setOtherRoute('')
+      setError(`El #${p.bib} ya sacó el bloque ${p.route}. No puede volver a intentarlo.`)
+      return
+    }
     if (data.error === 'already_topped') {
       setConfirm({ pending: { ...p, force: true }, message: `El #${p.bib} ya tiene top en la ruta ${p.route}. ¿Guardar otro intento de todos modos?` })
       return
@@ -180,6 +186,8 @@ function JudgeConsole({ code, onInvalid }: { code: string; onInvalid: () => void
 
   const byRoute = new Map(card?.routes.map(r => [r.route_number, r]) ?? [])
   const routeChoices = card ? (card.route_numbers.length > 0 ? card.route_numbers : [...byRoute.keys()]) : []
+  const blocks = !!card?.blocks_mode
+  const word = blocks ? 'bloque' : 'ruta'
 
   return (
     <div className="space-y-4">
@@ -217,18 +225,20 @@ function JudgeConsole({ code, onInvalid }: { code: string; onInvalid: () => void
               <p className="text-texto-principal font-black text-xl leading-tight">#{card.bib} {card.full_name}</p>
               <p className="text-zinc-300 text-sm">{card.category_name}</p>
             </div>
-            <p className="text-primario font-black text-lg tabular-nums shrink-0">{fmtPoints(card.points)} pts</p>
+            {card.points != null && <p className="text-primario font-black text-lg tabular-nums shrink-0">{fmtPoints(card.points)} pts</p>}
           </div>
 
           {/* 2. Ruta */}
           <div>
-            <p className="text-zinc-400 text-xs font-semibold mb-2">¿Qué ruta va a intentar?</p>
-            <div className="grid grid-cols-5 gap-2">
+            <p className="text-zinc-400 text-xs font-semibold mb-2">¿Qué {word} va a intentar?</p>
+            <div className={`grid gap-2 ${blocks ? 'grid-cols-6' : 'grid-cols-5'}`}>
               {routeChoices.map(n => {
                 const r = byRoute.get(n)
                 const selected = route === n
+                // Modo bloques: con top ya no se puede intentar otra vez.
+                const locked = blocks && !!r?.topped
                 return (
-                  <button key={n} onClick={() => { setRoute(n); setOtherRoute('') }}
+                  <button key={n} disabled={locked} onClick={() => { setRoute(n); setOtherRoute(''); setError(null) }}
                     className={`rounded-xl py-2 border text-center transition-all ${selected
                       ? 'bg-primario border-primario text-texto-en-acento'
                       : r?.topped ? 'bg-exito/15 border-exito/40 text-exito'
@@ -242,8 +252,9 @@ function JudgeConsole({ code, onInvalid }: { code: string; onInvalid: () => void
                 )
               })}
             </div>
+            {blocks && <p className="text-zinc-500 text-[11px] mt-2">En verde: ya los sacó (no se pueden volver a intentar).</p>}
             <div className="flex items-center gap-2 mt-2">
-              <span className="text-zinc-400 text-xs">Otra ruta:</span>
+              <span className="text-zinc-400 text-xs">Otr{blocks ? 'o bloque' : 'a ruta'}:</span>
               <input value={otherRoute} inputMode="numeric"
                 onChange={e => { const v = e.target.value.replace(/\D/g, ''); setOtherRoute(v); setRoute(v ? Number(v) : null) }}
                 className="w-20 bg-superficie-alta border border-zinc-700/50 rounded-lg px-2 py-1 text-texto-principal text-sm font-bold text-center" />
@@ -253,7 +264,7 @@ function JudgeConsole({ code, onInvalid }: { code: string; onInvalid: () => void
           {/* 3. Resultado */}
           {route != null && (
             <div className="space-y-2">
-              <p className="text-zinc-300 text-sm">Ruta <span className="font-black text-texto-principal">{route}</span>
+              <p className="text-zinc-300 text-sm">{blocks ? 'Bloque' : 'Ruta'} <span className="font-black text-texto-principal">{route}</span>
                 {byRoute.get(route) && ` · lleva ${byRoute.get(route)!.attempts} ${byRoute.get(route)!.attempts === 1 ? 'intento' : 'intentos'}`}</p>
               {confirm ? (
                 <div className="bg-atencion/15 border border-atencion/50 rounded-xl p-3 space-y-2">

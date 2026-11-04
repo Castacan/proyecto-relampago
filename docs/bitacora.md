@@ -1072,3 +1072,22 @@ permitiendo al staff lo de antes.
   - Desempates.
   - Todas las zonas dan boleto para la rifa.
 - Pendiente: visto bueno del armador y programarlo.
+
+## 2026-11-04 — Competencia: reglas por bloques programadas
+
+- Archivo `src/supabase/competencia_bloques.sql`, que se corre después de jueces y rifa:
+  - Tabla `competition_blocks` y columnas `count_best`, `zone_ratio` y `level_override`.
+  - Vuelve a escribir `competition_route_results` y `competition_ranking`; el modo anterior se queda igual si no hay bloques.
+  - `judge_record_attempt`: con un bloque que ya tiene top da `already_topped_final`, y un número que no es bloque da `not_a_block`.
+  - Funciones nuevas: `admin_set_blocks` y `admin_set_level_override`.
+  - La tarjeta del juez ya no muestra puntos.
+  - La rifa cuenta todas las zonas.
+- Pantallas:
+  - Pestaña "Bloques" en Puntos (editor del orden de dificultad).
+  - Ranking con categoría final, nivel a mano y desempates nuevos.
+  - Ajustes de bloques.
+  - El juez ve 24 bloques y los que ya tienen top quedan bloqueados.
+- TV: ya no muestra rutas por categoría (son secretas). Ahora muestra 24 bloques, horarios y cómo se juega.
+- Probado: PGlite (31 OK, la rifa sigue OK) y las pantallas con un servidor falso.
+- El SQL quedó pegado en la misma pestaña del SQL Editor que la rifa. Falta el Run del dueño. Resultado esperado: `premios_rifa = 13` y `bloques_listo = 1`.
+- El día de la competencia, el admin escribe el orden de los 24 bloques en Puntos → Bloques.

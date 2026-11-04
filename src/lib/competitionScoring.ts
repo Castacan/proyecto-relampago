@@ -20,7 +20,24 @@ export interface RouteResult {
   zoned: boolean
   flash: boolean
   zone_first?: boolean
-  points: number
+  points: number | null          // null en la tarjeta del juez (modo bloques)
+  block_value?: number | null    // modo bloques: valor del bloque (secreto)
+  block_level?: CompetitionLevel | null
+}
+
+export type CompetitionLevel = 'basico' | 'intermedio' | 'avanzado'
+
+export const LEVEL_LABELS: Record<CompetitionLevel, string> = {
+  basico: 'Básico',
+  intermedio: 'Intermedio',
+  avanzado: 'Avanzado',
+}
+
+/** Modo bloques (docs/competencia-reglas.md): un bloque por número con su valor. */
+export interface CompetitionBlock {
+  route_number: number
+  value: number
+  level: CompetitionLevel
 }
 
 export interface CompetitorCard {
@@ -28,6 +45,7 @@ export interface CompetitorCard {
   bib: number
   full_name: string
   category_name: string
+  blocks_mode?: boolean
   route_numbers: number[]
   routes: RouteResult[]
   points: number | null
@@ -51,6 +69,12 @@ export interface RankingRow {
   place: number
   routes: RouteResult[]
   promotion_hint: string | null
+  // Modo bloques
+  hardest_top: number | null        // valor del bloque más difícil con top
+  final_level: CompetitionLevel | null
+  auto_level: CompetitionLevel | null
+  counted_flashes: number
+  level_override: CompetitionLevel | null
 }
 
 export const SCORING_ERRORS: Record<string, string> = {
@@ -71,6 +95,10 @@ export const SCORING_ERRORS: Record<string, string> = {
   has_attempts: 'Ya hay intentos capturados: ya no se puede numerar de nuevo. Cambia números uno por uno.',
   bib_taken: 'Ese número ya lo tiene otro competidor.',
   invalid_bib: 'El número debe ser entre 1 y 9999.',
+  not_a_block: 'Ese número no es un bloque de la competencia.',
+  already_topped_final: 'Ya sacó ese bloque: no puede volver a intentarlo.',
+  invalid_blocks: 'Revisa la lista: solo números del 1 al 999 y sin repetir.',
+  invalid_levels: 'Revisa los cortes: básico < intermedio < total de bloques.',
 }
 
 export const scoringError = (code: string | undefined) =>

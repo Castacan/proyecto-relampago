@@ -176,48 +176,37 @@ function CompetitionRoutesDisplay() {
   const c = COMPETITION_DISPLAY
   return (
     <div className="w-screen h-screen bg-fondo overflow-hidden font-sans select-none flex flex-col">
-      <div className="shrink-0 px-[3vw] pt-[3vh] pb-[2vh] border-b border-zinc-800 flex items-end justify-between gap-6">
-        <div>
-          <h1 className="font-black tracking-tight text-primario" style={{ fontSize: '5.5vh', lineHeight: 1 }}>
-            {c.title}
-          </h1>
-          <p className="text-zinc-300 font-bold mt-[1vh]" style={{ fontSize: '2.8vh' }}>{c.subtitle}</p>
-        </div>
-        <p className="text-zinc-300 font-semibold text-right" style={{ fontSize: '2.4vh' }}>{c.schedule}</p>
+      <div className="shrink-0 px-[3vw] pt-[3vh] pb-[2vh] border-b border-zinc-800">
+        <h1 className="font-black tracking-tight text-primario" style={{ fontSize: '6vh', lineHeight: 1 }}>{c.title}</h1>
+        <p className="text-zinc-300 font-bold mt-[1vh]" style={{ fontSize: '3vh' }}>{c.subtitle}</p>
       </div>
 
-      <div className="flex-1 min-h-0 grid grid-cols-3">
-        {c.levels.map((level, i) => (
-          <div
-            key={level.name}
-            className={`min-h-0 flex flex-col px-[2vw] py-[2.5vh] gap-[2.5vh] ${i < c.levels.length - 1 ? 'border-r border-zinc-800' : ''} ${i === 1 ? 'bg-white/5' : ''}`}
-          >
-            <h2 className="font-black tracking-tight text-texto-principal text-center" style={{ fontSize: '4.5vh', lineHeight: 1 }}>
-              {level.name}
-            </h2>
-            {level.categories.map(cat => (
-              <div key={cat.name} className="flex-1 min-h-0 flex flex-col rounded-3xl bg-superficie border border-zinc-800 px-[1.5vw] py-[2vh]">
-                <div className="flex items-baseline justify-between gap-3 mb-[1.5vh]">
-                  <p className="font-black text-zinc-100" style={{ fontSize: '3.2vh' }}>{cat.name}</p>
-                  <p className="font-bold text-primario shrink-0" style={{ fontSize: '2.6vh' }}>
-                    {cat.routes.length} {cat.routes.length === 1 ? 'ruta' : 'rutas'}
-                  </p>
-                </div>
-                <div className="flex-1 grid grid-cols-5 content-center gap-[1vh]">
-                  {cat.routes.map(n => (
-                    <div
-                      key={n}
-                      className="aspect-square max-h-[9vh] mx-auto w-full rounded-full bg-fondo border-2 border-primario/60 flex items-center justify-center font-black text-texto-principal"
-                      style={{ fontSize: '3.8vh', maxWidth: '9vh' }}
-                    >
-                      {n}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            ))}
+      <div className="flex-1 min-h-0 grid grid-cols-[2fr_3fr]">
+        <div className="min-h-0 flex flex-col justify-center gap-[3vh] px-[3vw] border-r border-zinc-800">
+          <div className="rounded-3xl bg-superficie border border-zinc-800 px-[2vw] py-[3vh] text-center">
+            <p className="font-black text-primario tabular-nums" style={{ fontSize: '16vh', lineHeight: 1 }}>{c.blocks}</p>
+            <p className="font-black text-texto-principal" style={{ fontSize: '4.5vh' }}>bloques</p>
+            <p className="font-bold text-zinc-300" style={{ fontSize: '2.8vh' }}>para todas las categorías</p>
           </div>
-        ))}
+          <div className="space-y-[1.2vh]">
+            <p className="font-black text-zinc-400 tracking-widest" style={{ fontSize: '2.4vh' }}>HORARIOS</p>
+            {c.slots.map(s => (
+              <p key={s} className="font-black text-texto-principal tabular-nums" style={{ fontSize: '4vh', lineHeight: 1.1 }}>{s}</p>
+            ))}
+            <p className="font-bold text-primario" style={{ fontSize: '3vh' }}>{c.awards}</p>
+          </div>
+        </div>
+
+        <div className="min-h-0 flex flex-col justify-center px-[3vw] gap-[2.6vh] bg-white/5">
+          <p className="font-black text-zinc-400 tracking-widest" style={{ fontSize: '2.4vh' }}>CÓMO SE JUEGA</p>
+          {c.rules.map((r, i) => (
+            <div key={r} className="flex items-center gap-[1.5vw]">
+              <span className="shrink-0 rounded-full bg-primario text-texto-en-acento font-black flex items-center justify-center"
+                style={{ width: '6vh', height: '6vh', fontSize: '3.2vh' }}>{i + 1}</span>
+              <p className="font-bold text-zinc-100" style={{ fontSize: '3.6vh', lineHeight: 1.2 }}>{r}</p>
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   )
