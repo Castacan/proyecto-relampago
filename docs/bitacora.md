@@ -1103,7 +1103,7 @@ permitiendo al staff lo de antes.
 
 - Detalle en `docs/competencia-rifa.md` → "Ruleta en la TV y boletos extra".
 - SQL nuevo: `src/supabase/competencia_ruleta.sql` (falta Run del dueño). `competencia_bloques.sql` ya no pisa los boletos extra si se vuelve a correr.
-- Pantalla nueva `/competencia/ruleta`; la TV la muestra sola el sábado 7 de noviembre.
+- Pantalla nueva `/competencia/ruleta`; la TV la muestra sola del 5 al 7 de noviembre (el dueño la pidió "desde ya").
 - La TV ahora se actualiza sola con cada versión nueva (`useAutoUpdate`). Hay que recargarla una vez para que tome este cambio.
 - Corregido: la TV decía "Viernes 7 de noviembre" y la competencia es el sábado 7.
 - En el panel de Rifa ya no sale la pantalla completa con los nombres al sortear: el anuncio es en la ruleta. Hay botón "Abrir ruleta".

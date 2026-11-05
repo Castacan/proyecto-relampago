@@ -55,7 +55,7 @@ Pedido del dueño:
 Cómo funciona:
 - SQL: `src/supabase/competencia_ruleta.sql` (después de rifa y bloques). Columna `raffle_bonus` (0–20), `admin_raffle_set_bonus` y la pública `get_competition_raffle_wheel`. Boletos = zonas + extra.
 - Boletos extra: en la página de Rifa, columna "Extra" con − / + por persona.
-- Pantalla: `/competencia/ruleta` (proyector o cualquier navegador) y la TV (`/leaderboard/display`) **el 7 de noviembre** sola. Para verla antes en la TV: `/leaderboard/display?ruleta=1`.
+- Pantalla: `/competencia/ruleta` (proyector o cualquier navegador) y la TV (`/leaderboard/display`) sola del 5 al 7 de noviembre (pedido "desde ya"). Para verla antes en la TV: `/leaderboard/display?ruleta=1`.
 - La pantalla pide datos cada 2.5 s. El ganador lo elige el servidor; la ruleta solo lo muestra. Si se pica "Sortear" dos veces seguidas, los sorteos se muestran uno tras otro.
 - "Deshacer" en el panel: la pantalla quita el anuncio.
 - La lista de ganadores de la derecha no muestra al ganador hasta que la ruleta termina de girar.

@@ -16,10 +16,12 @@ export const COMPETITION_DISPLAY = {
   slots: ['10:00 a 12:00', '12:30 a 2:30', '3:00 a 5:00'],
   awards: 'Premiación 5:30 pm',
   blocks: 24,
-  // 2026-11-05: el día de la competencia la TV muestra la ruleta de la rifa
-  // (RaffleWheelDisplay) en lugar de esta información. Para verla antes:
+  // 2026-11-05: la TV muestra la ruleta de la rifa (RaffleWheelDisplay) en lugar
+  // de esta información desde el 5 (pedido del dueño: "desde ya") hasta el día de
+  // la competencia, inclusive. Para verla antes:
   // /leaderboard/display?ruleta=1 o /competencia/ruleta.
-  raffleWheelDate: '2026-11-07',
+  raffleWheelStart: '2026-11-05',
+  raffleWheelEnd: '2026-11-07',
   rules: [
     'Intenta los bloques que quieras, en el orden que quieras.',
     'Los bloques más difíciles valen más. La zona vale la mitad.',
@@ -37,5 +39,5 @@ export function isCompetitionDisplayActive(): boolean {
 export function isRaffleWheelActive(): boolean {
   const today = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Mexico_City' })
   if (typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('ruleta')) return true
-  return today === COMPETITION_DISPLAY.raffleWheelDate
+  return today >= COMPETITION_DISPLAY.raffleWheelStart && today <= COMPETITION_DISPLAY.raffleWheelEnd
 }
