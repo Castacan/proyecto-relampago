@@ -122,7 +122,11 @@ $function$;
 -- CASCADE de arriba la quitó (en modo bloques cuenta zonas de cualquier nivel).
 DO $$
 BEGIN
-  IF to_regclass('public.competition_raffle_prizes') IS NOT NULL THEN
+  -- Si ya se corrió competencia_ruleta.sql (boletos extra), no se pisa su versión.
+  IF to_regclass('public.competition_raffle_prizes') IS NOT NULL
+     AND NOT EXISTS (SELECT 1 FROM information_schema.columns
+                     WHERE table_schema = 'public' AND table_name = 'competition_registrations'
+                       AND column_name = 'raffle_bonus') THEN
     EXECUTE $f$
       CREATE OR REPLACE FUNCTION public.competition_raffle_tickets(p_competition_id UUID)
       RETURNS TABLE (registration_id UUID, tickets INT)

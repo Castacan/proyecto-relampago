@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, Navigate } from 'react-router-dom'
 import { useProfile } from '../../hooks/useProfile'
 import { supabase } from '../../lib/supabase'
@@ -7,6 +7,8 @@ import { COMPETITION_SLUG } from '../../lib/competition'
 // Rifa de premios al final de la competencia. RPCs en src/supabase/competencia_rifa.sql.
 // 1 boleto por cada ruta en la que llegó a zona (top incluido); cada persona gana máximo 1 premio;
 // no hay que estar presente; el staff se marca "fuera de la rifa".
+// 2026-11-05: boletos extra por la dinámica previa y ruleta en la TV (/competencia/ruleta,
+// src/supabase/competencia_ruleta.sql): al sortear aquí, la pantalla gira sola y anuncia.
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const db = supabase as unknown as any
@@ -19,7 +21,7 @@ interface Prize {
 }
 interface Participant {
   registration_id: string; full_name: string; bib: number | null; category: string
-  tickets: number; excluded: boolean; won: string | null
+  tickets: number; bonus?: number; excluded: boolean; won: string | null
 }
 interface RaffleData { name: string; prizes: Prize[]; participants: Participant[] }
 
@@ -47,7 +49,6 @@ export default function CompetitionRafflePage() {
   const [error, setError] = useState<string | null>(null)
   const [msg, setMsg] = useState<string | null>(null)
   const [busy, setBusy] = useState<string | null>(null)
-  const [reveal, setReveal] = useState<{ prize: string; sponsor: string | null; winner: Winner; tickets: number; pool: number; names: string[] } | null>(null)
   const [editing, setEditing] = useState(false)
 
   const fetchAll = useCallback(async () => {
@@ -68,11 +69,10 @@ export default function CompetitionRafflePage() {
 
   const draw = async (prize: Prize) => {
     setBusy(prize.id); setMsg(null)
-    const names = pool.map(p => p.full_name)
     const { data: res, error } = await db.rpc('admin_raffle_draw', { p_prize_id: prize.id })
     setBusy(null)
     if (error || !res || res.error) { setMsg(errorText(res?.error)); fetchAll(); return }
-    setReveal({ prize: prize.name, sponsor: prize.sponsor, winner: res.winner, tickets: res.tickets, pool: res.pool_tickets, names })
+    setMsg(`${prize.name}: la ruleta de la pantalla está girando. Ganó ${res.winner.full_name} (se ve aquí abajo).`)
     fetchAll()
   }
 
@@ -83,6 +83,14 @@ export default function CompetitionRafflePage() {
     const { data: res, error } = await db.rpc('admin_raffle_undo', { p_prize_id: prize.id, p_reason: reason })
     setBusy(null)
     if (error || !res || res.error) setMsg(errorText(res?.error))
+    fetchAll()
+  }
+
+  const setBonus = async (p: Participant, bonus: number) => {
+    setBusy(p.registration_id)
+    const { data: res, error } = await db.rpc('admin_raffle_set_bonus', { p_registration_id: p.registration_id, p_bonus: bonus })
+    setBusy(null)
+    if (error || !res || res.error) setMsg(error ? 'No se pudo. ¿Ya se corrió competencia_ruleta.sql?' : errorText(res?.error))
     fetchAll()
   }
 
@@ -109,6 +117,7 @@ export default function CompetitionRafflePage() {
           </div>
           <div className="flex gap-2 shrink-0">
             <button onClick={() => setEditing(v => !v)} className={smallBtn}>{editing ? 'Listo' : 'Editar premios'}</button>
+            <a href="/competencia/ruleta" target="_blank" rel="noreferrer" className={primaryBtn}>Abrir ruleta</a>
             <button onClick={fetchAll} className={smallBtn}>Actualizar</button>
           </div>
         </div>
@@ -126,7 +135,8 @@ export default function CompetitionRafflePage() {
               <Stat label="Fuera de la rifa" value={data.participants.filter(p => p.excluded).length} sub="staff" />
             </div>
             <p className="text-zinc-400 text-[11px] mb-3">
-              1 boleto por cada ruta en la que llegó a zona (el top cuenta). Quien gana sale de las rifas siguientes. No hay que estar presente.
+              1 boleto por cada bloque en el que llegó a zona (el top cuenta) + boletos extra de la dinámica. Quien gana sale de las rifas siguientes. No hay que estar presente.
+              {' '}Pon la ruleta en la pantalla (botón "Abrir ruleta" o la TV el día de la compe): al picar "Sortear" aquí, allá gira sola y anuncia al ganador.
             </p>
 
             {editing ? <PrizeEditor prizes={data.prizes} onChanged={fetchAll} /> : (
@@ -161,11 +171,10 @@ export default function CompetitionRafflePage() {
               </div>
             )}
 
-            <Participants data={data} busy={busy} onToggle={setExcluded} />
+            <Participants data={data} busy={busy} onToggle={setExcluded} onBonus={setBonus} />
           </>
         )}
 
-        {reveal && <Reveal {...reveal} onClose={() => setReveal(null)} />}
       </div>
     </div>
   )
@@ -177,56 +186,6 @@ function Stat({ label, value, sub, accent }: { label: string; value: number; sub
       <p className="text-zinc-400 text-[11px] font-semibold">{label}</p>
       <p className={`font-black text-2xl leading-tight tabular-nums ${accent ? 'text-primario' : 'text-texto-principal'}`}>{value}</p>
       <p className="text-zinc-400 text-[10px] truncate">{sub}</p>
-    </div>
-  )
-}
-
-// Pantalla completa para anunciar: los nombres de la tómbola pasan rápido unos segundos y se
-// detienen en el ganador (el ganador ya lo eligió el servidor; esto es solo para el público).
-function Reveal({ prize, sponsor, winner, tickets, pool, names, onClose }: {
-  prize: string; sponsor: string | null; winner: Winner; tickets: number; pool: number; names: string[]; onClose: () => void
-}) {
-  const [shown, setShown] = useState(names[0] ?? winner.full_name)
-  const [done, setDone] = useState(names.length < 2)
-  const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
-
-  useEffect(() => {
-    if (names.length < 2) { setShown(winner.full_name); return }
-    let i = 0
-    let delay = 60
-    const step = () => {
-      i++
-      delay *= 1.09
-      if (delay > 450) { setShown(winner.full_name); setDone(true); return }
-      setShown(names[Math.floor(Math.random() * names.length)])
-      timer.current = setTimeout(step, delay)
-    }
-    timer.current = setTimeout(step, delay)
-    return () => { if (timer.current) clearTimeout(timer.current) }
-  }, [names, winner.full_name])
-
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [onClose])
-
-  return (
-    <div className="fixed inset-0 z-50 bg-fondo flex flex-col items-center justify-center px-6 text-center select-none" onClick={done ? onClose : undefined}>
-      <p className="text-zinc-400 font-bold" style={{ fontSize: 'clamp(1rem, 3vh, 2rem)' }}>{sponsor ? `${sponsor} regala` : 'Premio'}</p>
-      <p className="text-primario font-black tracking-tight mt-2" style={{ fontSize: 'clamp(2rem, 7vh, 5rem)', lineHeight: 1.05 }}>{prize}</p>
-      <div className="mt-[6vh] min-h-[22vh] flex flex-col items-center justify-center">
-        <p className={`font-black tracking-tight ${done ? 'text-texto-principal' : 'text-zinc-500'}`}
-          style={{ fontSize: 'clamp(2.5rem, 10vh, 7rem)', lineHeight: 1.05 }}>
-          {shown}
-        </p>
-        {done && (
-          <p className="text-zinc-300 font-bold mt-4" style={{ fontSize: 'clamp(1rem, 3vh, 2rem)' }}>
-            {winner.bib != null && `#${winner.bib} · `}{winner.category} · {boletos(tickets)} de {pool}
-          </p>
-        )}
-      </div>
-      {done && <button onClick={onClose} className={`${primaryBtn} mt-[6vh] text-base px-6 py-3`}>Cerrar</button>}
     </div>
   )
 }
@@ -302,14 +261,19 @@ function PrizeRow({ prize, index, last, disabled, onMove, onSave, onDelete }: {
   )
 }
 
-function Participants({ data, busy, onToggle }: { data: RaffleData; busy: string | null; onToggle: (p: Participant, excluded: boolean) => void }) {
+function Participants({ data, busy, onToggle, onBonus }: {
+  data: RaffleData; busy: string | null
+  onToggle: (p: Participant, excluded: boolean) => void; onBonus: (p: Participant, bonus: number) => void
+}) {
   const [search, setSearch] = useState('')
   const rows = data.participants.filter(p => !search.trim() || p.full_name.toLowerCase().includes(search.trim().toLowerCase()) || String(p.bib ?? '') === search.trim())
   return (
     <div className={`${card} p-4`}>
       <div className="flex flex-wrap items-baseline justify-between gap-2 mb-3">
         <p className="text-texto-principal text-sm font-bold">Boletos por competidor</p>
-        <p className="text-zinc-400 text-[11px]">Si alguien es staff, sácalo con "Sacar de la rifa".</p>
+        <p className="text-zinc-400 text-[11px]">
+          Extra = boletos de la dinámica ({data.participants.filter(p => (p.bonus ?? 0) > 0).length} personas). Si alguien es staff, sácalo con "Sacar de la rifa".
+        </p>
       </div>
       <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Buscar por nombre o número..." className={`${inputClass} mb-3`} />
       <div className="divide-y divide-zinc-800/60">
@@ -322,7 +286,13 @@ function Participants({ data, busy, onToggle }: { data: RaffleData; busy: string
                 {p.category}{p.won && <span className="text-exito font-bold"> · ganó {p.won}</span>}{p.excluded && ' · fuera de la rifa'}
               </p>
             </div>
-            <span className={`font-black tabular-nums text-sm shrink-0 ${p.tickets > 0 ? 'text-primario' : 'text-zinc-500'}`}>{boletos(p.tickets)}</span>
+            <div className="flex items-center gap-1 shrink-0" title="Boletos extra (dinámica)">
+              <span className="text-zinc-400 text-[11px] mr-1">Extra</span>
+              <button onClick={() => onBonus(p, Math.max(0, (p.bonus ?? 0) - 1))} disabled={busy === p.registration_id || !(p.bonus ?? 0)} className={smallBtn} aria-label="Quitar boleto extra">−</button>
+              <span className={`w-5 text-center font-black tabular-nums text-sm ${(p.bonus ?? 0) > 0 ? 'text-amarillo-suave' : 'text-zinc-500'}`}>{p.bonus ?? 0}</span>
+              <button onClick={() => onBonus(p, (p.bonus ?? 0) + 1)} disabled={busy === p.registration_id || (p.bonus ?? 0) >= 20} className={smallBtn} aria-label="Dar boleto extra">+</button>
+            </div>
+            <span className={`font-black tabular-nums text-sm shrink-0 w-20 text-right ${p.tickets > 0 ? 'text-primario' : 'text-zinc-500'}`}>{boletos(p.tickets)}</span>
             <button onClick={() => onToggle(p, !p.excluded)} disabled={busy === p.registration_id} className={`${smallBtn} shrink-0`}>
               {p.excluded ? 'Regresar' : 'Sacar de la rifa'}
             </button>

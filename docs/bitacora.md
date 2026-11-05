@@ -1098,3 +1098,12 @@ permitiendo al staff lo de antes.
 - Bug: en /staff/competencia/puntos (y en /rifa) la rueda del mouse no movía la página.
 - Causa: el marco de staff tiene `overflow-hidden`, así que cada página debe traer su propio `h-full overflow-y-auto`. Estas dos no lo tenían.
 - Arreglo: se envolvieron las dos en `h-full overflow-y-auto bg-fondo`, igual que las demás páginas de staff.
+
+## 2026-11-05 — Ruleta de la rifa en la TV + boletos extra
+
+- Detalle en `docs/competencia-rifa.md` → "Ruleta en la TV y boletos extra".
+- SQL nuevo: `src/supabase/competencia_ruleta.sql` (falta Run del dueño). `competencia_bloques.sql` ya no pisa los boletos extra si se vuelve a correr.
+- Pantalla nueva `/competencia/ruleta`; la TV la muestra sola el sábado 7 de noviembre.
+- La TV ahora se actualiza sola con cada versión nueva (`useAutoUpdate`). Hay que recargarla una vez para que tome este cambio.
+- Corregido: la TV decía "Viernes 7 de noviembre" y la competencia es el sábado 7.
+- En el panel de Rifa ya no sale la pantalla completa con los nombres al sortear: el anuncio es en la ruleta. Hay botón "Abrir ruleta".

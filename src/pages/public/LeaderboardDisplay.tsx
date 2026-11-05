@@ -8,12 +8,16 @@ import { getColorHex } from '../../lib/colors'
 import { nowMX } from '../../lib/timezone'
 import { MONTHS_ES, DAYS_ES } from '../../lib/dates'
 import { SPECIAL_PERIOD, isSpecialPeriodActive } from '../../lib/specialPeriod'
-import { COMPETITION_DISPLAY, isCompetitionDisplayActive } from '../../lib/competitionDisplay'
+import { COMPETITION_DISPLAY, isCompetitionDisplayActive, isRaffleWheelActive } from '../../lib/competitionDisplay'
+import RaffleWheelDisplay from './RaffleWheelDisplay'
+import { useAutoUpdate } from '../../hooks/useAutoUpdate'
 import SponsorBanner from '../../components/SponsorBanner'
 import DisplaySlide from '../../components/DisplaySlide'
 import type { LeaderboardEntry, Sponsorship, SponsorPeriod } from '../../types'
 
 export default function LeaderboardDisplay() {
+  // La TV (Raspberry Pi) nadie la toca: se actualiza sola cuando hay versión nueva.
+  useAutoUpdate()
   const { daily, weekly, monthly, special, events, loading, connected } = useLeaderboard()
   const { sponsorships } = useSponsorships()
   const { slides } = useDisplaySlides()
@@ -73,6 +77,8 @@ export default function LeaderboardDisplay() {
   // TEMPORAL (lib/competitionDisplay.ts): del 3 al 7 de noviembre la TV solo
   // muestra las rutas de cada categoría. Se reevalúa con el reloj de cada
   // minuto, así que el 8 de noviembre regresa sola al leaderboard.
+  // El día de la competencia: la ruleta de la rifa en vivo.
+  if (isRaffleWheelActive()) return <RaffleWheelDisplay />
   if (isCompetitionDisplayActive()) return <CompetitionRoutesDisplay />
 
   if (loading) {

@@ -13,6 +13,7 @@ import { ErrorBoundary } from './components/ErrorBoundary'
 import PublicWallPage from './pages/public/PublicWallPage'
 import PublicRoutePage from './pages/public/PublicRoutePage'
 import LeaderboardDisplay from './pages/public/LeaderboardDisplay'
+import RaffleWheelDisplay from './pages/public/RaffleWheelDisplay'
 import LeaderboardPage from './pages/public/LeaderboardPage'
 import HubPage from './pages/public/HubPage'
 import MyAccountPage from './pages/public/MyAccountPage'
@@ -80,6 +81,7 @@ export default function App() {
         <Route path="/spraywall/:routeId" element={<SpraywallRoutePage />} />
         <Route path="/competencia" element={<CompetitionPage />} />
         <Route path="/competencia/consulta" element={<CompetitionLookupPage />} />
+        <Route path="/competencia/ruleta" element={<RaffleWheelDisplay />} />
         <Route path="/juez" element={<JudgePage />} />
         <Route path="/clases" element={<ClassesPage />} />
         <Route path="/domiciliacion/:token" element={<SubscriptionSetupPage />} />

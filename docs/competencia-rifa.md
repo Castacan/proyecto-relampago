@@ -44,3 +44,20 @@ Total: 13 premios. Cada magnesia, clase y sudadera se rifa por separado.
 - "Deshacer" regresa a la persona a la tómbola, pide un motivo y queda en la bitácora.
 - "Editar premios": agregar, renombrar, cambiar el orden y quitar los que no se han sorteado.
 - Probado con PGlite (22 comprobaciones; también el peso por boletos con 400 sorteos) y la pantalla con datos falsos.
+
+## Ruleta en la TV y boletos extra (2026-11-05)
+
+Pedido del dueño:
+- Durante la competencia, la TV muestra una **ruleta** que se va llenando en tiempo real con los nombres de quienes ganan boletos. El tamaño de cada rebanada es proporcional a sus boletos.
+- La ruleta **empieza con ~10 nombres**: personas que completaron una dinámica previa y tienen boletos extra.
+- En la rifa, el admin pica "Sortear" desde su computadora (/staff/competencia/rifa). En la TV se quitan los nombres del ganador anterior, la ruleta gira sola, cae en el ganador y lo anuncia en grande.
+
+Cómo funciona:
+- SQL: `src/supabase/competencia_ruleta.sql` (después de rifa y bloques). Columna `raffle_bonus` (0–20), `admin_raffle_set_bonus` y la pública `get_competition_raffle_wheel`. Boletos = zonas + extra.
+- Boletos extra: en la página de Rifa, columna "Extra" con − / + por persona.
+- Pantalla: `/competencia/ruleta` (proyector o cualquier navegador) y la TV (`/leaderboard/display`) **el 7 de noviembre** sola. Para verla antes en la TV: `/leaderboard/display?ruleta=1`.
+- La pantalla pide datos cada 2.5 s. El ganador lo elige el servidor; la ruleta solo lo muestra. Si se pica "Sortear" dos veces seguidas, los sorteos se muestran uno tras otro.
+- "Deshacer" en el panel: la pantalla quita el anuncio.
+- La lista de ganadores de la derecha no muestra al ganador hasta que la ruleta termina de girar.
+- La TV se actualiza sola: cada 5 min revisa si hay versión nueva y recarga (nunca a media ruleta). La primera vez después de este cambio sí hay que recargarla o reiniciar la Pi una vez, porque la versión que tiene ahora no sabe recargarse.
+- Probado: PGlite (`ruleta_test.mjs`, 14 comprobaciones) y la pantalla con un servidor falso: nombres entrando, giro, anuncio y que el ganador anterior sale.
