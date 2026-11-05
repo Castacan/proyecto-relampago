@@ -28,6 +28,8 @@ import CompetitionLookupPage from './pages/public/CompetitionLookupPage'
 import CompetitionAdminPage from './pages/staff/CompetitionAdminPage'
 import CompetitionScoringPage from './pages/staff/CompetitionScoringPage'
 import CompetitionRafflePage from './pages/staff/CompetitionRafflePage'
+import CompetitionCheckinAdminPage from './pages/staff/CompetitionCheckinAdminPage'
+import CompetitionCheckinPage from './pages/public/CompetitionCheckinPage'
 import JudgePage from './pages/public/JudgePage'
 import ClassesPage from './pages/public/ClassesPage'
 import ClassesAdminPage from './pages/staff/ClassesAdminPage'
@@ -82,6 +84,7 @@ export default function App() {
         <Route path="/competencia" element={<CompetitionPage />} />
         <Route path="/competencia/consulta" element={<CompetitionLookupPage />} />
         <Route path="/competencia/ruleta" element={<RaffleWheelDisplay />} />
+        <Route path="/competencia/checkin" element={<CompetitionCheckinPage />} />
         <Route path="/juez" element={<JudgePage />} />
         <Route path="/clases" element={<ClassesPage />} />
         <Route path="/domiciliacion/:token" element={<SubscriptionSetupPage />} />
@@ -109,6 +112,7 @@ export default function App() {
           <Route path="competencia" element={<ErrorBoundary label="Competencia"><CompetitionAdminPage /></ErrorBoundary>} />
           <Route path="competencia/puntos" element={<ErrorBoundary label="Puntos"><CompetitionScoringPage /></ErrorBoundary>} />
           <Route path="competencia/rifa" element={<ErrorBoundary label="Rifa"><CompetitionRafflePage /></ErrorBoundary>} />
+          <Route path="competencia/checkin" element={<ErrorBoundary label="Check-in"><CompetitionCheckinAdminPage /></ErrorBoundary>} />
           <Route path="clases" element={<ErrorBoundary label="Clases"><ClassesAdminPage /></ErrorBoundary>} />
           <Route path="inicio" element={<ErrorBoundary label="Inicio"><HomePage /></ErrorBoundary>} />
           <Route path="personas" element={<ErrorBoundary label="Personas"><PeoplePage /></ErrorBoundary>} />

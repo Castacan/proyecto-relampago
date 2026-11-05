@@ -109,7 +109,7 @@ BEGIN
     'cleared_at', v_comp.raffle_wheel_cleared_at,
     'entries', (
       SELECT coalesce(jsonb_agg(jsonb_build_object(
-               'id', r.id, 'full_name', r.full_name, 'bib', r.bib, 'tickets', x.tickets)
+               'id', r.id, 'full_name', r.full_name, 'bib', NULL, 'tickets', x.tickets)
              ORDER BY r.bib NULLS LAST, r.id), '[]'::jsonb)
       FROM competition_raffle_pool(v_comp.id) x
       JOIN competition_registrations r ON r.id = x.registration_id),

@@ -1108,3 +1108,9 @@ permitiendo al staff lo de antes.
 - Corregido: la TV decía "Viernes 7 de noviembre" y la competencia es el sábado 7.
 - En el panel de Rifa ya no sale la pantalla completa con los nombres al sortear: el anuncio es en la ruleta. Hay botón "Abrir ruleta".
 - (más tarde) Botón "Ruleta neutral" en la Rifa y arreglo de la diferencia de boletos entre el centro y la derecha. `competencia_ruleta.sql` actualizado (hay que volver a correrlo: se puede correr más de una vez).
+
+## 2026-11-05 — Check-in con firma de documentos
+
+- Detalle en `docs/competencia-checkin.md`. El competidor firma en su celular con su primer nombre y el número que le da recepción.
+- SQL nuevo: `src/supabase/competencia_checkin.sql` (falta Run). También quita los números de la ruleta pública (`competencia_ruleta.sql` actualizado igual).
+- Faltan los textos de los documentos: el dueño los va a pasar y se cargan en /staff/competencia/checkin → Documentos.

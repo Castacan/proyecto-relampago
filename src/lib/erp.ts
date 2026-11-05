@@ -137,6 +137,11 @@ export const ERP_ERRORS: Record<string, string> = {
   text_required: 'Escribe el título y el texto.',
   code_not_found: 'Código no reconocido.',
   invalid_url: 'El enlace debe empezar con https://',
+  // Check-in de la competencia (competencia_checkin.sql)
+  checkin_not_found: 'No encontramos ese nombre con ese número. Revisa tu número con el staff de recepción.',
+  checkin_expired: 'Se acabó el tiempo. Vuelve a escribir tu nombre y tu número.',
+  too_many_tries: 'Demasiados intentos. Pide ayuda al staff de recepción.',
+  no_documents: 'Todavía no están listos los documentos. Avisa al staff de recepción.',
 }
 export const erpError = (code?: string, fallback = 'No se pudo completar. Intenta de nuevo.') => (code && ERP_ERRORS[code]) || fallback
 

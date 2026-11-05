@@ -315,6 +315,7 @@ export default function CompetitionAdminPage() {
       if (minorsOnly && !r.is_minor) return false
       if (!q) return true
       return r.full_name.toLowerCase().includes(q) || r.folio.toLowerCase().includes(q)
+        || (r.bib != null && String(r.bib) === q.replace('#', ''))
         || (r.email ?? '').includes(q) || (r.phone ?? '').includes(q)
     })
   }, [regs, search, statusFilter, categoryFilter, slotFilter, minorsOnly])
@@ -370,6 +371,7 @@ export default function CompetitionAdminPage() {
         <div className="flex gap-2 shrink-0">
           <Link to="/staff/competencia/puntos" className={smallBtn}>Puntos y jueces</Link>
           <Link to="/staff/competencia/rifa" className={smallBtn}>Rifa</Link>
+          <Link to="/staff/competencia/checkin" className={smallBtn}>Check-in</Link>
           <button onClick={() => setShowCourtesy(v => !v)} className={smallBtn}>
             {showCourtesy ? 'Cerrar' : 'Cortesías'}
           </button>
