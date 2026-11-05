@@ -11,6 +11,9 @@
 
 ALTER TABLE public.competition_registrations
   ADD COLUMN IF NOT EXISTS raffle_bonus INT NOT NULL DEFAULT 0;
+-- Modo neutral (2026-11-05): los sorteos hechos hasta esta hora ya no se anuncian en la pantalla.
+ALTER TABLE public.competitions
+  ADD COLUMN IF NOT EXISTS raffle_wheel_cleared_at TIMESTAMPTZ;
 DO $$
 BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'competition_registrations_raffle_bonus_range') THEN
@@ -103,6 +106,7 @@ BEGIN
   RETURN jsonb_build_object(
     'name', v_comp.name,
     'now', now(),
+    'cleared_at', v_comp.raffle_wheel_cleared_at,
     'entries', (
       SELECT coalesce(jsonb_agg(jsonb_build_object(
                'id', r.id, 'full_name', r.full_name, 'bib', r.bib, 'tickets', x.tickets)
@@ -127,8 +131,24 @@ BEGIN
 END;
 $function$;
 
+-- Modo neutral: la pantalla quita el anuncio y los nombres del último ganador (entre giro y giro).
+CREATE OR REPLACE FUNCTION public.admin_raffle_clear_wheel(p_slug TEXT)
+RETURNS JSONB LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path = public AS $function$
+DECLARE
+  v_comp competitions%ROWTYPE;
+BEGIN
+  IF NOT competition_is_admin() THEN RETURN jsonb_build_object('error', 'forbidden'); END IF;
+  SELECT c.* INTO v_comp FROM competitions c WHERE c.slug = p_slug FOR UPDATE;
+  IF NOT FOUND THEN RETURN jsonb_build_object('error', 'not_found'); END IF;
+  UPDATE competitions SET raffle_wheel_cleared_at = now() WHERE id = v_comp.id;
+  RETURN jsonb_build_object('success', true);
+END;
+$function$;
+
+REVOKE ALL ON FUNCTION public.admin_raffle_clear_wheel(TEXT) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.admin_raffle_clear_wheel(TEXT) TO authenticated;
 REVOKE ALL ON FUNCTION public.admin_raffle_set_bonus(UUID, INT) FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.admin_raffle_set_bonus(UUID, INT) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.get_competition_raffle_wheel(TEXT) TO anon, authenticated;
 
-SELECT (SELECT count(*) FROM pg_proc WHERE proname = 'get_competition_raffle_wheel') AS ruleta_lista;
+SELECT (SELECT count(*) FROM pg_proc WHERE proname IN ('get_competition_raffle_wheel', 'admin_raffle_clear_wheel')) AS ruleta_lista;

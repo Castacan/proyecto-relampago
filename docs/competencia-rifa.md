@@ -61,3 +61,5 @@ Cómo funciona:
 - La lista de ganadores de la derecha no muestra al ganador hasta que la ruleta termina de girar.
 - La TV se actualiza sola: cada 5 min revisa si hay versión nueva y recarga (nunca a media ruleta). La primera vez después de este cambio sí hay que recargarla o reiniciar la Pi una vez, porque la versión que tiene ahora no sabe recargarse.
 - Probado: PGlite (`ruleta_test.mjs`, 14 comprobaciones) y la pantalla con un servidor falso: nombres entrando, giro, anuncio y que el ganador anterior sale.
+- **Ruleta neutral** (2026-11-05): botón en el panel de la Rifa. La pantalla quita el anuncio y los nombres del último ganador, y muestra la ruleta sola, para usar entre giro y giro. Se guarda en `competitions.raffle_wheel_cleared_at` (`admin_raffle_clear_wheel`). El siguiente "Sortear" gira normal.
+- Arreglado: el número de boletos del centro (contaba al ganador que se anunciaba) no coincidía con el de la derecha (no lo contaba). Ahora los dos muestran lo que hay en la rueda.

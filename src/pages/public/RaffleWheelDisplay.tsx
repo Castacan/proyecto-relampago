@@ -25,7 +25,7 @@ interface Draw {
   winner_id: string; full_name: string; bib: number | null; tickets: number
 }
 interface WheelData {
-  name: string; now: string; entries: Entry[]; draws: Draw[]
+  name: string; now: string; cleared_at: string | null; entries: Entry[]; draws: Draw[]
   prizes_total: number; next_prize: { name: string; sponsor: string | null } | null
 }
 interface Item { id: string; full_name: string; bib: number | null; w: number }
@@ -172,10 +172,15 @@ export default function RaffleWheelDisplay() {
     if (!data) return
     const draws = [...data.draws].sort((a, b) => time(a.drawn_at) - time(b.drawn_at))
 
+    // Modo neutral: los sorteos hasta esta hora ya no se anuncian (botón en el panel de la Rifa).
+    const cleared = data.cleared_at ? time(data.cleared_at) : 0
     if (processedRef.current === null) {
       const last = draws[draws.length - 1]
       const age = last ? time(data.now) - time(last.drawn_at) : Infinity
-      if (last && age > 30000) {
+      if (last && cleared >= time(last.drawn_at)) {
+        processedRef.current = time(last.drawn_at)
+        setRevealedAt(time(last.drawn_at))
+      } else if (last && age > 30000) {
         // Ya estaba sorteado cuando se abrió la pantalla: se muestra quieto, sin girar.
         processedRef.current = time(last.drawn_at)
         setRevealedAt(time(last.drawn_at))
@@ -197,8 +202,20 @@ export default function RaffleWheelDisplay() {
       setAnnounce(false)
     }
 
+    if (shownDraw && cleared >= time(shownDraw.drawn_at)) {
+      setShownDraw(null)
+      setAnnounce(false)
+    }
+
     const next = draws.find(d => time(d.drawn_at) > (processedRef.current ?? 0))
     if (!next) return
+    if (cleared >= time(next.drawn_at)) {
+      // Se sorteó y se puso neutral antes de que la pantalla lo viera: no se gira.
+      processedRef.current = time(next.drawn_at)
+      setRevealedAt(time(next.drawn_at))
+      setTick(t => t + 1)
+      return
+    }
     busyRef.current = true
     setNoReload(true)
     ;(async () => {
@@ -235,7 +252,9 @@ export default function RaffleWheelDisplay() {
   const target = useMemo(() => wheelTarget(data, shownDraw), [data, shownDraw])
   const slices = useTweened(target, SHRINK_MS)
   const totalTickets = target.reduce((s, i) => s + i.w, 0)
-  const people = data?.entries.length ?? 0
+  // Personas y boletos = lo que está en la rueda (incluye al ganador que se está anunciando),
+  // igual que el número del centro.
+  const people = target.length
   const winners = useMemo(() => [...(data?.draws ?? [])].filter(d => time(d.drawn_at) <= revealedAt)
     .sort((a, b) => time(b.drawn_at) - time(a.drawn_at)), [data, revealedAt])
   const spinning = shownDraw && !announce && time(shownDraw.drawn_at) > revealedAt ? shownDraw : null
@@ -260,7 +279,7 @@ export default function RaffleWheelDisplay() {
             <p className="font-bold text-zinc-300" style={{ fontSize: '2vh' }}>{people === 1 ? 'persona' : 'personas'}</p>
           </div>
           <div className="rounded-2xl bg-superficie border border-zinc-800 px-[1vw] py-[1.5vh] text-center">
-            <p className="font-black text-primario tabular-nums" style={{ fontSize: '6vh', lineHeight: 1 }}>{data?.entries.reduce((s, e) => s + e.tickets, 0) ?? 0}</p>
+            <p className="font-black text-primario tabular-nums" style={{ fontSize: '6vh', lineHeight: 1 }}>{totalTickets}</p>
             <p className="font-bold text-zinc-300" style={{ fontSize: '2vh' }}>boletos</p>
           </div>
         </div>

@@ -1107,3 +1107,4 @@ permitiendo al staff lo de antes.
 - La TV ahora se actualiza sola con cada versión nueva (`useAutoUpdate`). Hay que recargarla una vez para que tome este cambio.
 - Corregido: la TV decía "Viernes 7 de noviembre" y la competencia es el sábado 7.
 - En el panel de Rifa ya no sale la pantalla completa con los nombres al sortear: el anuncio es en la ruleta. Hay botón "Abrir ruleta".
+- (más tarde) Botón "Ruleta neutral" en la Rifa y arreglo de la diferencia de boletos entre el centro y la derecha. `competencia_ruleta.sql` actualizado (hay que volver a correrlo: se puede correr más de una vez).

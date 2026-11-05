@@ -86,6 +86,15 @@ export default function CompetitionRafflePage() {
     fetchAll()
   }
 
+  // Modo neutral: la pantalla quita el anuncio y los nombres del último ganador.
+  const clearWheel = async () => {
+    setBusy('clear'); setMsg(null)
+    const { data: res, error } = await db.rpc('admin_raffle_clear_wheel', { p_slug: COMPETITION_SLUG })
+    setBusy(null)
+    if (error || !res || res.error) { setMsg(error ? 'No se pudo. ¿Ya se corrió competencia_ruleta.sql?' : errorText(res?.error)); return }
+    setMsg('Listo: la pantalla quitó al ganador y muestra la ruleta sola.')
+  }
+
   const setBonus = async (p: Participant, bonus: number) => {
     setBusy(p.registration_id)
     const { data: res, error } = await db.rpc('admin_raffle_set_bonus', { p_registration_id: p.registration_id, p_bonus: bonus })
@@ -118,6 +127,9 @@ export default function CompetitionRafflePage() {
           <div className="flex gap-2 shrink-0">
             <button onClick={() => setEditing(v => !v)} className={smallBtn}>{editing ? 'Listo' : 'Editar premios'}</button>
             <a href="/competencia/ruleta" target="_blank" rel="noreferrer" className={primaryBtn}>Abrir ruleta</a>
+            <button onClick={clearWheel} disabled={busy !== null} className={smallBtn} title="Quita el anuncio y los nombres del último ganador de la pantalla">
+              {busy === 'clear' ? 'Quitando...' : 'Ruleta neutral'}
+            </button>
             <button onClick={fetchAll} className={smallBtn}>Actualizar</button>
           </div>
         </div>
