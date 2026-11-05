@@ -1091,3 +1091,10 @@ permitiendo al staff lo de antes.
 - Probado: PGlite (31 OK, la rifa sigue OK) y las pantallas con un servidor falso.
 - El SQL quedó pegado en la misma pestaña del SQL Editor que la rifa. Falta el Run del dueño. Resultado esperado: `premios_rifa = 13` y `bloques_listo = 1`.
 - El día de la competencia, el admin escribe el orden de los 24 bloques en Puntos → Bloques.
+
+## 2026-11-05 — Puntos y Rifa: no se podía hacer scroll
+
+- El dueño corrió el SQL de la rifa y de bloques (2026-11-05).
+- Bug: en /staff/competencia/puntos (y en /rifa) la rueda del mouse no movía la página.
+- Causa: el marco de staff tiene `overflow-hidden`, así que cada página debe traer su propio `h-full overflow-y-auto`. Estas dos no lo tenían.
+- Arreglo: se envolvieron las dos en `h-full overflow-y-auto bg-fondo`, igual que las demás páginas de staff.

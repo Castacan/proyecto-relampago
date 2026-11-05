@@ -97,74 +97,76 @@ export default function CompetitionRafflePage() {
   const drawn = data?.prizes.filter(p => p.winner).length ?? 0
 
   return (
-    <div className="max-w-4xl mx-auto w-full px-4 py-5">
-      <div className="flex items-start justify-between gap-3 mb-4">
-        <div className="min-w-0">
-          <h1 className="text-texto-principal font-black text-2xl tracking-tight">Rifa</h1>
-          <p className="text-zinc-400 text-xs truncate">
-            {data?.name ?? ''} · <Link to="/staff/competencia" className="text-primario font-bold">Inscripciones</Link>
-            {' · '}<Link to="/staff/competencia/puntos" className="text-primario font-bold">Puntos</Link>
-          </p>
-        </div>
-        <div className="flex gap-2 shrink-0">
-          <button onClick={() => setEditing(v => !v)} className={smallBtn}>{editing ? 'Listo' : 'Editar premios'}</button>
-          <button onClick={fetchAll} className={smallBtn}>Actualizar</button>
-        </div>
-      </div>
-
-      {error && <p className="text-alerta text-xs mb-3">{error}</p>}
-      {msg && <p role="status" className="text-amarillo-suave text-xs mb-3">{msg}</p>}
-
-      {!data ? (
-        !error && <div className="flex justify-center py-10"><div className="w-6 h-6 rounded-full border-2 border-primario border-t-transparent animate-spin" /></div>
-      ) : (
-        <>
-          <div className="grid grid-cols-3 gap-2 mb-4">
-            <Stat label="En la tómbola" value={pool.length} sub={boletos(poolTickets)} accent />
-            <Stat label="Premios sorteados" value={drawn} sub={`de ${data.prizes.length}`} />
-            <Stat label="Fuera de la rifa" value={data.participants.filter(p => p.excluded).length} sub="staff" />
+    <div className="h-full overflow-y-auto bg-fondo">
+      <div className="max-w-4xl mx-auto w-full px-4 py-5">
+        <div className="flex items-start justify-between gap-3 mb-4">
+          <div className="min-w-0">
+            <h1 className="text-texto-principal font-black text-2xl tracking-tight">Rifa</h1>
+            <p className="text-zinc-400 text-xs truncate">
+              {data?.name ?? ''} · <Link to="/staff/competencia" className="text-primario font-bold">Inscripciones</Link>
+              {' · '}<Link to="/staff/competencia/puntos" className="text-primario font-bold">Puntos</Link>
+            </p>
           </div>
-          <p className="text-zinc-400 text-[11px] mb-3">
-            1 boleto por cada ruta en la que llegó a zona (el top cuenta). Quien gana sale de las rifas siguientes. No hay que estar presente.
-          </p>
+          <div className="flex gap-2 shrink-0">
+            <button onClick={() => setEditing(v => !v)} className={smallBtn}>{editing ? 'Listo' : 'Editar premios'}</button>
+            <button onClick={fetchAll} className={smallBtn}>Actualizar</button>
+          </div>
+        </div>
 
-          {editing ? <PrizeEditor prizes={data.prizes} onChanged={fetchAll} /> : (
-            <div className="space-y-2 mb-6">
-              {data.prizes.map((p, i) => (
-                <div key={p.id} className={`${card} px-4 py-3 flex items-center gap-3 ${p.winner ? '' : 'border-zinc-700'}`}>
-                  <span className="text-zinc-500 font-black tabular-nums w-6 shrink-0">{i + 1}</span>
-                  <div className="min-w-0 flex-1">
-                    <p className="text-texto-principal font-bold text-sm truncate">{p.name}</p>
-                    <p className="text-zinc-400 text-xs truncate">{p.sponsor ?? ''}</p>
-                  </div>
-                  {p.winner ? (
-                    <div className="flex items-center gap-2 min-w-0">
-                      <div className="text-right min-w-0">
-                        <p className="text-exito font-bold text-sm truncate">
-                          {p.winner.bib != null && <span className="tabular-nums">#{p.winner.bib} </span>}{p.winner.full_name}
-                        </p>
-                        <p className="text-zinc-400 text-[11px] truncate">
-                          {p.winner.category} · {boletos(p.winner_tickets ?? 0)} de {p.pool_tickets}
-                        </p>
-                      </div>
-                      <button onClick={() => undo(p)} disabled={busy === p.id} className={smallBtn}>Deshacer</button>
-                    </div>
-                  ) : (
-                    <button onClick={() => draw(p)} disabled={busy !== null || poolTickets === 0} className={primaryBtn}>
-                      {busy === p.id ? 'Sorteando...' : 'Sortear'}
-                    </button>
-                  )}
-                </div>
-              ))}
-              {data.prizes.length === 0 && <p className="text-zinc-400 text-sm">No hay premios. Agrégalos en "Editar premios".</p>}
+        {error && <p className="text-alerta text-xs mb-3">{error}</p>}
+        {msg && <p role="status" className="text-amarillo-suave text-xs mb-3">{msg}</p>}
+
+        {!data ? (
+          !error && <div className="flex justify-center py-10"><div className="w-6 h-6 rounded-full border-2 border-primario border-t-transparent animate-spin" /></div>
+        ) : (
+          <>
+            <div className="grid grid-cols-3 gap-2 mb-4">
+              <Stat label="En la tómbola" value={pool.length} sub={boletos(poolTickets)} accent />
+              <Stat label="Premios sorteados" value={drawn} sub={`de ${data.prizes.length}`} />
+              <Stat label="Fuera de la rifa" value={data.participants.filter(p => p.excluded).length} sub="staff" />
             </div>
-          )}
+            <p className="text-zinc-400 text-[11px] mb-3">
+              1 boleto por cada ruta en la que llegó a zona (el top cuenta). Quien gana sale de las rifas siguientes. No hay que estar presente.
+            </p>
 
-          <Participants data={data} busy={busy} onToggle={setExcluded} />
-        </>
-      )}
+            {editing ? <PrizeEditor prizes={data.prizes} onChanged={fetchAll} /> : (
+              <div className="space-y-2 mb-6">
+                {data.prizes.map((p, i) => (
+                  <div key={p.id} className={`${card} px-4 py-3 flex items-center gap-3 ${p.winner ? '' : 'border-zinc-700'}`}>
+                    <span className="text-zinc-500 font-black tabular-nums w-6 shrink-0">{i + 1}</span>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-texto-principal font-bold text-sm truncate">{p.name}</p>
+                      <p className="text-zinc-400 text-xs truncate">{p.sponsor ?? ''}</p>
+                    </div>
+                    {p.winner ? (
+                      <div className="flex items-center gap-2 min-w-0">
+                        <div className="text-right min-w-0">
+                          <p className="text-exito font-bold text-sm truncate">
+                            {p.winner.bib != null && <span className="tabular-nums">#{p.winner.bib} </span>}{p.winner.full_name}
+                          </p>
+                          <p className="text-zinc-400 text-[11px] truncate">
+                            {p.winner.category} · {boletos(p.winner_tickets ?? 0)} de {p.pool_tickets}
+                          </p>
+                        </div>
+                        <button onClick={() => undo(p)} disabled={busy === p.id} className={smallBtn}>Deshacer</button>
+                      </div>
+                    ) : (
+                      <button onClick={() => draw(p)} disabled={busy !== null || poolTickets === 0} className={primaryBtn}>
+                        {busy === p.id ? 'Sorteando...' : 'Sortear'}
+                      </button>
+                    )}
+                  </div>
+                ))}
+                {data.prizes.length === 0 && <p className="text-zinc-400 text-sm">No hay premios. Agrégalos en "Editar premios".</p>}
+              </div>
+            )}
 
-      {reveal && <Reveal {...reveal} onClose={() => setReveal(null)} />}
+            <Participants data={data} busy={busy} onToggle={setExcluded} />
+          </>
+        )}
+
+        {reveal && <Reveal {...reveal} onClose={() => setReveal(null)} />}
+      </div>
     </div>
   )
 }

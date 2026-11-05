@@ -75,39 +75,41 @@ export default function CompetitionScoringPage() {
   if (profile && !isAdmin) return <Navigate to="/staff" replace />
 
   return (
-    <div className="max-w-4xl mx-auto w-full px-4 py-5">
-      <div className="flex items-start justify-between gap-3 mb-4">
-        <div className="min-w-0">
-          <h1 className="text-texto-principal font-black text-2xl tracking-tight">Puntos de la competencia</h1>
-          <p className="text-zinc-400 text-xs truncate">
-            {data?.competition.name ?? ''} · <Link to="/staff/competencia" className="text-primario font-bold">Inscripciones</Link>
-            {' · '}<Link to="/staff/competencia/rifa" className="text-primario font-bold">Rifa</Link>
-          </p>
+    <div className="h-full overflow-y-auto bg-fondo">
+      <div className="max-w-4xl mx-auto w-full px-4 py-5">
+        <div className="flex items-start justify-between gap-3 mb-4">
+          <div className="min-w-0">
+            <h1 className="text-texto-principal font-black text-2xl tracking-tight">Puntos de la competencia</h1>
+            <p className="text-zinc-400 text-xs truncate">
+              {data?.competition.name ?? ''} · <Link to="/staff/competencia" className="text-primario font-bold">Inscripciones</Link>
+              {' · '}<Link to="/staff/competencia/rifa" className="text-primario font-bold">Rifa</Link>
+            </p>
+          </div>
+          <button onClick={fetchAll} className={smallBtn}>Actualizar</button>
         </div>
-        <button onClick={fetchAll} className={smallBtn}>Actualizar</button>
-      </div>
 
-      <div className="flex gap-1 mb-4 overflow-x-auto">
-        {TABS.map(t => (
-          <button key={t.id} onClick={() => setTab(t.id)}
-            className={`text-xs font-bold px-3 py-2 rounded-xl whitespace-nowrap ${tab === t.id ? 'bg-primario text-texto-en-acento' : 'bg-superficie-alta/60 text-zinc-300'}`}>
-            {t.label}
-          </button>
-        ))}
-      </div>
+        <div className="flex gap-1 mb-4 overflow-x-auto">
+          {TABS.map(t => (
+            <button key={t.id} onClick={() => setTab(t.id)}
+              className={`text-xs font-bold px-3 py-2 rounded-xl whitespace-nowrap ${tab === t.id ? 'bg-primario text-texto-en-acento' : 'bg-superficie-alta/60 text-zinc-300'}`}>
+              {t.label}
+            </button>
+          ))}
+        </div>
 
-      {error && <p className="text-alerta text-xs mb-3">{error}</p>}
-      {!data ? (
-        !error && <div className="flex justify-center py-10"><div className="w-6 h-6 rounded-full border-2 border-primario border-t-transparent animate-spin" /></div>
-      ) : (
-        <>
-          {tab === 'ranking' && <RankingTab data={data} auto={auto} setAuto={setAuto} onChanged={fetchAll} />}
-          {tab === 'intentos' && <AttemptsTab data={data} onChanged={fetchAll} />}
-          {tab === 'rutas' && <RoutesTab data={data} onChanged={fetchAll} />}
-          {tab === 'jueces' && <JudgesTab data={data} onChanged={fetchAll} />}
-          {tab === 'ajustes' && <SettingsTab data={data} onChanged={fetchAll} />}
-        </>
-      )}
+        {error && <p className="text-alerta text-xs mb-3">{error}</p>}
+        {!data ? (
+          !error && <div className="flex justify-center py-10"><div className="w-6 h-6 rounded-full border-2 border-primario border-t-transparent animate-spin" /></div>
+        ) : (
+          <>
+            {tab === 'ranking' && <RankingTab data={data} auto={auto} setAuto={setAuto} onChanged={fetchAll} />}
+            {tab === 'intentos' && <AttemptsTab data={data} onChanged={fetchAll} />}
+            {tab === 'rutas' && <RoutesTab data={data} onChanged={fetchAll} />}
+            {tab === 'jueces' && <JudgesTab data={data} onChanged={fetchAll} />}
+            {tab === 'ajustes' && <SettingsTab data={data} onChanged={fetchAll} />}
+          </>
+        )}
+      </div>
     </div>
   )
 }
