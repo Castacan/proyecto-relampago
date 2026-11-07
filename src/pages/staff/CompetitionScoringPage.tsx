@@ -336,13 +336,16 @@ function CompetitorDetail({ row, data, onChanged }: { row: RankingRow; data: Sco
 
 function AttemptsTab({ data, onChanged }: { data: ScoringData; onChanged: () => void }) {
   const [filter, setFilter] = useState('')
+  // Los anulados no cuentan para nada; se esconden para no confundir (quedan guardados como respaldo).
+  const [showVoided, setShowVoided] = useState(false)
   const [voidId, setVoidId] = useState<string | null>(null)
   const [reason, setReason] = useState('')
   const [form, setForm] = useState({ bib: '', route: '', result: 'top' as AttemptResult, reason: '' })
   const [msg, setMsg] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
 
-  const shown = data.attempts.filter(a => !filter || String(a.bib) === filter.trim() || String(a.route_number) === filter.trim().replace(/^r/i, ''))
+  const voidedCount = data.attempts.filter(a => a.voided_at).length
+  const shown = data.attempts.filter(a => (showVoided || !a.voided_at)).filter(a => !filter ||String(a.bib) === filter.trim() || String(a.route_number) === filter.trim().replace(/^r/i, ''))
 
   const doVoid = async (id: string) => {
     setBusy(true)
@@ -379,7 +382,14 @@ function AttemptsTab({ data, onChanged }: { data: ScoringData; onChanged: () => 
       {msg && <p className="text-zinc-200 text-xs">{msg}</p>}
 
       <input value={filter} onChange={e => setFilter(e.target.value)} placeholder="Filtrar por número de competidor o ruta (ej. R5)" className={inputClass} />
-      <p className="text-zinc-500 text-[11px]">Se muestran los últimos 300.</p>
+      <div className="flex items-center justify-between gap-3">
+        <p className="text-zinc-500 text-[11px]">Se muestran los últimos 300. Los anulados no cuentan para nada.</p>
+        {voidedCount > 0 && (
+          <button onClick={() => setShowVoided(v => !v)} className="text-zinc-300 text-xs font-bold underline shrink-0">
+            {showVoided ? 'Ocultar anulados' : `Ver anulados (${voidedCount})`}
+          </button>
+        )}
+      </div>
       <div className={`${card} divide-y divide-zinc-800/60`}>
         {shown.length === 0 && <p className="text-zinc-400 text-xs px-4 py-3">Sin intentos.</p>}
         {shown.map(a => (

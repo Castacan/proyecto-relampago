@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { supabase } from '../../lib/supabase'
 import {
-  JUDGE_CODE_KEY, RESULT_LABELS, fmtPoints, fmtTime, scoringError,
+  JUDGE_CODE_KEY, RESULT_LABELS, fmtTime, scoringError,
   type AttemptResult, type CompetitorCard,
 } from '../../lib/competitionScoring'
 import logoHorizontal from '../../assets/logo-horizontal.png'
@@ -225,7 +225,6 @@ function JudgeConsole({ code, onInvalid }: { code: string; onInvalid: () => void
               <p className="text-texto-principal font-black text-xl leading-tight">#{card.bib} {card.full_name}</p>
               <p className="text-zinc-300 text-sm">{card.category_name}</p>
             </div>
-            {card.points != null && <p className="text-primario font-black text-lg tabular-nums shrink-0">{fmtPoints(card.points)} pts</p>}
           </div>
 
           {/* 2. Ruta */}

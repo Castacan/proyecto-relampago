@@ -242,8 +242,9 @@ BEGIN
 END;
 $function$;
 
--- Tarjeta del juez. En modo bloques no muestra puntos ni categoría (el
--- competidor podría verla y deducir qué bloques son más difíciles).
+-- Tarjeta del juez. Nunca muestra puntos (pedido del dueño 2026-11-06), y en
+-- modo bloques tampoco la categoría (el competidor podría verla y deducir
+-- qué bloques son más difíciles).
 CREATE OR REPLACE FUNCTION public.competition_competitor_card(p_registration_id UUID)
 RETURNS JSONB LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = public AS $function$
 DECLARE
@@ -268,11 +269,11 @@ BEGIN
         SELECT coalesce(jsonb_agg(jsonb_build_object(
                  'route_number', rr.route_number, 'attempts', rr.attempts,
                  'topped', rr.topped, 'zoned', rr.zoned, 'flash', rr.flash,
-                 'points', CASE WHEN v_bm THEN NULL ELSE rr.points END)
+                 'points', NULL)
                ORDER BY rr.route_number), '[]'::jsonb)
         FROM competition_route_results(v_reg.competition_id) rr WHERE rr.registration_id = v_reg.id),
-      'points', CASE WHEN v_bm THEN NULL
-        ELSE (SELECT k.points FROM competition_ranking(v_reg.competition_id) k WHERE k.registration_id = v_reg.id) END
+      -- 2026-11-06: el juez nunca ve puntos (sorpresa para todos hasta la premiación).
+      'points', NULL
     )
     FROM competition_categories cc
     JOIN competition_categories ec ON ec.id = coalesce(cc.merge_into, cc.id)
