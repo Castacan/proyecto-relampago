@@ -71,6 +71,7 @@ export default function CompetitionRulesPage() {
         <section className={card}>
           <h2 className={h2}>Top y zona</h2>
           <div className="space-y-3">
+            <p className={p}><b className="text-texto-principal">Salida:</b> para iniciar, marca bien la salida con tus <b className="text-texto-principal">4 extremidades</b> (las dos manos y los dos pies). Al levantar todas tus extremidades de la colchoneta, tu salida es oficial y cuenta como intento.</p>
             <p className={p}><b className="text-texto-principal">Top:</b> llegas a la presa final y la controlas con las dos manos durante 3 segundos. Te llevas el valor del bloque.</p>
             <p className={p}><b className="text-texto-principal">Zona:</b> llegas a la presa de zona marcada en el bloque, la controlas y progresas desde ella. Te llevas la mitad del valor (zona en un bloque que vale 9 = 4.5).</p>
             <p className={p}>Zona y top no se suman: en cada bloque te quedas con tu mejor resultado. Si hiciste zona y después top, te llevas el top.</p>
