@@ -69,6 +69,7 @@ export default function CompetitionCheckinPage() {
             <p className="text-zinc-300 font-semibold mt-3">Firmado a las {hora(doneAt)}</p>
             <p className="text-texto-principal font-bold mt-6">Muestra esta pantalla en recepción para recibir tu playera y tu número.</p>
             <p className="text-zinc-400 text-sm mt-4">Cada zona que saques es un boleto para la rifa. ¡Mucha suerte!</p>
+            <a href="/competencia/reglamento" target="_blank" rel="noopener" className="inline-block mt-4 text-primario font-bold underline">¿Cómo se gana? Lee el sistema de puntos</a>
           </div>
         ) : session ? (
           <div className="rounded-2xl bg-superficie border border-zinc-800 p-4">

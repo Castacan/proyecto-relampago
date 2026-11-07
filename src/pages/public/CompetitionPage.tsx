@@ -149,9 +149,14 @@ export default function CompetitionPage() {
     <div className="min-h-screen bg-fondo">
       <header className="flex items-center justify-between px-5 py-4 border-b border-zinc-800/40">
         <img src={logoHorizontal} alt="Jaibamuro" className="h-5 w-auto" />
-        <Link to="/competencia/consulta" className="text-primario text-xs font-bold hover:text-primario-hover transition-colors">
-          Consulta tu inscripción
-        </Link>
+        <div className="flex items-center gap-4">
+          <Link to="/competencia/reglamento" className="text-primario text-xs font-bold hover:text-primario-hover transition-colors">
+            Cómo se gana
+          </Link>
+          <Link to="/competencia/consulta" className="text-primario text-xs font-bold hover:text-primario-hover transition-colors">
+            Consulta tu inscripción
+          </Link>
+        </div>
       </header>
 
       <div className="max-w-md mx-auto w-full px-5 py-6 space-y-6">
