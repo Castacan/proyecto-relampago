@@ -16,6 +16,7 @@ interface Doc { id: string; title: string; body: string; sort_order: number; act
 interface Person {
   registration_id: string; bib: number | null; full_name: string; time_slot_id: string | null; shirt_size: string
   checked_in_at: string | null; is_minor: boolean; signed: number; last_signed_at: string | null
+  pending_payment?: boolean   // pagará en efectivo el día del evento (competencia_pendientes.sql)
 }
 interface Slot { id: string; label: string }
 interface Data { documents: Doc[]; people: Person[]; slots: Slot[] }
@@ -133,6 +134,7 @@ export default function CompetitionCheckinAdminPage() {
                   <div className="min-w-0 flex-1">
                     <p className="text-texto-principal font-bold text-sm truncate">
                       {p.full_name}{p.is_minor && <span className="ml-2 text-[10px] font-bold uppercase px-1.5 py-0.5 rounded text-amarillo-suave bg-amarillo-suave/10">Menor</span>}
+                      {p.pending_payment && <span className="ml-2 text-[10px] font-bold uppercase px-1.5 py-0.5 rounded text-alerta bg-alerta/10">Paga en efectivo</span>}
                     </p>
                     <p className="text-zinc-400 text-[11px] truncate">{slotName(p.time_slot_id)} · talla {p.shirt_size} · firmó {p.signed}/{activeDocs}</p>
                   </div>
