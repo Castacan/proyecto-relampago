@@ -103,7 +103,9 @@ LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $function$
          bool_or(a.result IN ('top','zone')),
          bool_or(a.result = 'top' AND a.n = 1),
          bool_or(a.result IN ('top','zone') AND a.n = 1),
-         CASE WHEN max(c.bm::int) = 1 THEN
+         -- 2026-11-07: un bloque sin zona ni top vale 0 (nunca negativo), para que
+         -- intentar un bloque y no sacarlo no reste aunque caiga en el top 5.
+         GREATEST(0, CASE WHEN max(c.bm::int) = 1 THEN
            (CASE WHEN bool_or(a.result = 'top') THEN max(a.bvalue)::numeric
                  WHEN bool_or(a.result = 'zone') THEN max(a.bvalue) * max(c.zone_ratio) ELSE 0 END)
          ELSE
@@ -115,7 +117,7 @@ LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $function$
          -- Si después hace top, se castiga todo igual que antes (el flash vale más).
          END - (count(*) FILTER (WHERE a.result <> 'top')
                 - CASE WHEN bool_or(a.result = 'zone') AND NOT bool_or(a.result = 'top') THEN 1 ELSE 0 END)
-               * max(c.score_attempt_penalty),
+               * max(c.score_attempt_penalty)),
          max(a.created_at),
          coalesce(min(a.created_at) FILTER (WHERE a.result = 'top'), min(a.created_at) FILTER (WHERE a.result = 'zone')),
          max(a.bvalue),
@@ -218,7 +220,8 @@ BEGIN
            CASE coalesce(max(competition_level_rank(rr.block_level)) FILTER (WHERE rr.topped), 1)
              WHEN 3 THEN 'avanzado' WHEN 2 THEN 'intermedio' ELSE 'basico' END AS auto_level,
            -- 6º, 7º, … mejor bloque, para desempatar.
-           coalesce(array_agg(rr.points ORDER BY rr.k) FILTER (WHERE rr.k > v_best), '{}') AS extra,
+           -- Solo bloques que dieron puntos (2026-11-07: un bloque de puras caídas no desempata).
+           coalesce(array_agg(rr.points ORDER BY rr.k) FILTER (WHERE rr.k > v_best AND rr.points > 0), '{}') AS extra,
            max(rr.last_at) AS last_at,
            max(rr.achieved_at) AS achieved_at
     FROM competition_registrations r

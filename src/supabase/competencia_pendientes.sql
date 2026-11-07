@@ -331,7 +331,8 @@ BEGIN
            CASE coalesce(max(competition_level_rank(rr.block_level)) FILTER (WHERE rr.topped), 1)
              WHEN 3 THEN 'avanzado' WHEN 2 THEN 'intermedio' ELSE 'basico' END AS auto_level,
            -- 6º, 7º, … mejor bloque, para desempatar.
-           coalesce(array_agg(rr.points ORDER BY rr.k) FILTER (WHERE rr.k > v_best), '{}') AS extra,
+           -- Solo bloques que dieron puntos (2026-11-07: un bloque de puras caídas no desempata).
+           coalesce(array_agg(rr.points ORDER BY rr.k) FILTER (WHERE rr.k > v_best AND rr.points > 0), '{}') AS extra,
            max(rr.last_at) AS last_at,
            max(rr.achieved_at) AS achieved_at
     FROM competition_registrations r
