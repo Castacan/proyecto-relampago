@@ -31,6 +31,7 @@ import CompetitionRafflePage from './pages/staff/CompetitionRafflePage'
 import CompetitionCheckinAdminPage from './pages/staff/CompetitionCheckinAdminPage'
 import CompetitionCheckinPage from './pages/public/CompetitionCheckinPage'
 import CompetitionRulesPage from './pages/public/CompetitionRulesPage'
+import CompetitionPrintPage from './pages/staff/CompetitionPrintPage'
 import JudgePage from './pages/public/JudgePage'
 import ClassesPage from './pages/public/ClassesPage'
 import ClassesAdminPage from './pages/staff/ClassesAdminPage'
@@ -115,6 +116,7 @@ export default function App() {
           <Route path="competencia/puntos" element={<ErrorBoundary label="Puntos"><CompetitionScoringPage /></ErrorBoundary>} />
           <Route path="competencia/rifa" element={<ErrorBoundary label="Rifa"><CompetitionRafflePage /></ErrorBoundary>} />
           <Route path="competencia/checkin" element={<ErrorBoundary label="Check-in"><CompetitionCheckinAdminPage /></ErrorBoundary>} />
+          <Route path="competencia/imprimir" element={<ErrorBoundary label="Imprimir"><CompetitionPrintPage /></ErrorBoundary>} />
           <Route path="clases" element={<ErrorBoundary label="Clases"><ClassesAdminPage /></ErrorBoundary>} />
           <Route path="inicio" element={<ErrorBoundary label="Inicio"><HomePage /></ErrorBoundary>} />
           <Route path="personas" element={<ErrorBoundary label="Personas"><PeoplePage /></ErrorBoundary>} />

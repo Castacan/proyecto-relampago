@@ -136,9 +136,32 @@
   margin: 0.6cm;
 }
 
+/* 2026-11-07: el #root solo se esconde cuando hay una hoja de impresión propia (QRs de rutas o
+ * /staff/competencia/imprimir). Antes se escondía siempre y cualquier otra impresión salía en blanco. */
+#comp-print-sheet {
+  display: none;
+}
+.cp-page + .cp-page {
+  break-before: page;
+}
+@media screen {
+  .cp-page + .cp-page {
+    margin-top: 1cm;
+    padding-top: 1cm;
+    border-top: 2px dashed #bbb;
+  }
+}
+
 @media print {
-  #root {
+  body:has(#qr-print-sheet) #root,
+  body:has(#comp-print-sheet) #root {
     display: none;
+  }
+
+  #comp-print-sheet {
+    display: block;
+    color: #000;
+    background: #fff;
   }
 
   #qr-print-sheet {

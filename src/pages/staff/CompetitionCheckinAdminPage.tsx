@@ -87,6 +87,7 @@ export default function CompetitionCheckinAdminPage() {
               <Link to="/staff/competencia" className="text-primario font-bold">Inscripciones</Link>
               {' · '}<Link to="/staff/competencia/puntos" className="text-primario font-bold">Puntos</Link>
               {' · '}<Link to="/staff/competencia/rifa" className="text-primario font-bold">Rifa</Link>
+              {' · '}<Link to="/staff/competencia/imprimir" className="text-primario font-bold">Imprimir</Link>
             </p>
           </div>
           <div className="flex gap-2 shrink-0">

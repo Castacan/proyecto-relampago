@@ -372,6 +372,7 @@ export default function CompetitionAdminPage() {
           <Link to="/staff/competencia/puntos" className={smallBtn}>Puntos y jueces</Link>
           <Link to="/staff/competencia/rifa" className={smallBtn}>Rifa</Link>
           <Link to="/staff/competencia/checkin" className={smallBtn}>Check-in</Link>
+          <Link to="/staff/competencia/imprimir" className={smallBtn}>Imprimir</Link>
           <button onClick={() => setShowCourtesy(v => !v)} className={smallBtn}>
             {showCourtesy ? 'Cerrar' : 'Cortesías'}
           </button>
