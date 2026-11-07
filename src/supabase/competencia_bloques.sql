@@ -109,7 +109,13 @@ LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $function$
          ELSE
            (CASE WHEN bool_or(a.result = 'top') THEN max(c.score_top)
                  WHEN bool_or(a.result = 'zone') THEN max(c.score_zone) ELSE 0 END)
-         END - count(*) FILTER (WHERE a.result <> 'top') * max(c.score_attempt_penalty),
+         -- Castigo por intento que no es top. 2026-11-06 (pedido del dueño): si el
+         -- bloque se queda en zona, la PRIMERA zona no se castiga (zona en el
+         -- bloque de valor 1 = 0.5 exacto). Las zonas repetidas y las caídas sí.
+         -- Si después hace top, se castiga todo igual que antes (el flash vale más).
+         END - (count(*) FILTER (WHERE a.result <> 'top')
+                - CASE WHEN bool_or(a.result = 'zone') AND NOT bool_or(a.result = 'top') THEN 1 ELSE 0 END)
+               * max(c.score_attempt_penalty),
          max(a.created_at),
          coalesce(min(a.created_at) FILTER (WHERE a.result = 'top'), min(a.created_at) FILTER (WHERE a.result = 'zone')),
          max(a.bvalue),

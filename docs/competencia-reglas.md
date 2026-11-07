@@ -18,6 +18,7 @@ Acordadas con el dueño el 2026-11-04. Reemplazan la idea del armador (10 por to
 - Cada bloque cuenta una sola vez, con lo mejor que sacó.
 - Cuentan los **5 bloques que más puntos le den** a cada quien (no "los 5 más difíciles").
 - **−0.01 por intento** en esos 5 bloques. Todo intento cuenta: fallido es fallido, también después de la zona.
+- **Excepción (2026-11-06):** si el bloque se queda en zona, la **primera zona no resta**. Zona al primer intento en el bloque que vale 1 = 0.5 exacto. Si vuelve a hacer zona, o se cayó antes de la zona, eso sí resta. Si después hace top, se cuentan todos los intentos como antes (zona y luego top en el 1 = 0.99; flash = 1).
 - Los intentos en bloques fuera de su top 5 no restan. Así conviene probar bloques duros.
 - Se muestra con decimales: "47.83 puntos".
 
