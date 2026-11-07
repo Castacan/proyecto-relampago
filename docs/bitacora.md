@@ -1114,3 +1114,10 @@ permitiendo al staff lo de antes.
 - Detalle en `docs/competencia-checkin.md`. El competidor firma en su celular con su primer nombre y el número que le da recepción.
 - SQL nuevo: `src/supabase/competencia_checkin.sql` (falta Run). También quita los números de la ruleta pública (`competencia_ruleta.sql` actualizado igual).
 - Faltan los textos de los documentos: el dueño los va a pasar y se cargan en /staff/competencia/checkin → Documentos.
+
+## 2026-11-06 — Limpieza final antes de la competencia
+
+- SQL del check-in corrido en producción (`competition_checkin_start` responde).
+- Anulados los 27 intentos de prueba de los jueces (motivo "Limpieza de pruebas antes de la competencia"). Ranking en 0, ruleta vacía, sin sorteos, sin boletos extra, sin check-ins.
+- Leaderboard 21–31 oct (dinámica de boletos extra), sacado con `get_leaderboard_for_range` igual que la TV: Agustin Sanchez 71, adan 70, Adrián Méndez 62, Heli canet 45, Matias Santos 38, Jose Carlos 34, Luis Fco 31, Gris R 23, Julien (El rey) 19, Jeringas 7.
+- Faltan los textos de los documentos del check-in.
