@@ -289,6 +289,9 @@ export default function RaffleWheelDisplay() {
             <p className="font-black text-texto-principal" style={{ fontSize: '3.4vh', lineHeight: 1.15 }}>
               Cada zona = <span className="text-primario">1 boleto</span> más en la ruleta
             </p>
+            <p className="font-bold text-zinc-300" style={{ fontSize: '2.2vh', lineHeight: 1.2 }}>
+              Quien gana un premio sale de la ruleta y ya no participa en las siguientes rifas.
+            </p>
             <div className="min-h-0 flex-1 overflow-hidden">
               <p className="font-black text-zinc-400 tracking-widest mb-[1.2vh]" style={{ fontSize: '2vh' }}>ACABAN DE GANAR BOLETO</p>
               <div className="space-y-[1vh]">
@@ -307,6 +310,9 @@ export default function RaffleWheelDisplay() {
           <div className="min-h-0 flex-1 overflow-hidden">
             <p className="font-black text-zinc-400 tracking-widest mb-[1.2vh]" style={{ fontSize: '2vh' }}>
               GANADORES · {winners.length} de {data?.prizes_total ?? 0}
+            </p>
+            <p className="font-bold text-zinc-300 mb-[1.2vh]" style={{ fontSize: '1.9vh', lineHeight: 1.2 }}>
+              Quien gana ya no participa en las siguientes rifas.
             </p>
             <div className="space-y-[0.8vh]">
               {winners.map(w => (
