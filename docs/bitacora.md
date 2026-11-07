@@ -1119,5 +1119,5 @@ permitiendo al staff lo de antes.
 
 - SQL del check-in corrido en producción (`competition_checkin_start` responde).
 - Anulados los 27 intentos de prueba de los jueces (motivo "Limpieza de pruebas antes de la competencia"). Ranking en 0, ruleta vacía, sin sorteos, sin boletos extra, sin check-ins.
-- Leaderboard 21–31 oct (dinámica de boletos extra), sacado con `get_leaderboard_for_range` igual que la TV: Agustin Sanchez 71, adan 70, Adrián Méndez 62, Heli canet 45, Matias Santos 38, Jose Carlos 34, Luis Fco 31, Gris R 23, Julien (El rey) 19, Jeringas 7.
+- Leaderboard 21–31 oct (dinámica de boletos extra), sacado con `get_leaderboard_for_range` igual que la TV: Agustin Sanchez 71, adan 70, Adrián Méndez 62, Heli canet 45, Matias Santos 38, Jose Carlos 34, Luis Fco 31, Gris R 23, Julien (El rey) 19, Jeringas 7. Solo 10 personas sumaron en ese rango. Julien y Jeringas no compiten. Se dio +1 boleto extra a los otros 8, ya ligados a su inscripción: #12 Agustin, #29 Adán, #14 Edgar Adrian, #34 Erick (Heli canet), #19 Matias, #18 Jose Carlos, #10 Luis Francisco, #3 Grisel.
 - Faltan los textos de los documentos del check-in.
