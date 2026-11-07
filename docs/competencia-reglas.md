@@ -15,11 +15,12 @@ Acordadas con el dueño el 2026-11-04. Reemplazan la idea del armador (10 por to
 
 - Los bloques se ordenan por dificultad: el más fácil vale 1 y el más difícil vale 24.
 - Top = valor del bloque. Zona = la mitad (zona en el 9 = 4.5).
+- **Zonas solo de tu nivel (2026-11-07):** una zona suma solo si el bloque es del nivel final de la persona o de uno más fácil; si es de un nivel más alto vale 0 (sí da boleto de rifa). En Puntos esas zonas dicen "arriba de su nivel, no suma". Si el admin pone el nivel a mano, se recalcula con ese nivel.
 - Top: controlar la presa final con las dos manos durante 3 segundos. Zona: llegar a la presa de zona, controlarla y progresar desde ella (definiciones del dueño, 2026-11-07). Salida: bien marcada con las 4 extremidades; es oficial (cuenta como intento) al levantar todas las extremidades de la colchoneta.
 - Página pública con todo esto explicado fácil: /competencia/reglamento ("¿Cómo se califica?").
 - Cada bloque cuenta una sola vez, con lo mejor que sacó.
 - Cuentan los **5 bloques que más puntos le den** a cada quien (no "los 5 más difíciles").
-- **−0.01 por intento** en esos 5 bloques. Todo intento cuenta: fallido es fallido, también después de la zona.
+- **−0.01 por intento** en esos 5 bloques. Todo intento cuenta: fallido es fallido, también después de la zona. Un bloque sin zona ni top vale 0 (nunca resta, 2026-11-07).
 - **Excepción (2026-11-06):** si el bloque se queda en zona, la **primera zona no resta**. Zona al primer intento en el bloque que vale 1 = 0.5 exacto. Si vuelve a hacer zona, o se cayó antes de la zona, eso sí resta. Si después hace top, se cuentan todos los intentos como antes (zona y luego top en el 1 = 0.99; flash = 1).
 - Los intentos en bloques fuera de su top 5 no restan. Así conviene probar bloques duros.
 - Se muestra con decimales: "47.83 puntos".

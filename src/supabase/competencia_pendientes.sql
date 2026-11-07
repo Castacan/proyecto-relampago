@@ -312,14 +312,31 @@ BEGIN
   SELECT c.count_best INTO v_best FROM competitions c WHERE c.id = p_competition_id;
 
   RETURN QUERY
-  WITH rr AS (
-    SELECT x.*, row_number() OVER (PARTITION BY x.registration_id
-                                   ORDER BY x.points DESC, x.block_value DESC) AS k
-    FROM competition_route_results(p_competition_id) x
+  -- 2026-11-07 (regla del dueño): una zona solo suma si el bloque es de su nivel
+  -- final o de uno más fácil. Una zona en un bloque de nivel más alto vale 0
+  -- (sí da boleto para la rifa). El nivel final sale de sus tops (o el nivel a mano).
+  WITH base AS (SELECT * FROM competition_route_results(p_competition_id)),
+  lvl AS (
+    SELECT r.id AS rid, coalesce(r.level_override,
+             CASE coalesce((SELECT max(competition_level_rank(b.block_level)) FROM base b
+                            WHERE b.registration_id = r.id AND b.topped), 1)
+               WHEN 3 THEN 'avanzado' WHEN 2 THEN 'intermedio' ELSE 'basico' END) AS lv
+    FROM competition_registrations r WHERE r.competition_id = p_competition_id
+  ),
+  adj AS (
+    SELECT x.*, CASE WHEN NOT x.topped AND x.zoned
+                       AND competition_level_rank(x.block_level) > competition_level_rank(l.lv)
+                     THEN 0::numeric ELSE x.points END AS pts
+    FROM base x JOIN lvl l ON l.rid = x.registration_id
+  ),
+  rr AS (
+    SELECT a.*, row_number() OVER (PARTITION BY a.registration_id
+                                   ORDER BY a.pts DESC, a.block_value DESC) AS k
+    FROM adj a
   ),
   per AS (
     SELECT r.id, r.bib, r.full_name, r.category_id, cc.gender, r.level_override,
-           round(coalesce(sum(rr.points) FILTER (WHERE rr.k <= v_best), 0), 3) AS points,
+           round(coalesce(sum(rr.pts) FILTER (WHERE rr.k <= v_best), 0), 3) AS points,
            count(*) FILTER (WHERE rr.topped)::int AS tops,
            count(*) FILTER (WHERE rr.zoned)::int AS zones,
            count(*) FILTER (WHERE rr.flash)::int AS flashes,
@@ -332,7 +349,7 @@ BEGIN
              WHEN 3 THEN 'avanzado' WHEN 2 THEN 'intermedio' ELSE 'basico' END AS auto_level,
            -- 6º, 7º, … mejor bloque, para desempatar.
            -- Solo bloques que dieron puntos (2026-11-07: un bloque de puras caídas no desempata).
-           coalesce(array_agg(rr.points ORDER BY rr.k) FILTER (WHERE rr.k > v_best AND rr.points > 0), '{}') AS extra,
+           coalesce(array_agg(rr.pts ORDER BY rr.k) FILTER (WHERE rr.k > v_best AND rr.pts > 0), '{}') AS extra,
            max(rr.last_at) AS last_at,
            max(rr.achieved_at) AS achieved_at
     FROM competition_registrations r

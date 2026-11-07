@@ -23,6 +23,7 @@ export interface RouteResult {
   points: number | null          // null en la tarjeta del juez (modo bloques)
   block_value?: number | null    // modo bloques: valor del bloque (secreto)
   block_level?: CompetitionLevel | null
+  above_level?: boolean          // zona en un bloque de nivel más alto que el suyo: no suma (regla 2026-11-07)
 }
 
 export type CompetitionLevel = 'basico' | 'intermedio' | 'avanzado'

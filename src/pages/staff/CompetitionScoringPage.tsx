@@ -293,7 +293,7 @@ function CompetitorDetail({ row, data, onChanged }: { row: RankingRow; data: Sco
         <div className="flex flex-wrap gap-1.5">
           {row.routes.map((rt, i) => (
             <span key={rt.route_number} className={`text-[11px] font-bold px-2 py-1 rounded-lg border ${rt.topped ? 'border-exito/50 text-exito' : rt.zoned ? 'border-atencion/50 text-atencion' : 'border-zinc-700 text-zinc-300'} ${blocksMode && i >= best ? 'opacity-50' : ''}`}>
-              {blocksMode ? `B${rt.route_number} (vale ${rt.block_value})` : `R${rt.route_number}`}: {rt.topped ? (rt.flash ? 'flash' : 'top') : rt.zoned ? 'zona' : 'nada'} · {rt.attempts} int. · {fmtPoints(rt.points)}
+              {blocksMode ? `B${rt.route_number} (vale ${rt.block_value})` : `R${rt.route_number}`}: {rt.topped ? (rt.flash ? 'flash' : 'top') : rt.zoned ? 'zona' : 'nada'} · {rt.attempts} int. · {rt.above_level ? 'arriba de su nivel, no suma' : fmtPoints(rt.points)}
             </span>
           ))}
         </div>

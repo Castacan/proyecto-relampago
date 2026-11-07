@@ -75,6 +75,7 @@ export default function CompetitionRulesPage() {
             <p className={p}><b className="text-texto-principal">Top:</b> llegas a la presa final y la controlas con las dos manos durante 3 segundos. Te llevas el valor del bloque.</p>
             <p className={p}><b className="text-texto-principal">Zona:</b> llegas a la presa de zona marcada en el bloque, la controlas y progresas desde ella. Te llevas la mitad del valor (zona en un bloque que vale 9 = 4.5).</p>
             <p className={p}>Zona y top no se suman: en cada bloque te quedas con tu mejor resultado. Si hiciste zona y después top, te llevas el top.</p>
+            <p className={p}><b className="text-texto-principal">Las zonas solo suman si el bloque es de tu nivel o de uno más fácil.</b> Tu nivel lo deciden tus tops (ve "Tu categoría final"). Una zona en un bloque de nivel más alto no suma puntos, pero sí te da boleto para la rifa.</p>
             <p className={p}>Cuando haces top en un bloque, <b className="text-texto-principal">ese bloque se cierra</b> para ti: ya no lo puedes volver a intentar.</p>
           </div>
         </section>
