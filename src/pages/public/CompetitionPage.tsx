@@ -151,7 +151,7 @@ export default function CompetitionPage() {
         <img src={logoHorizontal} alt="Jaibamuro" className="h-5 w-auto" />
         <div className="flex items-center gap-4">
           <Link to="/competencia/reglamento" className="text-primario text-xs font-bold hover:text-primario-hover transition-colors">
-            Cómo se gana
+            Cómo se califica
           </Link>
           <Link to="/competencia/consulta" className="text-primario text-xs font-bold hover:text-primario-hover transition-colors">
             Consulta tu inscripción

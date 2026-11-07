@@ -1,7 +1,7 @@
 import { Link } from 'react-router-dom'
 import logoHorizontal from '../../assets/logo-horizontal.png'
 
-// /competencia/reglamento — sistema de puntuación explicado fácil (pedido del dueño, 2026-11-06),
+// /competencia/reglamento — "¿Cómo se califica?": sistema de puntuación explicado fácil (pedido del dueño, 2026-11-06),
 // para ser transparentes con los competidores. Debe coincidir con docs/competencia-reglas.md y con
 // competition_route_results / competition_ranking (src/supabase/competencia_bloques.sql).
 // NO revela el orden de dificultad de los bloques (eso solo lo sabe el staff).
@@ -19,7 +19,7 @@ function Step({ n, children }: { n: number; children: React.ReactNode }) {
   )
 }
 
-function Example({ title, rows, total }: { title: string; rows: [string, string][]; total: string }) {
+function Example({ title, rows, total }: { title: string; rows: [string, string][]; total?: string }) {
   return (
     <div className="rounded-xl bg-fondo/60 border border-zinc-800 p-4">
       <p className="text-texto-principal font-bold text-sm mb-2">{title}</p>
@@ -31,10 +31,12 @@ function Example({ title, rows, total }: { title: string; rows: [string, string]
           </div>
         ))}
       </div>
-      <div className="flex justify-between gap-3 mt-2 pt-2 border-t border-zinc-800 text-sm">
-        <span className="text-zinc-300 font-bold">Total</span>
-        <span className="text-primario font-black tabular-nums">{total}</span>
-      </div>
+      {total && (
+        <div className="flex justify-between gap-3 mt-2 pt-2 border-t border-zinc-800 text-sm">
+          <span className="text-zinc-300 font-bold">Total</span>
+          <span className="text-primario font-black tabular-nums">{total}</span>
+        </div>
+      )}
     </div>
   )
 }
@@ -52,12 +54,11 @@ export default function CompetitionRulesPage() {
       <main className="max-w-xl mx-auto px-4 py-6 space-y-5">
         <div>
           <p className="text-primario font-black text-xs tracking-widest">JAM · JAIBAS AL MURO 2026</p>
-          <h1 className="text-texto-principal font-black text-3xl leading-tight mt-1">¿Cómo se gana?</h1>
-          <p className={`${p} mt-2`}>Así calculamos los puntos y el ranking. Es el mismo cálculo que hace el sistema, sin letras chiquitas.</p>
+          <h1 className="text-texto-principal font-black text-3xl leading-tight mt-1">¿Cómo se califica?</h1>
         </div>
 
         <section className={card}>
-          <h2 className={h2}>En 30 segundos</h2>
+          <h2 className={h2}>Lo básico</h2>
           <ol className="space-y-3">
             <Step n={1}>Hay <b className="text-texto-principal">24 bloques numerados</b>. Intentas los que quieras durante tu horario.</Step>
             <Step n={2}>Cada bloque vale según su dificultad: <b className="text-texto-principal">el más fácil vale 1 y el más difícil vale 24</b>. Los números de los bloques están revueltos: el bloque #3 no vale 3.</Step>
@@ -70,9 +71,9 @@ export default function CompetitionRulesPage() {
         <section className={card}>
           <h2 className={h2}>Top y zona</h2>
           <div className="space-y-3">
-            <p className={p}><b className="text-texto-principal">Top:</b> llegas a la presa final y la controlas con las dos manos. Te llevas el valor del bloque.</p>
-            <p className={p}><b className="text-texto-principal">Zona:</b> controlas la presa de zona marcada en el bloque. Te llevas la mitad del valor (zona en un bloque que vale 9 = 4.5).</p>
-            <p className={p}>Cada bloque cuenta una sola vez, con lo mejor que sacaste en él.</p>
+            <p className={p}><b className="text-texto-principal">Top:</b> llegas a la presa final y la controlas con las dos manos durante 3 segundos. Te llevas el valor del bloque.</p>
+            <p className={p}><b className="text-texto-principal">Zona:</b> llegas a la presa de zona marcada en el bloque, la controlas y progresas desde ella. Te llevas la mitad del valor (zona en un bloque que vale 9 = 4.5).</p>
+            <p className={p}>Zona y top no se suman: en cada bloque te quedas con tu mejor resultado. Si hiciste zona y después top, te llevas el top.</p>
             <p className={p}>Cuando haces top en un bloque, <b className="text-texto-principal">ese bloque se cierra</b> para ti: ya no lo puedes volver a intentar.</p>
           </div>
         </section>
@@ -84,7 +85,7 @@ export default function CompetitionRulesPage() {
             <ul className="space-y-2 text-[15px] text-zinc-300 list-disc pl-5">
               <li><b className="text-texto-principal">Flash</b> (top al primer intento): no resta nada.</li>
               <li><b className="text-texto-principal">Tu primera zona no resta</b> si el bloque se te queda en zona. Si vuelves a hacer zona o te caes antes, eso sí resta.</li>
-              <li>Si después de la zona haces top, cuentan todos tus intentos. Por eso un flash siempre vale más.</li>
+              <li>Si en un intento haces zona y en otro haces top, te llevas el valor completo del top menos 0.01 por aquel intento de zona. Ejemplo en un bloque que vale 10: zona y luego top = 9.99; flash = 10.</li>
               <li>Solo restan los intentos de tus 5 bloques que cuentan. <b className="text-texto-principal">Probar bloques difíciles no te quita puntos</b> si no los sacas.</li>
             </ul>
           </div>
@@ -99,7 +100,7 @@ export default function CompetitionRulesPage() {
               ['Zona al primer intento (y ahí se queda)', '5.00'],
               ['Te caes, luego zona', '4.99'],
               ['Zona y luego top', '9.99'],
-            ]} total="—" />
+            ]} />
             <Example title="Tu total con tus 5 mejores bloques" rows={[
               ['Top en uno que vale 18 (2 intentos)', '17.99'],
               ['Flash en uno que vale 14', '14.00'],
@@ -132,7 +133,6 @@ export default function CompetitionRulesPage() {
             <Step n={2}>El <b className="text-texto-principal">bloque más difícil</b> en el que hiciste top.</Step>
             <Step n={3}>Más <b className="text-texto-principal">flashes</b> en tus 5 bloques que cuentan.</Step>
             <Step n={4}>Tu <b className="text-texto-principal">6º mejor bloque</b>, luego el 7º, y así.</Step>
-            <Step n={5}>Si sigue el empate, comparten el lugar. En podio, la organización puede hacer una superfinal.</Step>
           </ol>
         </section>
 

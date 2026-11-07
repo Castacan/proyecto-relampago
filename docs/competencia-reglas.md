@@ -15,6 +15,8 @@ Acordadas con el dueño el 2026-11-04. Reemplazan la idea del armador (10 por to
 
 - Los bloques se ordenan por dificultad: el más fácil vale 1 y el más difícil vale 24.
 - Top = valor del bloque. Zona = la mitad (zona en el 9 = 4.5).
+- Top: controlar la presa final con las dos manos durante 3 segundos. Zona: llegar a la presa de zona, controlarla y progresar desde ella (definiciones del dueño, 2026-11-07).
+- Página pública con todo esto explicado fácil: /competencia/reglamento ("¿Cómo se califica?").
 - Cada bloque cuenta una sola vez, con lo mejor que sacó.
 - Cuentan los **5 bloques que más puntos le den** a cada quien (no "los 5 más difíciles").
 - **−0.01 por intento** en esos 5 bloques. Todo intento cuenta: fallido es fallido, también después de la zona.
