@@ -1139,4 +1139,5 @@ permitiendo al staff lo de antes.
 - Nueva página pública `/competencia/resultados` (`CompetitionResultsPage.tsx`): ranking final por categoría (lugar, nombre, número, tops, zonas, puntos) con buscador. Solo LEE `get_competition_ranking_public` (mismo cálculo que Puntos); no cambia datos ni hay SQL nuevo.
 - Se publica sola cuando el admin prende "Ranking visible sin sesión" en Puntos → Ajustes y da Guardar. Mientras esté apagado, el público ve "se publican muy pronto" y el admin con sesión ve una vista previa con aviso.
 - Verificado antes del push: las 64 personas, lugares y puntos coinciden con el ranking del staff; sin sesión responde `hidden`.
+- Quien no escaló (0 puntos, sin tops ni zonas) no aparece en resultados (Lilia, Rafa, Vicente).
 - Correcciones del día: Regina Valle #62 (número a mano, pendiente de pago), top equivocado de Adán en el bloque 3 anulado (SQL corrido por el dueño).

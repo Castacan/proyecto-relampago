@@ -48,6 +48,8 @@ export default function CompetitionResultsPage() {
 
   const term = q.trim().toLowerCase()
   const cats = (data?.categories ?? [])
+    // Fuera quien no escaló (0 puntos, sin tops ni zonas): inscritos que no participaron.
+    .map(c => ({ ...c, ranking: c.ranking.filter(r => r.points > 0 || r.tops > 0 || r.zones > 0) }))
     .map(c => ({ ...c, ranking: c.ranking.filter(r => !term || r.full_name.toLowerCase().includes(term) || String(r.bib ?? '') === term) }))
     .filter(c => c.ranking.length > 0)
 
