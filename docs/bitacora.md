@@ -1134,3 +1134,9 @@ permitiendo al staff lo de antes.
 - `/staff/competencia/imprimir` (`CompetitionPrintPage.tsx`, nuevo): se marca qué imprimir. Opciones: carteles con QR (check-in, "¿Cómo se califica?", jueces), lista de recepción A–Z con casillas de check-in y playera, lista por horario, hojas de respaldo para jueces y números para el pecho (2 por hoja). Usa los datos al momento. Ligada desde Inscripciones y Check-in.
 - Arreglo de impresión: `index.css` escondía `#root` en TODA impresión (por la hoja de QRs de rutas), así que imprimir desde cualquier otra página salía en blanco, incluido "Ver firmas". Ahora solo se esconde si existe `#qr-print-sheet` o `#comp-print-sheet` (`body:has`).
 - Faltan los textos de los documentos del check-in.
+
+## 2026-11-08 — Página de resultados de la competencia
+- Nueva página pública `/competencia/resultados` (`CompetitionResultsPage.tsx`): ranking final por categoría (lugar, nombre, número, tops, zonas, puntos) con buscador. Solo LEE `get_competition_ranking_public` (mismo cálculo que Puntos); no cambia datos ni hay SQL nuevo.
+- Se publica sola cuando el admin prende "Ranking visible sin sesión" en Puntos → Ajustes y da Guardar. Mientras esté apagado, el público ve "se publican muy pronto" y el admin con sesión ve una vista previa con aviso.
+- Verificado antes del push: las 64 personas, lugares y puntos coinciden con el ranking del staff; sin sesión responde `hidden`.
+- Correcciones del día: Regina Valle #62 (número a mano, pendiente de pago), top equivocado de Adán en el bloque 3 anulado (SQL corrido por el dueño).

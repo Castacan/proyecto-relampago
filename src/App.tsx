@@ -32,6 +32,7 @@ import CompetitionCheckinAdminPage from './pages/staff/CompetitionCheckinAdminPa
 import CompetitionCheckinPage from './pages/public/CompetitionCheckinPage'
 import CompetitionRulesPage from './pages/public/CompetitionRulesPage'
 import CompetitionPrintPage from './pages/staff/CompetitionPrintPage'
+import CompetitionResultsPage from './pages/public/CompetitionResultsPage'
 import JudgePage from './pages/public/JudgePage'
 import ClassesPage from './pages/public/ClassesPage'
 import ClassesAdminPage from './pages/staff/ClassesAdminPage'
@@ -88,6 +89,7 @@ export default function App() {
         <Route path="/competencia/ruleta" element={<RaffleWheelDisplay />} />
         <Route path="/competencia/checkin" element={<CompetitionCheckinPage />} />
         <Route path="/competencia/reglamento" element={<CompetitionRulesPage />} />
+        <Route path="/competencia/resultados" element={<CompetitionResultsPage />} />
         <Route path="/juez" element={<JudgePage />} />
         <Route path="/clases" element={<ClassesPage />} />
         <Route path="/domiciliacion/:token" element={<SubscriptionSetupPage />} />
