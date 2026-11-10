@@ -1150,3 +1150,17 @@ permitiendo al staff lo de antes.
 - Cierre: interruptor "Inscripciones abiertas" del panel /staff/competencia → apagado. Eso también detiene los recordatorios de pago (el cron filtra `c.is_open`).
 - Un link de Clip que alguien ya tuviera abierto sigue siendo pagable en Clip hasta que venza; si entra un pago así, sale en el panel y se reembolsa.
 - 2026-11-10: Inge corrió `competencia_cierre.sql` en producción (Success).
+
+### 2026-11-10 — Migración de EVO, paso 1: ventas históricas
+
+- Inge: migrar de EVO empezando por las ventas (desde la primera) y luego los gastos.
+- Fuente: EVO → Gestión/Reportes → Ventas → Ventas detalladas → Exportar, del 01/01/2024 a hoy. Tipo = Plan, Plan adicional fijo, Producto y Servicio (con "adicional opcional" o "secundario" sale vacío). Ventas manuales, en línea, cobro recurrente y cambio de plan. El reporte vive en un iframe de evo3 que no se puede leer: se exporta en el Chrome de la laptop y Inge sube el Excel al chat.
+- Contenido (al 9-nov-2026): 2,101 renglones, 1,182 ventas, 27-oct-2025 → 9-nov-2026, $201,046 (igual al "Total general" de EVO), 450 personas de EVO.
+- `scripts/evo_ventas_sql.py <Vendas.xlsx> <salida.sql>` genera el SQL. **La salida trae nombres de clientes: se genera fuera del repo y no se sube a git.**
+  - Agrega `people.evo_id` y `sales.evo_sale_id` (únicos) y `source = 'evo'` en sales. Idempotente: se puede volver a correr con un Excel más nuevo.
+  - Personas: por `evo_id`; si no, por nombre igual (sin acentos ni mayúsculas) cuando hay exactamente una; si no, ficha nueva (`source = 'evo'`). "VENTAS GENERAL PRODUCTOS" queda sin persona.
+  - Productos: mapa de nombres de EVO → los 15 de `erp_productos_evo.sql` + servicios; Membresía Parejas y Prueba Domiciliación quedan sin producto.
+  - Pagos: Efectivo → cash; crédito/débito/en línea → card (referencia dice cuál); mixto → other con nota; "Ninguno"/"Saldo deudor" → venta sin pago (7 ventas, $2,400).
+  - Sin caja, sin inventario, sin membresías.
+- Probado en PGlite con las tablas reales: totales por mes idénticos a EVO, segunda corrida no duplica, liga por nombre y no liga si el nombre es ambiguo.
+- UI: etiqueta "Importada de EVO" en ventas y "Venía de EVO" en la ficha.

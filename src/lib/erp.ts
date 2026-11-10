@@ -68,6 +68,7 @@ export const SOURCE_LABELS: Record<string, string> = {
   class: 'Clase',
   subscription: 'Domiciliación',
   online: 'En línea',
+  evo: 'Importada de EVO',
 }
 
 export const SUB_STATUS: Record<string, { label: string; cls: string }> = {

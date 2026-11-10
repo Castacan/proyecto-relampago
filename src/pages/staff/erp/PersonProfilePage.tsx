@@ -99,7 +99,7 @@ export default function PersonProfilePage() {
             <dt className="text-zinc-400">Nacimiento</dt><dd className="text-texto-principal">{person.birth_date ? fmtDate(person.birth_date) : '—'}</dd>
             <dt className="text-zinc-400">Emergencia</dt><dd className="text-texto-principal">{person.emergency_name ? `${person.emergency_name} · ${person.emergency_phone ?? ''}` : '—'}</dd>
             {person.is_minor && <><dt className="text-zinc-400">Tutor</dt><dd className="text-texto-principal">{person.guardian_name ? `${person.guardian_name} · ${person.guardian_phone ?? ''}` : 'Falta capturar'}</dd></>}
-            <dt className="text-zinc-400">Nos conoció</dt><dd className="text-texto-principal">{person.source === 'staff' ? 'Registrado en el gym' : person.source === 'web' ? 'Se registró en la app' : person.source ?? '—'}</dd>
+            <dt className="text-zinc-400">Nos conoció</dt><dd className="text-texto-principal">{person.source === 'staff' ? 'Registrado en el gym' : person.source === 'web' ? 'Se registró en la app' : person.source === 'evo' ? 'Venía de EVO' : person.source ?? '—'}</dd>
             <dt className="text-zinc-400">Nota</dt><dd className="text-texto-principal whitespace-pre-line">{person.note ?? '—'}</dd>
           </dl>
         </Card>
