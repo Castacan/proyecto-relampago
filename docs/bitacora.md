@@ -1149,3 +1149,4 @@ permitiendo al staff lo de antes.
 - Arreglo: si la competencia está cerrada, regresa `closed` antes de crear o reusar el link (`src/supabase/competencia_cierre.sql`, también en `competencia_pagos.sql`); mensaje nuevo en `PAYMENT_ERRORS`.
 - Cierre: interruptor "Inscripciones abiertas" del panel /staff/competencia → apagado. Eso también detiene los recordatorios de pago (el cron filtra `c.is_open`).
 - Un link de Clip que alguien ya tuviera abierto sigue siendo pagable en Clip hasta que venza; si entra un pago así, sale en el panel y se reembolsa.
+- 2026-11-10: Inge corrió `competencia_cierre.sql` en producción (Success).
