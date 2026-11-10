@@ -178,6 +178,7 @@ export const PAYMENT_ERRORS: Record<string, string> = {
   not_found: 'No encontramos tu inscripción. Revisa tu folio y correo.',
   already_paid: 'Esta inscripción ya está pagada.',
   not_payable: 'Esta inscripción ya no se puede pagar. Escríbenos si crees que es un error.',
+  closed: 'Las inscripciones ya están cerradas, así que no se puede pagar en línea.',
   full: 'Tu reserva venció y ya no quedan lugares, por eso no generamos el cobro.',
   busy: 'Ya estamos generando tu pago. Espera unos segundos e intenta de nuevo.',
   not_configured: 'El pago en línea aún no está disponible. Te contactaremos con los datos para pagar.',

@@ -112,6 +112,8 @@ BEGIN
 
   IF v_reg.status = 'paid' THEN RETURN jsonb_build_object('error', 'already_paid'); END IF;
   IF v_reg.status <> 'pending_payment' THEN RETURN jsonb_build_object('error', 'not_payable'); END IF;
+  -- Con las inscripciones cerradas ya no se cobra (ni se reusa un link viejo).
+  IF NOT v_comp.is_open THEN RETURN jsonb_build_object('error', 'closed'); END IF;
 
   IF v_reg.hold_expires_at <= now() THEN
     SELECT cc.* INTO v_cat FROM competition_categories cc WHERE cc.id = v_reg.category_id;
