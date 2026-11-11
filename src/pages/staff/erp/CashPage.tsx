@@ -121,7 +121,11 @@ function OpenCash({ session, onChanged }: { session: OpenSession; onChanged: () 
     if (error) { setMsg(erpError(error)); return }
     setMovAmount(''); setMovNote(''); onChanged()
   }
+  const [confirming, setConfirming] = useState(false)
   const close = async () => {
+    if (diff !== null && diff !== 0 && closeNote.trim().length < 3) { setMsg('Explica la diferencia antes de cerrar (mínimo 3 letras).'); return }
+    if (!confirming) { setConfirming(true); return }
+    setConfirming(false)
     setBusy(true); setMsg(null)
     const { error } = await call('close_cash', { p_counted_cents: toCents(counted), p_note: closeNote || null })
     setBusy(false)
@@ -177,7 +181,15 @@ function OpenCash({ session, onChanged }: { session: OpenSession; onChanged: () 
               <input value={closeNote} onChange={e => setCloseNote(e.target.value)} className={input} placeholder="Ej. di mal un cambio" />
             </div>
           )}
-          <button onClick={close} disabled={busy || counted === ''} className={`${btnPrimary} mt-3`}>{busy ? 'Cerrando…' : 'Cerrar caja'}</button>
+          {confirming && (
+            <p className="text-texto-principal text-sm font-semibold mt-3">
+              ¿Cerrar la caja con {money(toCents(counted))} contados{diff ? ` (${diff > 0 ? 'sobran' : 'faltan'} ${money(Math.abs(diff))})` : ''}? Ya no se podrá vender hasta abrirla otra vez.
+            </p>
+          )}
+          <div className="flex gap-2 mt-3">
+            <button onClick={close} disabled={busy || counted === ''} className={btnPrimary}>{busy ? 'Cerrando…' : confirming ? 'Sí, cerrar caja' : 'Cerrar caja'}</button>
+            {confirming && <button onClick={() => setConfirming(false)} className={btnGhost}>No, regresar</button>}
+          </div>
         </Card>
       </div>
       <Msg text={msg} />

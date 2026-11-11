@@ -122,7 +122,7 @@ function SessionPanel({ s, settings, isAdmin, onChanged }: { s: DaySession; sett
   const [showCancelled, setShowCancelled] = useState(false)
   const active = s.bookings.filter(b => isActiveBooking(b.status))
   const cancelled = s.bookings.filter(b => !isActiveBooking(b.status))
-  const owed = active.filter(b => b.payment_status === 'pending').reduce((acc, b) => acc + b.amount_cents, 0)
+  const owed = active.filter(b => b.payment_status === 'pending' && b.status !== 'no_show').reduce((acc, b) => acc + b.amount_cents, 0)
 
   const cancelSession = async () => {
     const { data, error } = await db.rpc('admin_cancel_session', { p_session_id: s.id, p_reason: reason })
@@ -217,7 +217,7 @@ function BookingRow({ b, settings, onChanged }: { b: BookingInfo; settings: Clas
       <p className="text-zinc-400 text-xs">
         {PRICE_TIER_LABELS[b.price_tier]}
         {b.amount_cents > 0 && ` · ${formatMoney(b.amount_cents)}`}
-        {b.payment_status === 'pending' && <span className="text-amarillo-suave font-semibold"> · por cobrar</span>}
+        {b.payment_status === 'pending' && b.status !== 'no_show' && <span className="text-amarillo-suave font-semibold"> · por cobrar</span>}
         {b.payment_status === 'paid' && ` · pagado (${PAID_WITH_LABELS[b.paid_with ?? ''] ?? b.paid_with})`}
         {b.phone && ` · ${b.phone}`}
       </p>

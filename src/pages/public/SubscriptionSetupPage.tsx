@@ -64,9 +64,9 @@ export default function SubscriptionSetupPage() {
         {error && <p className="text-alerta font-semibold text-center py-10">{error}</p>}
         {!s && !error && <div className="flex justify-center py-16"><div className="w-8 h-8 rounded-full border-2 border-primario border-t-transparent animate-spin" /></div>}
         {s && done && (
-          <div className="bg-superficie rounded-2xl border border-exito/50 p-6 text-center space-y-2">
-            <p className="text-exito font-black text-2xl">¡Listo!</p>
-            <p className="text-texto-principal">Tu tarjeta •••• {done.last4} quedó registrada.</p>
+          <div className={`bg-superficie rounded-2xl border p-6 text-center space-y-2 ${done.charge === 'failed' ? 'border-alerta/60' : 'border-exito/50'}`}>
+            <p className={`font-black text-2xl ${done.charge === 'failed' ? 'text-alerta' : 'text-exito'}`}>{done.charge === 'failed' ? 'No se pudo cobrar' : '¡Listo!'}</p>
+            <p className="text-texto-principal">Tu tarjeta •••• {done.last4} {done.charge === 'failed' ? 'quedó guardada, pero el banco no aceptó el cobro.' : 'quedó registrada.'}</p>
             {done.charge === 'paid' && <p className="text-zinc-300 text-sm">Ya cobramos tu primer mes. Te mandamos el recibo por correo.</p>}
             {done.charge === 'failed' && <p className="text-alerta text-sm font-semibold">El banco rechazó el cobro. Intenta con otra tarjeta o avísanos en el gym.</p>}
             {(done.charge === 'unknown' || done.charge === 'needs_action') && <p className="text-amarillo-suave text-sm">El cobro está en revisión con el banco; te avisamos por correo.</p>}
@@ -88,8 +88,8 @@ export default function SubscriptionSetupPage() {
                 <span className="text-primario font-black">{chargesToday ? money(s.next_amount_cents) : `${fmtDate(s.next_charge_on)} · ${money(s.next_amount_cents)}`}</span></div>
               {s.card_last4 && <div className="flex justify-between"><span className="text-zinc-400">Tarjeta actual</span><span className="text-texto-principal">{s.card_brand} •••• {s.card_last4}</span></div>}
             </div>
+            <p className="text-zinc-300 text-sm">🔒 Tus datos de tarjeta van directo a {s.provider === 'openpay' ? 'Openpay (BBVA)' : 'Stripe'}; Jaibamuro no los ve ni los guarda. Puedes cancelar cuando quieras avisando en el gym.</p>
             {s.provider === 'openpay' ? <OpenpayForm s={s} token={token} onDone={setDone} /> : <StripeForm s={s} token={token} onDone={setDone} />}
-            <p className="text-zinc-500 text-xs text-center">Tus datos de tarjeta se procesan directamente con {s.provider === 'openpay' ? 'Openpay (BBVA)' : 'Stripe'}; Jaibamuro no los ve ni los guarda. Puedes cancelar cuando quieras avisando en el gym.</p>
           </>
         )}
       </div>

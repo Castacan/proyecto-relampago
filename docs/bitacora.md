@@ -1205,3 +1205,12 @@ Inge pidió atacar en paralelo la migración, la recepción con cámara y el cob
 - **Aviso de privacidad v2** propuesto en `docs/aviso-privacidad-propuesta.md`. Falta el nombre o razón social del responsable. Nota: hoy firmar el aviso = autorizar la cámara; convendría una casilla aparte.
 - **Laptop de recepción:** `docs/recepcion-laptop.md` (perfil de Chrome, `--app`, inicio automático, energía, cámara).
 - **Domiciliados de EVO:** `src/supabase/erp_evo_domiciliados.sql` (`get_evo_subscribers`) y la tarjeta "Pasar de EVO" en Domiciliaciones. Probado en PGlite con los datos reales de membresías: 5 personas en 60 días, 4 vigentes. Quedó pegado en la pestaña 2 del SQL Editor, antes de las membresías. Falta Run.
+
+**2026-11-11 (cierre): arreglos de la auditoría que no necesitan decisión**
+- Aviso de privacidad v2 con responsable **Regina Valle Gutiérrez** (persona física), en `src/supabase/erp_privacidad_v2.sql`. Apaga la v1 e inserta la v2; es idempotente y está probado en PGlite con el trigger de inmutabilidad. NO está pegado todavía: falta que Inge confirme que hola@jaibamuro.com recibe correo.
+- Caja: el corte pide confirmar ("¿Cerrar la caja con $X…?") y la explicación es obligatoria si no cuadra.
+- Firma: debajo del botón dice qué falta (nombre, casilla, firma).
+- /registro: "Te damos la bienvenida" y la salida "¿No puedes abrir tu correo…? te registramos en recepción".
+- Personas: los de EVO sin membresía dicen "Cliente de EVO", no "Prospecto". "Nuevos sin foto" (3 días) y "Personas nuevas" (7 días) se limpian solos el 13 y el 17 de noviembre; no se tocó SQL.
+- Clases: "por cobrar" ya no cuenta a los que faltaron.
+- Link de domiciliación: si el banco rechaza, dice "No se pudo cobrar" en rojo, no "¡Listo!", y la garantía de Openpay va arriba del formulario.

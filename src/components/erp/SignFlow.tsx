@@ -67,6 +67,11 @@ export default function SignFlow({ docs, defaultName, isMinor, defaultGuardian, 
       </label>
       <SignaturePad key={padKey} onChange={setSig} />
       {error && <p role="alert" className="text-alerta text-sm font-semibold">{error}</p>}
+      {!busy && (name.trim().length < 3 || !accepted || !sig) && (
+        <p className={`text-xs ${light ? 'text-zinc-500' : 'text-zinc-400'}`}>
+          Para firmar falta: {[name.trim().length < 3 && 'escribir tu nombre completo', !accepted && 'marcar la casilla "Leí el documento"', !sig && 'dibujar tu firma en el recuadro'].filter(Boolean).join(', ')}.
+        </p>
+      )}
       <button onClick={submit} disabled={busy || !accepted || !sig || name.trim().length < 3}
         className="w-full py-3 rounded-xl bg-primario text-texto-en-acento font-black disabled:opacity-40">
         {busy ? 'Guardando…' : i + 1 < docs.length ? 'Firmar y continuar' : 'Firmar'}

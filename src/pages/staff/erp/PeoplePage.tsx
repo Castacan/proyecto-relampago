@@ -6,7 +6,7 @@ import PersonForm from '../../../components/erp/PersonForm'
 
 interface PersonRow {
   id: string; full_name: string; phone: string | null; email: string | null; has_login: boolean
-  membership_until: string | null; membership_last_until: string | null; subscription_status: string | null
+  membership_until: string | null; membership_last_until: string | null; subscription_status: string | null; source?: string | null
 }
 
 export default function PeoplePage() {
@@ -46,7 +46,7 @@ export default function PeoplePage() {
               <div className="flex flex-col items-end gap-1 shrink-0">
                 {p.membership_until
                   ? <Badge cls="text-exito bg-exito/10">Miembro hasta {fmtDate(p.membership_until)}</Badge>
-                  : p.membership_last_until ? <Badge>Venció {fmtDate(p.membership_last_until)}</Badge> : <Badge>Prospecto</Badge>}
+                  : p.membership_last_until ? <Badge>Venció {fmtDate(p.membership_last_until)}</Badge> : p.source === 'evo' ? <Badge>Cliente de EVO</Badge> : <Badge>Prospecto</Badge>}
                 {p.subscription_status && p.subscription_status !== 'active' && (
                   <Badge cls={p.subscription_status === 'past_due' ? 'text-white bg-alerta' : 'text-amarillo-suave bg-amarillo-suave/10'}>
                     {p.subscription_status === 'past_due' ? 'Cobro pendiente' : 'Falta tarjeta'}

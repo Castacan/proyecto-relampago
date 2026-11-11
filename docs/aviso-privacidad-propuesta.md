@@ -3,7 +3,7 @@
 Preparado el 2026-11-11 para reemplazar el BORRADOR v1, que dice "BORRADOR — revisar con un abogado" en su primera línea y los clientes lo verían al firmar.
 
 **Antes de publicarlo, Inge llena o confirma lo que está entre [corchetes]:**
-- [NOMBRE DEL RESPONSABLE]: el nombre de la persona física o la razón social con la que factura Jaibamuro. Debe ser el mismo de la contadora.
+- Responsable: **Regina Valle Gutiérrez** (persona física), confirmado por Inge el 2026-11-11.
 - Correo para datos personales: propongo hola@jaibamuro.com. Confirmar que alguien lo lee.
 - El domicilio ya es el de Google: Paraíso del Estero 5A, Alvarado, Ver., C.P. 95264. Confirmar que sirve como domicilio para recibir solicitudes.
 
@@ -20,7 +20,7 @@ Nota: el texto sigue lo que pide la ley mexicana de datos personales: identidad 
 **AVISO DE PRIVACIDAD — JAIBAMURO**
 
 **¿Quién cuida tus datos?**
-[NOMBRE DEL RESPONSABLE], que opera el gimnasio de escalada Jaibamuro, con domicilio en Paraíso del Estero 5A, Alvarado, Veracruz, C.P. 95264, es responsable de tus datos personales. Para cualquier tema de privacidad escríbenos a hola@jaibamuro.com o pregunta en recepción.
+Regina Valle Gutiérrez, que opera el gimnasio de escalada Jaibamuro, con domicilio en Paraíso del Estero 5A, Alvarado, Veracruz, C.P. 95264, es responsable de tus datos personales. Para cualquier tema de privacidad escríbenos a hola@jaibamuro.com o pregunta en recepción.
 
 **¿Qué datos usamos?**
 - Tus datos de contacto: nombre, celular, correo y fecha de nacimiento.
@@ -67,7 +67,7 @@ Si cambiamos este aviso te lo diremos en la app y en recepción. Si el cambio to
 **Consentimiento**
 Al firmar, acepto este aviso de privacidad y otorgo mi consentimiento expreso y por escrito para el uso de mis datos personales para las finalidades descritas, incluidos mis datos sensibles (biométricos) si autorizo el reconocimiento con cámara. Si soy menor de edad, firma mi mamá, papá o tutor.
 
-Última actualización: [FECHA DE PUBLICACIÓN].
+Última actualización: 11 de noviembre de 2026.
 
 ---
 

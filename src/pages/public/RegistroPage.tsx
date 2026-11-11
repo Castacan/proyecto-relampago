@@ -43,7 +43,7 @@ export default function RegistroPage() {
     <div className="min-h-screen bg-zinc-100 px-4 py-6">
       <div className="max-w-md mx-auto space-y-4">
         <div className="text-center">
-          <p className="text-2xl font-black text-zinc-900">Bienvenido a Jaibamuro</p>
+          <p className="text-2xl font-black text-zinc-900">Te damos la bienvenida a Jaibamuro</p>
           {step && <p className="text-zinc-500 text-sm">Paso {step} de 3</p>}
         </div>
         <div className="bg-white rounded-2xl p-5 shadow-sm">{children}</div>
@@ -110,6 +110,7 @@ function EmailStep() {
       <input id="reg-email" type="email" inputMode="email" autoComplete="email" value={email} onChange={e => setEmail(e.target.value)} className={field} placeholder="tucorreo@ejemplo.com" />
       {error && <p className="text-red-600 text-sm">{error}</p>}
       <button onClick={send} disabled={busy || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email.trim())} className={btn}>{busy ? 'Enviando…' : 'Mandar código'}</button>
+      <p className="text-zinc-500 text-sm">¿No puedes abrir tu correo en este celular? Avísale a recepción y te registramos ahí.</p>
     </div>
   )
   return (
