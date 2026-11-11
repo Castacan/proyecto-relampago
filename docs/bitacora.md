@@ -1189,3 +1189,19 @@ Inge pidió atacar en paralelo la migración, la recepción con cámara y el cob
 - **Falta:** modelo de terminal de Inge; pedir a Clip la app PinPad; Run de `erp_clip_terminal.sql`; Deploy de `clip-terminal`; primera prueba con un cobro real chico.
 
 **Membresías de EVO (2026-11-11, misma tarde).** `scripts/evo_membresias_sql.py` toma el mismo Excel de ventas y crea un periodo en `memberships` por cada venta de membresía: desde "Inicio en" hasta +1 o +3 meses − 1 día, ligado a la persona por `evo_id`, a la venta por `evo_sale_id` y al producto por nombre. Es idempotente. Da 38 periodos y **4 personas vigentes hoy**, todas de domiciliación; una con "Saldo deudor" el 7-nov. Probado en PGlite, con una segunda corrida que no duplica. El SQL (sin nombres) quedó pegado en otra pestaña del SQL Editor; **falta Run**. Inge dice que su terminal es una "Clip Stand": la API solo lista **Stand 2**, así que hay que confirmar el modelo. La lista de pendientes del dueño está en `docs/pendientes-inge.md`.
+
+### 2026-11-11 (noche): auditoría, clases, aviso, laptop, domiciliados de EVO y TV
+
+- **Auditoría** (`docs/auditoria-2026-11-11.md`): capturas reales más 3 revisores con papeles distintos (recepcionista nuevo, clienta de 47 años, QA de clases). Bloqueantes para el lunes:
+  - las sesiones del 11 y 12 de noviembre ya se pueden reservar;
+  - hoja de inicio de sesión del leaderboard al reservar;
+  - casi nadie figura como miembro;
+  - duplicados por correo;
+  - la reserva no pide responsiva.
+- **Arreglado:**
+  - `ClimberAuthSheet` tiene `purpose="classes"`: "Aparta tu lugar · Mandar código", sin alias ni TV, y abre la clase que se quería.
+  - `CLASS_ERRORS.cash_closed`.
+- **TV:** se quitó el código temporal (`specialPeriod.ts`, `competitionDisplay.ts`, `CompetitionRoutesDisplay`). /competencia/ruleta sigue.
+- **Aviso de privacidad v2** propuesto en `docs/aviso-privacidad-propuesta.md`. Falta el nombre o razón social del responsable. Nota: hoy firmar el aviso = autorizar la cámara; convendría una casilla aparte.
+- **Laptop de recepción:** `docs/recepcion-laptop.md` (perfil de Chrome, `--app`, inicio automático, energía, cámara).
+- **Domiciliados de EVO:** `src/supabase/erp_evo_domiciliados.sql` (`get_evo_subscribers`) y la tarjeta "Pasar de EVO" en Domiciliaciones. Probado en PGlite con los datos reales de membresías: 5 personas en 60 días, 4 vigentes. Quedó pegado en la pestaña 2 del SQL Editor, antes de las membresías. Falta Run.

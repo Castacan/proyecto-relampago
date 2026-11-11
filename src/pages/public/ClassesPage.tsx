@@ -24,6 +24,8 @@ export default function ClassesPage() {
   const [loadError, setLoadError] = useState(false)
   const [authOpen, setAuthOpen] = useState(false)
   const [selected, setSelected] = useState<CalendarSession | null>(null)
+  // La clase que quería reservar antes de iniciar sesión: se abre sola al entrar.
+  const [wanted, setWanted] = useState<CalendarSession | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
 
   const load = useCallback(async () => {
@@ -124,7 +126,7 @@ export default function ClassesPage() {
               {sessions.map(s => (
                 <SessionCard key={s.id} s={s} onOpen={() => {
                   setNotice(null)
-                  if (!loggedIn) { setAuthOpen(true); return }
+                  if (!loggedIn) { setWanted(s); setAuthOpen(true); return }
                   setSelected(s)
                 }} />
               ))}
@@ -147,8 +149,12 @@ export default function ClassesPage() {
 
       <ClimberAuthSheet
         isOpen={authOpen}
-        onClose={() => setAuthOpen(false)}
-        onDone={() => { setAuthOpen(false); refetchClimber(); load() }}
+        onClose={() => { setAuthOpen(false); setWanted(null) }}
+        onDone={async () => {
+          setAuthOpen(false); refetchClimber(); await load()
+          if (wanted) { setSelected(wanted); setWanted(null) }
+        }}
+        purpose="classes"
       />
     </div>
   )

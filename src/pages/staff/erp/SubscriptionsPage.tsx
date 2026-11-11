@@ -10,6 +10,12 @@ interface Sub {
   open_charge: { status: string; attempt: number; max_attempts: number; next_attempt_at: string | null } | null
 }
 
+interface EvoSub {
+  person_id: string; full_name: string; phone: string | null; email: string | null
+  evo_until: string; evo_next_charge: string; membership_until: string | null
+  subscription_status: string | null; subscription_start: string | null
+}
+
 const FILTERS: Record<string, string> = { live: 'Vigentes', past_due: 'Con cobro pendiente', pending_card: 'Esperando tarjeta', cancelled: 'Canceladas', all: 'Todas' }
 
 export default function SubscriptionsPage() {
@@ -44,6 +50,7 @@ export default function SubscriptionsPage() {
     <Page title="Domiciliaciones" subtitle="Cobro automático mensual con tarjeta. Para dar de alta una, ve a la ficha de la persona → Domiciliar."
       actions={isAdmin ? <button onClick={runDue} disabled={running} className={btnGhost}>{running ? 'Cobrando…' : 'Cobrar lo que toca hoy'}</button> : undefined}>
       <Msg text={msg?.text ?? null} tone={msg?.tone} />
+      <EvoCard />
       {subs === null ? <Spinner /> : (
         <>
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
@@ -89,5 +96,46 @@ export default function SubscriptionsPage() {
         </>
       )}
     </Page>
+  )
+}
+
+// Domiciliados que vienen de EVO: hay que pasarlos a Relámpago sin cobrarles doble.
+function EvoCard() {
+  const [people, setPeople] = useState<EvoSub[] | null>(null)
+  useEffect(() => {
+    call<{ people: EvoSub[] }>('get_evo_subscribers').then(({ data, error }) => setPeople(error ? null : data?.people ?? []))
+  }, [])
+  if (!people || people.length === 0) return null
+  const today = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Mexico_City' })
+  const pending = people.filter(p => !p.subscription_status)
+  return (
+    <div className="bg-superficie rounded-2xl border border-amarillo-suave/40 p-4 space-y-3">
+      <div>
+        <p className="text-texto-principal font-bold">Pasar de EVO ({pending.length} de {people.length} pendientes)</p>
+        <p className="text-zinc-400 text-xs mt-1">
+          Para cada uno, antes de su próximo cobro en EVO: 1) abre su ficha → <b>Domiciliar</b> y mándale el link (empieza a cobrar solo el día que le tocaba en EVO);
+          2) cuando registre su tarjeta, <b>cancela su domiciliación en EVO</b> para que no le cobren doble.
+        </p>
+      </div>
+      <div className="divide-y divide-zinc-800/80">
+        {people.map(p => {
+          const late = !p.subscription_status && p.evo_next_charge <= today
+          return (
+            <div key={p.person_id} className="py-2 flex flex-wrap items-center justify-between gap-2 text-sm">
+              <div className="min-w-0">
+                <Link to={`/staff/personas/${p.person_id}`} className="text-texto-principal font-semibold hover:text-primario">{p.full_name}</Link>
+                <p className="text-zinc-400 text-xs">
+                  Pagado en EVO hasta {fmtDate(p.evo_until)} · EVO le cobraría el {fmtDate(p.evo_next_charge)}
+                  {!p.phone && !p.email && <span className="text-amarillo-suave"> · sin celular ni correo: pídeselos para mandarle el link</span>}
+                </p>
+              </div>
+              {p.subscription_status
+                ? <Badge cls={(SUB_STATUS[p.subscription_status] ?? SUB_STATUS.active).cls}>{p.subscription_status === 'pending_card' ? 'Link enviado: falta su tarjeta' : `En Relámpago desde ${p.subscription_start ? fmtDate(p.subscription_start) : '—'}`}</Badge>
+                : <Link to={`/staff/personas/${p.person_id}`} className={`text-xs font-bold px-3 py-1.5 rounded-xl ${late ? 'bg-alerta/15 text-alerta' : 'bg-primario text-texto-en-acento'}`}>{late ? 'Ya le tocaba: revisar' : 'Domiciliar'}</Link>}
+            </div>
+          )
+        })}
+      </div>
+    </div>
   )
 }

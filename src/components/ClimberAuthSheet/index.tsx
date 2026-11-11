@@ -12,13 +12,17 @@ interface Props {
   onClose: () => void
   onDone: () => void
   startAtSetup?: boolean
+  // 'classes': para reservar una clase. Otro texto y sin el paso del alias del
+  // leaderboard (un alumno de calistenia no tiene por qué salir en la TV).
+  purpose?: 'climbing' | 'classes'
 }
 
 type Step = 'email' | 'sent' | 'setup' | 'saving'
 
 const RESEND_DELAY = 30
 
-export default function ClimberAuthSheet({ isOpen, onClose, onDone, startAtSetup }: Props) {
+export default function ClimberAuthSheet({ isOpen, onClose, onDone, startAtSetup, purpose = 'climbing' }: Props) {
+  const forClasses = purpose === 'classes'
   const { session } = useAuth()
   const [step, setStep] = useState<Step>(startAtSetup ? 'setup' : 'email')
   const [email, setEmail] = useState('')
@@ -43,6 +47,7 @@ export default function ClimberAuthSheet({ isOpen, onClose, onDone, startAtSetup
   // padre, que puede no estar listo todavía en este mismo instante.
   useEffect(() => {
     if (!(session?.user && step === 'sent')) return
+    if (forClasses) { onDone(); return }
     let cancelled = false
     ;(async () => {
       const { data } = await db.from('climbers').select('id').eq('id', session.user.id).single()
@@ -115,7 +120,7 @@ export default function ClimberAuthSheet({ isOpen, onClose, onDone, startAtSetup
     if (error) {
       setSendError('No se pudo enviar el link. Verifica tu correo.')
     } else {
-      markPendingOnboarding()
+      if (!forClasses) markPendingOnboarding()
       setStep('sent')
     }
   }
@@ -184,8 +189,10 @@ export default function ClimberAuthSheet({ isOpen, onClose, onDone, startAtSetup
 
         {step === 'email' && (
           <>
-            <h2 className="text-texto-principal font-black text-xl tracking-tight mb-1">Suma tus puntos</h2>
-            <p className="text-zinc-500 text-sm mb-6">Inicia sesión para registrar tus sends y aparecer en el leaderboard.</p>
+            <h2 className="text-texto-principal font-black text-xl tracking-tight mb-1">{forClasses ? 'Aparta tu lugar' : 'Suma tus puntos'}</h2>
+            <p className="text-zinc-500 text-sm mb-6">{forClasses
+              ? 'Escribe tu correo y te mandamos un código de 6 números para entrar. No necesitas contraseña.'
+              : 'Inicia sesión para registrar tus sends y aparecer en el leaderboard.'}</p>
             <p className="text-zinc-500 text-[11px] font-semibold uppercase tracking-widest mb-2">Tu correo</p>
             <input
               type="email"
@@ -203,7 +210,7 @@ export default function ClimberAuthSheet({ isOpen, onClose, onDone, startAtSetup
               disabled={sending || !email.trim()}
               className="w-full py-4 rounded-2xl bg-primario hover:bg-primario-hover text-texto-en-acento font-bold text-sm transition-all disabled:opacity-40 active:scale-95"
             >
-              {sending ? 'Enviando...' : 'Enviar link mágico'}
+              {sending ? 'Enviando...' : forClasses ? 'Mandar código' : 'Enviar link mágico'}
             </button>
             <button onClick={onClose} className="w-full py-3 text-zinc-500 hover:text-zinc-300 text-sm font-medium transition-colors mt-1">
               Cancelar

@@ -7,13 +7,35 @@ Actualizado: 2026-11-11. Tacha cada punto conforme lo hagas.
 En el Chrome de la compu ya hay 3 pestañas abiertas:
 
 1. [ ] **Supabase, pestaña 1:** "talla de gatas + terminal Clip". Dale **Run**. Debe decir *Success*.
-2. [ ] **Supabase, pestaña 2:** "membresías de EVO". Dale **Run**. Abajo deben salir tres renglones:
+2. [ ] **Supabase, pestaña 2:** "membresías de EVO" (también trae la lista de domiciliados de EVO). Dale **Run**. Abajo deben salir tres renglones:
    - `sin persona`: **0**
    - `membresias de EVO en Relampago`: **38**
    - `vigentes hoy`: **4**
 3. [ ] **EVO:** inicia sesión y avísame. Yo exporto clientes con correo y celular, y gastos.
 
 Si un Run marca error, mándame foto y no corras lo demás.
+
+## Clases (empiezan el lunes 16): antes del viernes
+
+- [ ] **Cancelar las sesiones del mié 11 y jue 12**, que hoy se pueden reservar: /staff/clases → Hoy → ir a ese día → "Cancelar clase". No edites los horarios después, o se vuelven a abrir.
+- [ ] **Apagar "Pide responsiva firmada"** en Acceso mientras los clientes viejos firman. Hoy está prendido.
+- [ ] **Decidir 3 reglas** (ver `docs/auditoria-2026-11-11.md`, sección B):
+  1. Las clases se cobran solo desde Clases → Cobrar, no desde Vender.
+  2. Qué pasa si alguien reserva "pago en el gym" y no llega.
+  3. Si el coach puede cancelar una clase o solo tú.
+- [ ] Hacer la **prueba de 10 pasos** de la sección E de la auditoría.
+
+## Aviso de privacidad
+
+- [ ] Leer `docs/aviso-privacidad-propuesta.md` y darme tu nombre o razón social (el que usa tu contadora). Confirmar que hola@jaibamuro.com sirve para recibir solicitudes.
+
+## Laptop de recepción
+
+- [ ] Seguir `docs/recepcion-laptop.md`: perfil de Chrome, que abra sola en Acceso, que no se duerma y dónde poner la cámara.
+
+## Domiciliados de EVO
+
+- [ ] Después del Run 2, en **Domiciliaciones** aparece la tarjeta **"Pasar de EVO"** con los 4, cuándo les cobraría EVO y un botón **Domiciliar**. Mándales el link antes de esa fecha. Cuando registren su tarjeta, **cancela su cobro en EVO**.
 
 ## Terminal Clip
 

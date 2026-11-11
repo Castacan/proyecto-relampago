@@ -122,6 +122,7 @@ export const PAID_WITH_LABELS: Record<string, string> = {
 export const WEEKDAYS = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado']
 
 export const CLASS_ERRORS: Record<string, string> = {
+  cash_closed: 'La caja está cerrada: ábrela en Caja para poder cobrar la clase.',
   not_logged_in: 'Inicia sesión para reservar.',
   profile_required: 'Completa tus datos para reservar.',
   invalid_option: 'Elige cómo vas a pagar.',
