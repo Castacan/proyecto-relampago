@@ -84,5 +84,6 @@ Si un Run marca error, mándame foto y no corras lo demás.
 ## Viejos que siguen abiertos
 
 - Borrar la persona "Test" de la prueba de Openpay. Si no, el día 23 se le intenta cobrar en sandbox.
-- Registrar el WiFi del muro para la asistencia del staff y completar el horario de Erick.
+- Asistencia del staff: **quitar la restricción de WiFi** (decisión de Inge, 2026-11-12). Es un interruptor: /staff/asistencia/reporte → "Ajustes y WiFi" → desmarcar "Exigir el WiFi del muro para checar" → "Guardar ajustes". La selfie se sigue pidiendo.
+- Completar el horario de Erick.
 - Contar cerveza y refresco, que estaban en negativo.
