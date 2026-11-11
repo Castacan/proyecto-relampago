@@ -1214,3 +1214,10 @@ Inge pidió atacar en paralelo la migración, la recepción con cámara y el cob
 - Personas: los de EVO sin membresía dicen "Cliente de EVO", no "Prospecto". "Nuevos sin foto" (3 días) y "Personas nuevas" (7 días) se limpian solos el 13 y el 17 de noviembre; no se tocó SQL.
 - Clases: "por cobrar" ya no cuenta a los que faltaron.
 - Link de domiciliación: si el banco rechaza, dice "No se pudo cobrar" en rojo, no "¡Listo!", y la garantía de Openpay va arriba del formulario.
+
+**2026-11-11 (fin de sesión):** Inge corrió los dos Run (pestaña 1: talla de gatas + terminal Clip; pestaña 2: `get_evo_subscribers` + membresías de EVO). No se verificó el resultado 0/38/4 desde aquí. Siguiente sesión, en orden:
+1. Verificar en producción (solo lectura) las membresías de EVO (0/38/4), `people.shoe_size` y `terminal_payments`.
+2. Login de EVO → exportar contactos y gastos.
+3. Login de Namecheap → reenvío hola@ → correo de prueba. Luego Inge hace Resend + Gmail "Enviar como" y yo pego `erp_privacidad_v2.sql`.
+4. Clases (arrancan el lunes 16): cancelar sesiones del 11 y 12, apagar "Pide responsiva firmada", 3 reglas, prueba de 10 pasos.
+5. Terminal Clip: confirmar Stand 2 y pedir PinPad; después, Deploy de `clip-terminal`.

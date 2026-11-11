@@ -2,12 +2,12 @@
 
 Actualizado: 2026-11-11. Tacha cada punto conforme lo hagas.
 
-## Hoy, en cuanto llegues (5 minutos)
+## Hoy, en cuanto llegues (5 minutos) — Runs 1 y 2 HECHOS el 2026-11-11
 
 En el Chrome de la compu ya hay 3 pestañas abiertas:
 
-1. [ ] **Supabase, pestaña 1:** "talla de gatas + terminal Clip". Dale **Run**. Debe decir *Success*.
-2. [ ] **Supabase, pestaña 2:** "membresías de EVO" (también trae la lista de domiciliados de EVO). Dale **Run**. Abajo deben salir tres renglones:
+1. [x] **Supabase, pestaña 1:** "talla de gatas + terminal Clip". Dale **Run**. Debe decir *Success*.
+2. [x] **Supabase, pestaña 2:** "membresías de EVO" (también trae la lista de domiciliados de EVO). Dale **Run**. Abajo deben salir tres renglones:
    - `sin persona`: **0**
    - `membresias de EVO en Relampago`: **38**
    - `vigentes hoy`: **4**
@@ -72,7 +72,7 @@ Si un Run marca error, mándame foto y no corras lo demás.
 ## Migración EVO (lo que falta)
 
 - [x] Ventas históricas (1,182 ventas, $201,046).
-- [ ] Membresías: quedaron pegadas en el punto 2. Son 4 vigentes, todas de domiciliación.
+- [x] Membresías: Run hecho el 2026-11-11 (punto 2). Son 4 vigentes, todas de domiciliación.
   - Uno de los 4 (venta EVO 1525768, 7-nov) tiene "Saldo deudor" en EVO: debe esa mensualidad.
 - [ ] Contactos (correo y celular): necesita el punto 3.
 - [ ] Gastos desde oct-2025: necesita el punto 3.
