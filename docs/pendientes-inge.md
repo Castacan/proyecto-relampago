@@ -1,0 +1,51 @@
+# Pendientes de Inge en la compu
+
+Actualizado: 2026-11-11. Tacha cada punto conforme lo hagas.
+
+## Hoy, en cuanto llegues (5 minutos)
+
+En el Chrome de la compu ya hay 3 pestañas abiertas:
+
+1. [ ] **Supabase, pestaña 1:** "talla de gatas + terminal Clip". Dale **Run**. Debe decir *Success*.
+2. [ ] **Supabase, pestaña 2:** "membresías de EVO". Dale **Run**. Abajo deben salir tres renglones:
+   - `sin persona`: **0**
+   - `membresias de EVO en Relampago`: **38**
+   - `vigentes hoy`: **4**
+3. [ ] **EVO:** inicia sesión y avísame. Yo exporto clientes con correo y celular, y gastos.
+
+Si un Run marca error, mándame foto y no corras lo demás.
+
+## Terminal Clip
+
+4. [ ] **Confirmar el modelo.** La API solo sirve con **Clip Stand 2** (además de Ultra, PinPad y Total 3). Atrás o en la caja debe decir "Stand 2". Si es la Stand de primera generación, pregúntale a Clip si es compatible antes de seguir.
+5. [ ] **Pedir la app PinPad:** manda un correo a **sdk@payclip.com** con el número de serie de la terminal, pidiendo que instalen la app PinPad para usar la API de Punto de Venta. Te pueden pedir la verificación de identidad del comercio.
+6. [ ] Cuando Clip la instale, avísame y te dejo listo el **Deploy** de la función `clip-terminal` (Verify JWT apagado).
+7. [ ] En la app: **Configuración → Integraciones → Terminal Clip**:
+   - Pon el número de serie.
+   - Prende el interruptor.
+   - Dale **Probar conexión con Clip**.
+8. [ ] **Primera prueba:** en Vender, una agua con "Terminal Clip (automático)" y paga con tu tarjeta. Luego la cancelas en el portal de Clip.
+
+## Recepción con cámara
+
+9. [ ] Abrir **Acceso** en la laptop de recepción con la webcam y probar que te reconozca:
+   - Primero registra tu cara con "Registrar su cara".
+   - La cámara debe estar a la altura de la cara y sin contraluz de la puerta.
+10. [ ] **Leer el aviso de privacidad** (BORRADOR), que es obligatorio para guardar caras: Configuración → Documentos. Dime qué cambiarle.
+11. [ ] **Revisar "Pide responsiva firmada"** en Acceso: déjalo **apagado** mientras los clientes viejos no hayan firmado. Si está prendido, se les niega la entrada.
+
+## Migración EVO (lo que falta)
+
+- [x] Ventas históricas (1,182 ventas, $201,046).
+- [ ] Membresías: quedaron pegadas en el punto 2. Son 4 vigentes, todas de domiciliación.
+  - Uno de los 4 (venta EVO 1525768, 7-nov) tiene "Saldo deudor" en EVO: debe esa mensualidad.
+- [ ] Contactos (correo y celular): necesita el punto 3.
+- [ ] Gastos desde oct-2025: necesita el punto 3.
+- [ ] Los 4 domiciliados: cuando les toque su siguiente cobro en EVO, pasarlos a la domiciliación de Relámpago con su link (registran su tarjeta otra vez). Después se cancela su cobro en EVO.
+- [ ] Dar de baja EVO: al final, después de 1–2 semanas usando los dos.
+
+## Viejos que siguen abiertos
+
+- Borrar la persona "Test" de la prueba de Openpay. Si no, el día 23 se le intenta cobrar en sandbox.
+- Registrar el WiFi del muro para la asistencia del staff y completar el horario de Erick.
+- Contar cerveza y refresco, que estaban en negativo.
