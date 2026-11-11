@@ -7,9 +7,6 @@ import { useSlideCarousel } from '../../hooks/useSlideCarousel'
 import { getColorHex } from '../../lib/colors'
 import { nowMX } from '../../lib/timezone'
 import { MONTHS_ES, DAYS_ES } from '../../lib/dates'
-import { SPECIAL_PERIOD, isSpecialPeriodActive } from '../../lib/specialPeriod'
-import { COMPETITION_DISPLAY, isCompetitionDisplayActive, isRaffleWheelActive } from '../../lib/competitionDisplay'
-import RaffleWheelDisplay from './RaffleWheelDisplay'
 import { useAutoUpdate } from '../../hooks/useAutoUpdate'
 import SponsorBanner from '../../components/SponsorBanner'
 import DisplaySlide from '../../components/DisplaySlide'
@@ -18,7 +15,7 @@ import type { LeaderboardEntry, Sponsorship, SponsorPeriod } from '../../types'
 export default function LeaderboardDisplay() {
   // La TV (Raspberry Pi) nadie la toca: se actualiza sola cuando hay versión nueva.
   useAutoUpdate()
-  const { daily, weekly, monthly, special, events, loading, connected } = useLeaderboard()
+  const { daily, weekly, monthly, events, loading, connected } = useLeaderboard()
   const { sponsorships } = useSponsorships()
   const { slides } = useDisplaySlides()
   const { settings } = useDisplaySettings()
@@ -70,17 +67,6 @@ export default function LeaderboardDisplay() {
     : `${DAYS_ES[monday.getDay()]} ${monday.getDate()} de ${MONTHS_ES[monday.getMonth()]} a ${DAYS_ES[sunday.getDay()]} ${sunday.getDate()} de ${MONTHS_ES[sunday.getMonth()]}`
 
   const currentEvent = events[tickerIdx]
-  // TEMPORAL: se reevalúa con el reloj de cada minuto, así que el 1 de
-  // noviembre a las 00:00 regresa solo a HOY / SEMANA / MES.
-  const specialActive = isSpecialPeriodActive()
-
-  // TEMPORAL (lib/competitionDisplay.ts): del 3 al 7 de noviembre la TV solo
-  // muestra las rutas de cada categoría. Se reevalúa con el reloj de cada
-  // minuto, así que el 8 de noviembre regresa sola al leaderboard.
-  // El día de la competencia: la ruleta de la rifa en vivo.
-  if (isRaffleWheelActive()) return <RaffleWheelDisplay />
-  if (isCompetitionDisplayActive()) return <CompetitionRoutesDisplay />
-
   if (loading) {
     return (
       <div className="w-screen h-screen bg-fondo flex items-center justify-center">
@@ -134,29 +120,16 @@ export default function LeaderboardDisplay() {
           abajo (commit 2026-08-23, antes era Diario 65% + Mensual 35% con
           un solo banner global de pie de página) */}
       <div className="flex-1 flex overflow-hidden">
-        {specialActive ? (
-          // TEMPORAL (lib/specialPeriod.ts): una columna 21–31 oct en lugar
-          // de HOY y SEMANA. Sin patrocinador propio (lista vacía → pie de
-          // respaldo "Jaibamuro").
-          <LeaderboardColumn
-            title={SPECIAL_PERIOD.title} titleAccent subtitle={SPECIAL_PERIOD.subtitle}
-            entries={special} emptyTitle="Sin actividad todavía" emptySubtitle="¡Sé el primero!"
-            period="top_1_weekly" sponsorships={[]} borderRight
-          />
-        ) : (
-          <>
-            <LeaderboardColumn
-              title="HOY" titleAccent subtitle={dayLabel}
-              entries={daily} emptyTitle="Nadie ha marcado un send hoy" emptySubtitle="¡Sé el primero!"
-              period="top_1_daily" sponsorships={sponsorships} borderRight
-            />
-            <LeaderboardColumn
-              title="SEMANA" subtitle={weekRange}
-              entries={weekly} emptyTitle="Sin actividad esta semana"
-              period="top_1_weekly" sponsorships={sponsorships} borderRight tinted
-            />
-          </>
-        )}
+        <LeaderboardColumn
+          title="HOY" titleAccent subtitle={dayLabel}
+          entries={daily} emptyTitle="Nadie ha marcado un send hoy" emptySubtitle="¡Sé el primero!"
+          period="top_1_daily" sponsorships={sponsorships} borderRight
+        />
+        <LeaderboardColumn
+          title="SEMANA" subtitle={weekRange}
+          entries={weekly} emptyTitle="Sin actividad esta semana"
+          period="top_1_weekly" sponsorships={sponsorships} borderRight tinted
+        />
         <LeaderboardColumn
           title={monthLabel.toUpperCase()} subtitle={monthRange}
           entries={monthly} emptyTitle="Sin actividad este mes"
@@ -170,49 +143,6 @@ export default function LeaderboardDisplay() {
         style={{ opacity: slideVisible ? 1 : 0, transitionDuration: `${settings.fade_duration_ms}ms` }}
       >
         <DisplaySlide slide={currentSlide} />
-      </div>
-    </div>
-  )
-}
-
-// Pantalla de la competencia: 3 columnas (Básico / Intermedio / Avanzado),
-// cada una con Femenil y Varonil y sus números de ruta en círculos grandes.
-// Tamaños en vh/vw para que quepa igual en la TV de la Pi que en una laptop.
-function CompetitionRoutesDisplay() {
-  const c = COMPETITION_DISPLAY
-  return (
-    <div className="w-screen h-screen bg-fondo overflow-hidden font-sans select-none flex flex-col">
-      <div className="shrink-0 px-[3vw] pt-[3vh] pb-[2vh] border-b border-zinc-800">
-        <h1 className="font-black tracking-tight text-primario" style={{ fontSize: '6vh', lineHeight: 1 }}>{c.title}</h1>
-        <p className="text-zinc-300 font-bold mt-[1vh]" style={{ fontSize: '3vh' }}>{c.subtitle}</p>
-      </div>
-
-      <div className="flex-1 min-h-0 grid grid-cols-[2fr_3fr]">
-        <div className="min-h-0 flex flex-col justify-center gap-[3vh] px-[3vw] border-r border-zinc-800">
-          <div className="rounded-3xl bg-superficie border border-zinc-800 px-[2vw] py-[3vh] text-center">
-            <p className="font-black text-primario tabular-nums" style={{ fontSize: '16vh', lineHeight: 1 }}>{c.blocks}</p>
-            <p className="font-black text-texto-principal" style={{ fontSize: '4.5vh' }}>bloques</p>
-            <p className="font-bold text-zinc-300" style={{ fontSize: '2.8vh' }}>para todas las categorías</p>
-          </div>
-          <div className="space-y-[1.2vh]">
-            <p className="font-black text-zinc-400 tracking-widest" style={{ fontSize: '2.4vh' }}>HORARIOS</p>
-            {c.slots.map(s => (
-              <p key={s} className="font-black text-texto-principal tabular-nums" style={{ fontSize: '4vh', lineHeight: 1.1 }}>{s}</p>
-            ))}
-            <p className="font-bold text-primario" style={{ fontSize: '3vh' }}>{c.awards}</p>
-          </div>
-        </div>
-
-        <div className="min-h-0 flex flex-col justify-center px-[3vw] gap-[2.6vh] bg-white/5">
-          <p className="font-black text-zinc-400 tracking-widest" style={{ fontSize: '2.4vh' }}>CÓMO SE JUEGA</p>
-          {c.rules.map((r, i) => (
-            <div key={r} className="flex items-center gap-[1.5vw]">
-              <span className="shrink-0 rounded-full bg-primario text-texto-en-acento font-black flex items-center justify-center"
-                style={{ width: '6vh', height: '6vh', fontSize: '3.2vh' }}>{i + 1}</span>
-              <p className="font-bold text-zinc-100" style={{ fontSize: '3.6vh', lineHeight: 1.2 }}>{r}</p>
-            </div>
-          ))}
-        </div>
       </div>
     </div>
   )
