@@ -17,6 +17,16 @@ export default function PosPage() {
   const [products, setProducts] = useState<Product[] | null>(null)
   const [person, setPerson] = useState<Person | null>(null)
   const [lines, setLines] = useState<Line[]>([])
+  // Talla de gatas de la persona elegida (para la renta).
+  const [shoeSize, setShoeSize] = useState<string | null>(null)
+  useEffect(() => {
+    setShoeSize(null)
+    if (!person?.id) return
+    let alive = true
+    call<{ person: { shoe_size?: string | null } }>('get_person_profile', { p_person_id: person.id })
+      .then(({ data }) => { if (alive) setShoeSize(data?.person?.shoe_size ?? null) })
+    return () => { alive = false }
+  }, [person?.id])
   const [discount, setDiscount] = useState('')
   const [payments, setPayments] = useState<Payment[]>([{ method: 'cash', amount: '', reference: '' }])
   const [cashGiven, setCashGiven] = useState('')
@@ -164,6 +174,7 @@ export default function PosPage() {
         <div className="space-y-4">
           <Card title="Persona">
             <PersonPicker selected={person} onPick={p => { setPerson(p); setDone(null) }} />
+            {person && shoeSize && <p className="text-texto-principal text-sm mt-2">🧗 Talla de gatas: <span className="font-bold">{shoeSize}</span></p>}
             {needsPerson && !person && <p className="text-amarillo-suave text-xs mt-2">Necesaria: hay un plan en la venta.</p>}
           </Card>
           <Card title={group ?? 'Artículos'} actions={group ? <button onClick={() => setGroup(null)} className={btnSmall}>← Todos</button> : undefined}>

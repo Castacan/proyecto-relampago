@@ -16,6 +16,7 @@ export interface PersonData {
   guardian_name?: string | null
   guardian_phone?: string | null
   allow_marketing?: boolean
+  shoe_size?: string | null
   has_login?: boolean
 }
 
@@ -28,6 +29,7 @@ export default function PersonForm({ person, onSaved, onCancel }: { person?: Per
     emergency_name: person?.emergency_name ?? '', emergency_phone: person?.emergency_phone ?? '',
     guardian_name: person?.guardian_name ?? '', guardian_phone: person?.guardian_phone ?? '',
     allow_marketing: person?.allow_marketing ?? true,
+    shoe_size: person?.shoe_size ?? '',
   })
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -69,6 +71,7 @@ export default function PersonForm({ person, onSaved, onCancel }: { person?: Per
             <option value="X">Otro</option>
           </select>
         </div>
+        {field('shoe_size', 'Talla de gatas', { placeholder: 'Ej. 40 o 26.5 MX', maxLength: 12 })}
         {field('source', '¿Cómo nos conoció?', { placeholder: 'Instagram, recomendación, pasaba por aquí…' })}
       </div>
 

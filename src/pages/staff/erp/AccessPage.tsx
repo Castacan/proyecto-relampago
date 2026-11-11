@@ -12,7 +12,7 @@ import { Page, Card, Stat, Badge, Empty, Spinner, Msg, input, btnPrimary, btnGho
 
 interface Decision {
   result?: string; allowed: boolean; reasons: string[]; ok_by: string | null; membership_until: string | null
-  person: { id: string; full_name: string; photo_path: string | null; access_code: string; block_reason: string | null; is_minor: boolean }
+  person: { id: string; full_name: string; photo_path: string | null; access_code: string; block_reason: string | null; is_minor: boolean; shoe_size?: string | null }
   pending_documents: { title: string }[]; last_entry: string | null
 }
 interface Today { require_documents: boolean; unique_today: number; events: { id: string; created_at: string; result: string; reasons: string[]; method: string; note: string | null; person_id: string | null; person_name: string | null; by: string | null }[] }
@@ -166,6 +166,7 @@ export default function AccessPage() {
                   ) : (
                     <p className="text-alerta font-semibold">{dec.reasons.map(r => (r === 'no_membership' ? 'Sin membresía activa' : ACCESS_REASONS[r] ?? r) + (r === 'blocked' && dec.person.block_reason ? `: ${dec.person.block_reason}` : '')).join(' · ')}</p>
                   )}
+                  {dec.person.shoe_size && <p className="text-texto-principal text-sm">🧗 Talla de gatas: <span className="font-bold">{dec.person.shoe_size}</span></p>}
                   {dec.pending_documents.length > 0 && <p className="text-amarillo-suave text-sm">Falta firmar: {dec.pending_documents.map(d => d.title).join(', ')}</p>}
                   <p className="text-zinc-500 text-xs">Última visita: {dec.last_entry ? fmtDateTime(dec.last_entry) : 'nunca'}</p>
                 </div>
