@@ -8,6 +8,7 @@ import { BOOKING_STATUS_LABELS, PRICE_TIER_LABELS, fmtTime, type BookingInfo } f
 import { Page, Card, Stat, Badge, Empty, Spinner, Msg, input, label, btnPrimary, btnGhost, btnSmall, btnDanger } from '../../../components/erp/ui'
 import PersonForm, { type PersonData } from '../../../components/erp/PersonForm'
 import { SubscriptionHistory, DocumentsCard, AccessCard } from './PersonExtras'
+import { PersonDuplicates } from './Duplicates'
 
 interface Charge { id: string; cycle: number; period_start: string; period_end: string; amount_cents: number; status: string; attempt: number; max_attempts: number; error_message: string | null; next_attempt_at: string | null; paid_at: string | null }
 interface Subscription {
@@ -75,6 +76,8 @@ export default function PersonProfilePage() {
         <Stat label="Total comprado" value={money(totalSpent)} sub={`${p.sales.filter(s => s.status === 'completed').length} compras`} tone="accent" />
         <Stat label="Clases asistidas" value={attended} sub={`${p.bookings.filter(b => b.status === 'no_show').length} faltas`} />
       </div>
+
+      <PersonDuplicates personId={person.id} isAdmin={isAdmin} onMerged={load} />
 
       {editing && (
         <Card title="Datos" tone="accent">

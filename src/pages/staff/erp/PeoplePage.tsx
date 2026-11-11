@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { call, fmtDate } from '../../../lib/erp'
-import { Page, Card, Badge, Empty, Spinner, input, btnPrimary } from '../../../components/erp/ui'
+import { Page, Card, Badge, Empty, Spinner, input, btnPrimary, btnGhost } from '../../../components/erp/ui'
 import PersonForm from '../../../components/erp/PersonForm'
+import { DuplicatesList } from './Duplicates'
 
 interface PersonRow {
   id: string; full_name: string; phone: string | null; email: string | null; has_login: boolean
@@ -14,6 +15,9 @@ export default function PeoplePage() {
   const [query, setQuery] = useState('')
   const [people, setPeople] = useState<PersonRow[] | null>(null)
   const [creating, setCreating] = useState(false)
+  const [showDups, setShowDups] = useState(false)
+  const [isAdmin, setIsAdmin] = useState(false)
+  useEffect(() => { call<{ is_admin: boolean }>('get_erp_settings').then(({ data }) => setIsAdmin(!!data?.is_admin)) }, [])
 
   useEffect(() => {
     const t = setTimeout(async () => {
@@ -25,7 +29,11 @@ export default function PeoplePage() {
 
   return (
     <Page title="Personas" subtitle="Clientes y prospectos. Toca a alguien para ver su ficha."
-      actions={<button onClick={() => setCreating(v => !v)} className={btnPrimary}>{creating ? 'Cerrar' : '+ Nueva persona'}</button>}>
+      actions={<>
+        <button onClick={() => setShowDups(v => !v)} className={btnGhost}>{showDups ? 'Cerrar duplicados' : 'Posibles duplicados'}</button>
+        <button onClick={() => setCreating(v => !v)} className={btnPrimary}>{creating ? 'Cerrar' : '+ Nueva persona'}</button>
+      </>}>
+      {showDups && <DuplicatesList isAdmin={isAdmin} />}
       {creating && (
         <Card title="Nueva persona" tone="accent">
           <PersonForm onSaved={id => navigate(`/staff/personas/${id}`)} onCancel={() => setCreating(false)} />
