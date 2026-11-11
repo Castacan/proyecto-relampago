@@ -9,9 +9,16 @@ import {
   type BookingInfo, type Calendar, type CalendarSession,
 } from '../../lib/classes'
 import logoHorizontal from '../../assets/logo-horizontal.png'
+import { call } from '../../lib/erp'
+import SignFlow from '../../components/erp/SignFlow'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const db = supabase as unknown as any
+
+interface MyDocs {
+  person: { full_name: string; is_minor: boolean; guardian_name: string | null } | null
+  documents: { id: string; doc_key: string; version: number; title: string; body: string; required: boolean; signed_at: string | null }[]
+}
 
 const inputClass = 'w-full bg-superficie-alta text-texto-principal rounded-xl px-4 py-3 text-sm outline-none border border-zinc-700/50 focus:border-primario/60 transition-all placeholder:text-zinc-500'
 const labelClass = 'block text-zinc-300 text-xs font-bold mb-1.5'
@@ -209,6 +216,14 @@ function BookingSheet({ s, cal, needsProfile, onClose, onBooked }: {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const price = s.is_member ? s.member_price_cents : s.price_cents
+  // Responsiva: si le falta firmar algo obligatorio, firma aquí mismo antes de reservar.
+  const [docs, setDocs] = useState<MyDocs | null>(null)
+  const loadDocs = useCallback(async () => {
+    const { data } = await call<MyDocs>('get_my_documents')
+    setDocs(data ?? { person: null, documents: [] })
+  }, [])
+  useEffect(() => { if (!needsProfile) loadDocs() }, [needsProfile, loadDocs])
+  const pendingDocs = docs?.documents.filter(x => x.required && !x.signed_at) ?? []
 
   const submit = async () => {
     if (!option) { setError('Elige cómo vas a pagar.'); return }
@@ -235,6 +250,17 @@ function BookingSheet({ s, cal, needsProfile, onClose, onBooked }: {
 
         {needsProfile ? (
           <p className="text-amarillo-suave text-sm font-semibold">Primero completa tus datos arriba en la página.</p>
+        ) : docs === null ? (
+          <p className="text-zinc-400 text-sm">Cargando…</p>
+        ) : pendingDocs.length > 0 && docs.person ? (
+          <div className="space-y-2">
+            <p className="text-texto-principal text-sm font-bold">Antes de tu primera clase, firma tu responsiva. Es un minuto y ya no te la volvemos a pedir.</p>
+            <div className="bg-white rounded-2xl p-4">
+              <SignFlow light docs={pendingDocs} defaultName={docs.person.full_name} isMinor={docs.person.is_minor} defaultGuardian={docs.person.guardian_name}
+                onSign={async p => { const { error } = await call('sign_my_document', { p }); return error }}
+                onDone={loadDocs} />
+            </div>
+          </div>
         ) : (
           <>
             <fieldset className="space-y-2">
