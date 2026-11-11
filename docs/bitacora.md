@@ -1221,3 +1221,21 @@ Inge pidió atacar en paralelo la migración, la recepción con cámara y el cob
 3. Login de Namecheap → reenvío hola@ → correo de prueba. Luego Inge hace Resend + Gmail "Enviar como" y yo pego `erp_privacidad_v2.sql`.
 4. Clases (arrancan el lunes 16): cancelar sesiones del 11 y 12, apagar "Pide responsiva firmada", 3 reglas, prueba de 10 pasos.
 5. Terminal Clip: confirmar Stand 2 y pedir PinPad; después, Deploy de `clip-terminal`.
+
+### 2026-11-12 — Unir duplicados, responsiva al reservar y script de contactos de EVO (sin Chrome)
+
+Chrome no estaba conectado, así que se avanzó en lo que no lo necesita:
+- **Unir fichas duplicadas** (`src/supabase/erp_unir_personas.sql`, `Duplicates.tsx`):
+  - Personas → "Posibles duplicados": pares con el mismo correo o celular, el mismo nombre, o las mismas dos primeras palabras del nombre.
+  - En la ficha sale "¿Es la misma persona?" si hay otra parecida.
+  - Solo un admin puede unir. La unión pasa a la ficha que se queda TODO lo que apunta a la otra (busca las llaves foráneas sola), llena sus datos vacíos, junta las notas, borra la sobrante y deja registro en la bitácora.
+  - Las firmas siguen inmutables; solo se les permite cambiar de persona durante una unión.
+  - Probado en PGlite. **Falta Run.** Sin el Run la pantalla no truena, solo no muestra nada.
+- **Clases: responsiva al reservar.** Si al cliente le falta firmar algo obligatorio, la hoja de reserva le muestra la firma ahí mismo y luego sigue con la reserva. Cierra el punto A5 de la auditoría. Es solo pantalla: Acceso sigue revisando.
+- **`scripts/evo_contactos_sql.py`**: convierte la exportación de clientes y prospectos de EVO (.xlsx o .csv) en SQL.
+  - Reconoce las columnas por el encabezado.
+  - Liga cada contacto por número de EVO o por nombre único y SOLO llena lo vacío.
+  - No repite correos: los que ya usa otra ficha salen en la revisión como posibles duplicados.
+  - Crea a los prospectos que no tienen ficha. Es idempotente.
+  - Probado en PGlite con un CSV inventado.
+  - Aclaración: en EVO los contactos sí están completos. Lo que faltaba es Relámpago, porque las 450 fichas salieron del reporte de ventas, que solo trae el nombre.

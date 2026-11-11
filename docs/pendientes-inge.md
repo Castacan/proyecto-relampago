@@ -12,6 +12,7 @@ En el Chrome de la compu ya hay 3 pestañas abiertas:
    - `membresias de EVO en Relampago`: **38**
    - `vigentes hoy`: **4**
 3. [ ] **EVO:** inicia sesión y avísame. Yo exporto clientes con correo y celular, y gastos.
+4. [ ] **Supabase, Run de "unir duplicados"** (`erp_unir_personas.sql`). Te lo dejo pegado cuando abras Chrome. Después, en **Personas → Posibles duplicados**, puedes unir las fichas de la misma persona. Solo el admin puede hacerlo, y no se puede deshacer.
 
 Si un Run marca error, mándame foto y no corras lo demás.
 
@@ -24,6 +25,7 @@ Si un Run marca error, mándame foto y no corras lo demás.
   2. Qué pasa si alguien reserva "pago en el gym" y no llega.
   3. Si el coach puede cancelar una clase o solo tú.
 - [ ] Hacer la **prueba de 10 pasos** de la sección E de la auditoría.
+- Nuevo (2026-11-12): al reservar desde /clases, si al cliente le falta firmar la responsiva, la firma ahí mismo antes de confirmar. En la prueba, el paso 3 debe pedir la firma.
 
 ## Aviso de privacidad
 
