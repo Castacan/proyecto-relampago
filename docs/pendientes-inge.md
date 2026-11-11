@@ -27,7 +27,8 @@ Si un Run marca error, mándame foto y no corras lo demás.
 
 ## Aviso de privacidad
 
-- [ ] Leer `docs/aviso-privacidad-propuesta.md` y darme tu nombre o razón social (el que usa tu contadora). Confirmar que hola@jaibamuro.com sirve para recibir solicitudes.
+- [x] Responsable: Regina Valle Gutiérrez.
+- [ ] Confirmar que **hola@jaibamuro.com recibe correos** (ahí escribirán los clientes). En cuanto me digas, te pego el SQL del aviso v2 para Run.
 
 ## Laptop de recepción
 
