@@ -28,7 +28,19 @@ Si un Run marca error, mándame foto y no corras lo demás.
 ## Aviso de privacidad
 
 - [x] Responsable: Regina Valle Gutiérrez.
-- [ ] Confirmar que **hola@jaibamuro.com recibe correos** (ahí escribirán los clientes). En cuanto me digas, te pego el SQL del aviso v2 para Run.
+- [x] Correo: hola@jaibamuro.com hoy NO recibe (el dominio no tiene MX). Elegiste la opción 2: reenvío a Gmail + responder como hola@ (ver abajo).
+- [ ] Cuando hola@ ya reciba, te pego el SQL del aviso v2 para Run.
+
+## Correo hola@jaibamuro.com (opción 2), en la PC, unos 20 min
+
+1. [ ] **Namecheap** (tú inicias sesión; yo hago el cambio si quieres): Domain List → jaibamuro.com → Manage → Advanced DNS → Mail Settings: **Email Forwarding** → Redirect Email → alias `hola` → `jaibamuro@gmail.com`. No toques los registros de `send` ni `resend._domainkey`: son los de los correos de la app.
+2. [ ] Yo mando un correo de prueba a hola@ y confirmas que llega a jaibamuro@gmail.com.
+3. [ ] **Resend** (resend.com, tú inicias sesión): API Keys → Create → nombre `gmail-hola`, permiso **Sending access**, dominio jaibamuro.com. Copia la llave (empieza con `re_`; se ve una sola vez) y **no me la mandes**.
+4. [ ] **Gmail** de jaibamuro@gmail.com → Configuración → Ver toda la configuración → **Cuentas e importación** → "Enviar como" → **Agregar otra dirección**:
+   - Nombre: `Jaibamuro`. Correo: `hola@jaibamuro.com`. Desmarca "Tratar como alias".
+   - Servidor SMTP: `smtp.resend.com` · Puerto `465` · Usuario: `resend` · Contraseña: la llave del paso 3 · **SSL**.
+   - Gmail manda un código a hola@, que gracias al paso 1 llega a tu Gmail. Escríbelo y listo.
+5. [ ] (Opcional) En "Enviar como", marca "Responder desde la misma dirección a la que se envió el mensaje" para contestar siempre como hola@.
 
 ## Laptop de recepción
 
