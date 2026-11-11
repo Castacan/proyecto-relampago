@@ -1,8 +1,9 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { call, erpError, money, fmtDate, toCents, durationLabel, METHOD_LABELS, POS_METHODS, type Product } from '../../../lib/erp'
 import { Page, Card, Empty, Msg, Spinner, input, label, btnPrimary, btnGhost, btnSmall } from '../../../components/erp/ui'
 import { PersonPicker, type Person } from '../classes/people'
+import { terminal, TERMINAL_ERRORS, cardLabel, type TerminalPayment } from '../../../lib/clipTerminal'
 
 interface TodayPerson { id: string; full_name: string; phone: string | null; email: string | null; entered_at: string | null; bought: string | null; last_at: string; membership_until: string | null }
 type Tier = 'regular' | 'member' | 'free_monthly'
@@ -11,6 +12,10 @@ interface ClassPricing { is_member: boolean; free_left: number; products: Record
 // Orden de los grupos en Vender (lo demás va alfabético; sin grupo, suelto al final).
 const GROUP_ORDER = ['Servicios', 'Clases semanales']
 interface Payment { method: string; amount: string; reference: string }
+// Método solo de pantalla: se cobra en la terminal Clip y la venta se guarda como 'card'.
+const TERMINAL = 'clip_terminal'
+interface Unlinked { id: string; amount_cents: number; description: string | null; card_brand: string | null; card_last4: string | null; created_at: string; by: string | null }
+const sleep = (ms: number) => new Promise(r => setTimeout(r, ms))
 
 export default function PosPage() {
   const [params] = useSearchParams()
@@ -42,6 +47,22 @@ export default function PosPage() {
   const [group, setGroup] = useState<string | null>(null)
   const [pricing, setPricing] = useState<ClassPricing | null>(null)
   const [pricingKey, setPricingKey] = useState(0)
+  // Terminal Clip
+  const [terminalOn, setTerminalOn] = useState(false)
+  const [term, setTerm] = useState<{ text: string; payment: TerminalPayment | null; canCancel: boolean } | null>(null)
+  const stopTerm = useRef(false)
+  const [unlinked, setUnlinked] = useState<Unlinked[]>([])
+  const [resolveNote, setResolveNote] = useState<Record<string, string>>({})
+  const loadUnlinked = useCallback(async () => {
+    const { data } = await call<{ payments: Unlinked[] }>('get_unlinked_terminal_payments')
+    setUnlinked(data?.payments ?? [])
+  }, [])
+  useEffect(() => {
+    call<{ enabled: boolean }>('get_clip_terminal_settings').then(({ data }) => {
+      setTerminalOn(!!data?.enabled)
+      if (data?.enabled) loadUnlinked()
+    })
+  }, [loadUnlinked])
   const loadTodayPeople = useCallback(async () => { const { data } = await call<{ people: TodayPerson[] }>('get_today_people'); setTodayPeople(data?.people ?? []) }, [])
   useEffect(() => { loadTodayPeople() }, [loadTodayPeople])
 
@@ -115,20 +136,87 @@ export default function PosPage() {
     if (needsPerson && !person) { setError('Elige a la persona: el plan le da membresía.'); return }
     if (paid !== total && total > 0) { setError(`Los pagos suman ${money(paid)} y el total es ${money(total)}.`); return }
     if (freeUsedInCart > freeLeft) { setError(`Solo le queda ${freeLeft} clase gratis este mes.`); return }
+    const termLines = payments.filter(p => p.method === TERMINAL && toCents(p.amount) > 0)
+    if (termLines.length > 1) { setError('Solo un cobro con terminal Clip por venta.'); return }
     setBusy(true)
+    let pays = payments
+    let termPayment: TerminalPayment | null = null
+    if (termLines.length === 1) {
+      termPayment = await runTerminal(toCents(termLines[0].amount))
+      if (!termPayment) { setBusy(false); return }
+      const tp = termPayment
+      pays = payments.map(p => p.method === TERMINAL
+        ? { method: 'card', amount: String(tp.amount_cents / 100), reference: `Terminal Clip · ${cardLabel(tp)}` } : p)
+    }
     const { data, error } = await call<{ folio: number; total_cents: number; product?: string; stock?: number }>('create_sale', { p_sale: {
       person_id: person?.id ?? null,
       items: lines.map(l => ({ product_id: l.product.id, quantity: l.qty, discount_cents: toCents(l.discount), starts_on: l.startsOn || null, class_tier: l.tier ?? null })),
       discount_cents: toCents(discount),
-      payments: payments.filter(p => toCents(p.amount) > 0).map(p => ({ method: p.method, amount_cents: toCents(p.amount), reference: p.reference || null })),
+      payments: pays.filter(p => toCents(p.amount) > 0).map(p => ({ method: p.method, amount_cents: toCents(p.amount), reference: p.reference || null })),
       note: note || null,
     } })
     setBusy(false)
+    if (termPayment && (error || !data)) {
+      // El dinero ya entró: queda en "Cobros de terminal sin venta" para resolverlo.
+      setTerm(null); loadUnlinked()
+      const why = error === 'out_of_stock' && data?.product ? `no hay suficiente ${data.product}` : erpError(error ?? undefined)
+      setError(`OJO: la tarjeta SÍ se cobró en la terminal (${money(termPayment.amount_cents)}), pero la venta no se guardó: ${why}. Queda arriba en "Cobros de terminal sin venta".`)
+      return
+    }
     if (error === 'out_of_stock' && data?.product) { setError(`No hay suficiente ${data.product}: quedan ${data.stock ?? 0}.`); return }
     if (error || !data) { setError(erpError(error ?? undefined)); return }
+    if (termPayment) {
+      await call('staff_link_terminal_payment', { p_id: termPayment.id, p_folio: data.folio })
+      setTerm(null); loadUnlinked()
+    }
     setDone({ folio: data.folio, total: data.total_cents, change }); setEntryMsg(null)
     loadTodayPeople(); setPricingKey(k => k + 1)
     setLines([]); setDiscount(''); setPayments([{ method: 'cash', amount: '', reference: '' }]); setCashGiven(''); setNote('')
+  }
+
+  // Manda el cobro a la terminal y espera el resultado. Regresa el cobro
+  // aprobado, o null (rechazado, cancelado, error) con el mensaje ya puesto.
+  const runTerminal = async (cents: number): Promise<TerminalPayment | null> => {
+    stopTerm.current = false
+    setTerm({ text: 'Mandando el cobro a la terminal…', payment: null, canCancel: false })
+    const desc = lines.map(l => `${l.product.name}${l.qty > 1 ? ` x${l.qty}` : ''}`).join(', ').slice(0, 120)
+    const { data, error } = await terminal<{ payment: TerminalPayment }>({ action: 'charge', amount_cents: cents, description: desc })
+    if (error || !data?.payment) { setTerm(null); setError(TERMINAL_ERRORS[error ?? 'server'] ?? `Terminal: ${error}`); return null }
+    let pay = data.payment
+    const started = Date.now()
+    while (!stopTerm.current && Date.now() - started < 5 * 60_000) {
+      setTerm({ text: pay.status === 'in_process' ? 'Procesando la tarjeta…' : `Pide al cliente que pase su tarjeta en la terminal (${money(cents)}).`, payment: pay, canCancel: pay.status === 'sent' })
+      await sleep(2000)
+      const r = await terminal<{ payment: TerminalPayment }>({ action: 'check', id: pay.id })
+      if (r.data?.payment) pay = r.data.payment
+      if (pay.status === 'approved') {
+        if ((pay.amount_paid_cents ?? pay.amount_cents) !== cents) {
+          setTerm(null); loadUnlinked()
+          setError(`La terminal cobró ${money(pay.amount_paid_cents ?? 0)} y la venta es de ${money(cents)}. No se guardó la venta: revisa el cobro arriba en "Cobros de terminal sin venta".`)
+          return null
+        }
+        setTerm({ text: `Aprobado (${cardLabel(pay)}). Guardando la venta…`, payment: pay, canCancel: false })
+        return pay
+      }
+      if (pay.status === 'declined') { setTerm(null); setError('La tarjeta fue rechazada. Puede intentar con otra tarjeta u otra forma de pago.'); return null }
+      if (pay.status === 'cancelled') { setTerm(null); setError('Se canceló el cobro en la terminal.'); return null }
+      if (pay.status === 'error') { setTerm(null); setError(TERMINAL_ERRORS.terminal_unavailable); return null }
+    }
+    setTerm(null)
+    setError(stopTerm.current ? 'Se canceló el cobro.' : 'Dejé de esperar a la terminal. Si el cliente sí pagó, el cobro aparecerá arriba en "Cobros de terminal sin venta".')
+    loadUnlinked()
+    return null
+  }
+  const cancelTerminal = async () => {
+    if (!term?.payment) return
+    const { error } = await terminal<{ payment: TerminalPayment }>({ action: 'cancel', id: term.payment.id })
+    if (error === 'in_terminal') { setTerm(t => t && { ...t, text: TERMINAL_ERRORS.in_terminal, canCancel: false }); return }
+    stopTerm.current = true
+  }
+  const resolveUnlinked = async (id: string) => {
+    const { error } = await call('staff_resolve_terminal_payment', { p_id: id, p_note: resolveNote[id] ?? '' })
+    if (error) { setError(error === 'invalid_value' ? 'Escribe qué se hizo con ese cobro (mínimo 3 letras).' : erpError(error)); return }
+    loadUnlinked()
   }
 
   const giveEntry = async () => {
@@ -150,6 +238,27 @@ export default function PosPage() {
         <Card tone="alert"><div className="flex flex-wrap items-center justify-between gap-3">
           <p className="text-texto-principal font-semibold">La caja está cerrada: ábrela para poder cobrar.</p>
           <Link to="/staff/caja" className={btnPrimary}>Ir a caja</Link>
+        </div></Card>
+      )}
+      {unlinked.length > 0 && (
+        <Card tone="alert" title="Cobros de terminal sin venta">
+          <p className="text-zinc-300 text-xs mb-2">La tarjeta se cobró en la terminal Clip pero no quedó ninguna venta. Registra la venta a mano (forma de pago: Tarjeta) y escribe aquí el folio o lo que se hizo.</p>
+          <div className="space-y-2">
+            {unlinked.map(u => (
+              <div key={u.id} className="flex flex-wrap items-center gap-2 text-sm">
+                <span className="text-texto-principal font-bold">{money(u.amount_cents)}</span>
+                <span className="text-zinc-400">{cardLabel(u)} · {new Date(u.created_at).toLocaleString('es-MX', { dateStyle: 'short', timeStyle: 'short' })}{u.by ? ` · ${u.by}` : ''}{u.description ? ` · ${u.description}` : ''}</span>
+                <input value={resolveNote[u.id] ?? ''} onChange={e => setResolveNote(n => ({ ...n, [u.id]: e.target.value }))} placeholder="Ej. Venta #123 registrada a mano" className={`${input} max-w-xs`} />
+                <button onClick={() => resolveUnlinked(u.id)} className={btnSmall}>Resuelto</button>
+              </div>
+            ))}
+          </div>
+        </Card>
+      )}
+      {term && (
+        <Card><div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-3"><Spinner /><p className="text-texto-principal text-lg font-bold">{term.text}</p></div>
+          {term.canCancel && <button onClick={cancelTerminal} className={btnGhost}>Cancelar cobro</button>}
         </div></Card>
       )}
       {done && (
@@ -257,6 +366,7 @@ export default function PosPage() {
                 {payments.map((p, i) => (
                   <div key={i} className="flex gap-2">
                     <select value={p.method} onChange={e => setPayments(ps => ps.map((x, j) => j === i ? { ...x, method: e.target.value } : x))} className={`${input} max-w-[10rem]`}>
+                      {terminalOn && <option value={TERMINAL}>Terminal Clip (automático)</option>}
                       {POS_METHODS.map(m => <option key={m} value={m}>{METHOD_LABELS[m]}</option>)}
                     </select>
                     <input type="number" min={0} value={p.amount} onChange={e => setPayments(ps => ps.map((x, j) => j === i ? { ...x, amount: e.target.value } : x))} className={input} placeholder="$" />

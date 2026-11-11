@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { call, billing, erpError, money, toCents, toPesos, durationLabel, scheduleLabel, KIND_LABELS, type Product, type ProductKind } from '../../../lib/erp'
 import { Page, Card, Badge, Empty, Spinner, Msg, input, label, btnPrimary, btnGhost, btnSmall, MoneyField } from '../../../components/erp/ui'
+import { terminal, TERMINAL_ERRORS } from '../../../lib/clipTerminal'
 
 // ---------------------------------------------------------------------------
 // Productos y planes
@@ -313,6 +314,8 @@ export function IntegrationsPage() {
       <Msg text={msg?.text ?? null} tone={msg?.tone} />
       <button onClick={save} disabled={busy} className={btnPrimary}>{busy ? 'Guardando…' : 'Guardar integraciones'}</button>
 
+      <ClipTerminalCard />
+
       <Card title="Otras integraciones">
         {statusError && <p className="text-amarillo-suave text-sm mb-2">No se pudo leer el estado de la función "billing" (¿ya está desplegada?).</p>}
         <div className="space-y-1">
@@ -332,6 +335,59 @@ export function IntegrationsPage() {
         </details>
       </Card>
     </Page>
+  )
+}
+
+// Terminal física de Clip (API de PinPad): Vender le manda el monto.
+function ClipTerminalCard() {
+  const [cfg, setCfg] = useState<{ enabled: boolean; serial: string } | null>(null)
+  const [busy, setBusy] = useState(false)
+  const [msg, setMsg] = useState<{ text: string; tone?: 'ok' | 'error' } | null>(null)
+  const [devices, setDevices] = useState<{ serial_number: string; status: string; updated_at?: string }[] | null>(null)
+  useEffect(() => {
+    call<{ enabled: boolean; serial: string | null }>('get_clip_terminal_settings').then(({ data, error }) => {
+      if (error === 'server') { setMsg({ text: 'Falta correr src/supabase/erp_clip_terminal.sql en Supabase.', tone: 'error' }); return }
+      setCfg({ enabled: !!data?.enabled, serial: data?.serial ?? '' })
+    })
+  }, [])
+  const save = async () => {
+    if (!cfg) return
+    setBusy(true); setMsg(null)
+    const { error } = await call('admin_set_clip_terminal', { p_enabled: cfg.enabled, p_serial: cfg.serial })
+    setBusy(false)
+    setMsg(error ? { text: error === 'invalid_value' ? 'Escribe el número de serie de la terminal (viene atrás o en Ajustes de la terminal).' : erpError(error), tone: 'error' } : { text: 'Guardado.', tone: 'ok' })
+  }
+  const test = async () => {
+    setBusy(true); setMsg(null); setDevices(null)
+    const { data, error } = await terminal<{ devices: { serial_number: string; status: string; updated_at?: string }[] }>({ action: 'devices' })
+    setBusy(false)
+    if (error) { setMsg({ text: error === 'clip_error' ? `Clip respondió con error${data && 'status' in (data as object) ? ` (${(data as unknown as { status: number }).status})` : ''}. ¿Ya activaron PinPad en tu cuenta?` : TERMINAL_ERRORS[error] ?? error, tone: 'error' }); return }
+    setDevices(Array.isArray(data?.devices) ? data!.devices : [])
+  }
+  return (
+    <Card title="Terminal Clip en mostrador (cobro automático desde Vender)">
+      <p className="text-zinc-400 text-sm mb-3">Al cobrar con "Terminal Clip", Vender manda el monto a la terminal; el cliente pasa su tarjeta y la venta se guarda sola. Solo funciona con Clip PinPad, Ultra, Total 3 o Stand 2, con la app PinPad instalada (se pide a <code>sdk@payclip.com</code> con el número de serie).</p>
+      {cfg && (
+        <div className="space-y-3">
+          <div>
+            <label htmlFor="clip-serial" className={label}>Número de serie de la terminal</label>
+            <input id="clip-serial" value={cfg.serial} onChange={e => setCfg({ ...cfg, serial: e.target.value })} className={`${input} max-w-xs`} placeholder="Ej. P8220724000042" />
+          </div>
+          <label className="flex items-center gap-2 text-sm text-zinc-200">
+            <input type="checkbox" checked={cfg.enabled} onChange={e => setCfg({ ...cfg, enabled: e.target.checked })} className="accent-primario w-4 h-4" />
+            Mostrar "Terminal Clip" como forma de pago en Vender
+          </label>
+          <div className="flex flex-wrap gap-2">
+            <button onClick={save} disabled={busy} className={btnPrimary}>Guardar</button>
+            <button onClick={test} disabled={busy} className={btnGhost}>Probar conexión con Clip</button>
+          </div>
+        </div>
+      )}
+      {devices && (devices.length === 0
+        ? <p className="text-amarillo-suave text-sm mt-2">Clip respondió, pero no tiene ninguna terminal PinPad ligada a tu cuenta.</p>
+        : <ul className="text-sm mt-2 space-y-1">{devices.map(d => <li key={d.serial_number} className="text-texto-principal">{d.serial_number}: <b>{d.status === 'active' ? 'activa' : d.status}</b></li>)}</ul>)}
+      <div className="mt-2"><Msg text={msg?.text ?? null} tone={msg?.tone} /></div>
+    </Card>
   )
 }
 

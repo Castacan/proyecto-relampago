@@ -1164,3 +1164,26 @@ permitiendo al staff lo de antes.
   - Sin caja, sin inventario, sin membresías.
 - Probado en PGlite con las tablas reales: totales por mes idénticos a EVO, segunda corrida no duplica, liga por nombre y no liga si el nombre es ambiguo.
 - UI: etiqueta "Importada de EVO" en ventas y "Venía de EVO" en la ficha.
+- 2026-11-10: Inge corrió el SQL en producción. Revisado en Supabase: 1,182 ventas, $201,046, igual a EVO mes por mes.
+
+### 2026-11-11 — Fase "dejar EVO": tres frentes
+
+Inge pidió atacar en paralelo la migración, la recepción con cámara y el cobro con la terminal Clip; si uno se atora porque él no está, pasar al siguiente.
+
+**1. Migración EVO: detenida.** La sesión de EVO caducó en el Chrome conectado y hay que iniciarla (no capturo contraseñas). En producción hay 450 personas y solo 2 tienen correo o teléfono. Faltan: contactos (CRM 2.0 → Segmentación), membresías vigentes (las ventas importadas no crean membresías: sin esto Acceso diría "sin membresía" a quien sí pagó), los 4 domiciliados (deben volver a registrar su tarjeta) y gastos (Cuentas a pagar).
+
+**2. Recepción con cámara: talla de gatas** (commit ada3d07).
+- Revisado en producción: `person_faces` y `get_face_index` existen, 0 caras registradas.
+- `src/supabase/erp_gatas.sql` (después de erp_crm.sql): `people.shoe_size` (texto ≤ 12), en `admin_save_person` (solo si viene en el JSON) y en `erp_access_decision` (`person.shoe_size`).
+- Se captura en la ficha (PersonForm), sale en el Contacto de la ficha, en la tarjeta de Acceso al reconocer al cliente y en Vender al elegir a la persona.
+- Pruebas PGlite: crear, editar sin el campo (no se borra), cambiar, demasiado larga, vaciar, y que Acceso la regresa. El front funciona igual sin el SQL corrido.
+- **Falta Run** de `erp_gatas.sql`. Sigue pendiente probar la webcam real y revisar el aviso de privacidad (BORRADOR).
+
+**3. Cobro con la terminal física de Clip (API de PinPad).**
+- Documentación revisada en developer.clip.mx (Tarjeta Presente → API de Punto de Venta). Base `https://api.payclip.io/f2f/pinpad/v1/payment` (POST crea; GET `?pinpadRequestId=` consulta con `Pinpad-Include-Detail: true`; DELETE `/{id}` cancela si la terminal no lo ha tomado). Estados PENDING / IN_PROCESS / COMPLETED; el resultado real está en `detail.results[].status` (approved / declined / cancelled). Webhook `PINPAD_INTENT_STATUS_CHANGED` trae solo el id. No hay sandbox. Terminales: Clip PinPad, Ultra, Total 3, Stand 2, con la app PinPad instalada por Clip (correo a sdk@payclip.com con el número de serie).
+- Auth: la doc pide `x-api-key` para crear y `Authorization: Basic` para consultar; la función manda ambas con base64(CLIP_API_KEY:CLIP_API_SECRET), o `CLIP_PINPAD_TOKEN` si Clip da otra llave. **Confirmar en la primera prueba real.**
+- `src/supabase/erp_clip_terminal.sql`: `erp_settings.clip_terminal_enabled/serial`, tabla `terminal_payments` (RLS sin políticas), RPC `get_clip_terminal_settings`, `admin_set_clip_terminal`, `staff_link_terminal_payment`, `get_unlinked_terminal_payments`, `staff_resolve_terminal_payment`. 14 pruebas PGlite (`scratchpad/pgt/terminal.mjs`).
+- Edge Function `clip-terminal` (Verify JWT apagado): devices / charge / check / cancel + webhook `?wh=<id>` que solo dispara la consulta. El renglón se escribe antes de mandar el cobro; el estado sale siempre de la API de Clip.
+- Vender: forma de pago "Terminal Clip (automático)" (solo si está prendida). Al cobrar manda el monto, muestra "pide al cliente que pase su tarjeta", consulta cada 2 s (hasta 5 min) y, si se aprueba, guarda la venta como `card` con referencia "Terminal Clip · Visa ····1234" y la liga. Si la venta falla después de cobrar, o el monto no coincide, el cobro queda en "Cobros de terminal sin venta" arriba de Vender hasta resolverlo con nota.
+- Config → Integraciones: número de serie, interruptor y "Probar conexión con Clip".
+- **Falta:** modelo de terminal de Inge; pedir a Clip la app PinPad; Run de `erp_clip_terminal.sql`; Deploy de `clip-terminal`; primera prueba con un cobro real chico.
