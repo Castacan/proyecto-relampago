@@ -1314,3 +1314,11 @@ Chrome no estaba conectado, así que se avanzó en lo que no lo necesita:
   - Ojo: si se unen dos fichas de tutores, los menores no se pasan solos (la llave `guardian_person_id` apunta a la misma tabla de personas).
 - Skill de claude.ai `docs/skill-gastos-jaibamuro/SKILL.md` (zip en Descargas): Emiliano anota gastos en Claude normal y pega aquí el bloque "GASTOS JAIBAMURO".
 - Camila $640 (13-oct) = complemento del patrocinio de la competencia, capturado en Otros ingresos.
+
+**2026-11-12 (tarde, 6): Emiliano fuera; el staff empieza a usar Relámpago**
+- `erp_menores.sql`: Run hecho (se volvió a pegar; antes no estaba). /registro ahora oculta "Menores a mi cargo" si la RPC falla (3d99515).
+- Estados financieros (6fb00fe):
+  - En "Con costo de lo vendido", cada grupo de gastos (fijos, variables, inversión, impuestos) se abre con sus proveedores. El detalle solo aparece si cuadra al centavo con el total del grupo; por eso "Compra de productos" queda suelto.
+  - En las dos pestañas se puede tocar todo el renglón del título para abrir o cerrar, no solo el texto.
+  - Probado en vivo.
+- Revisión de gastos ago–nov: falta toda la nómina de octubre (~$12k en efectivo). Contadora, Mercadotecnia, Meta y comisiones de Clip no aparecen desde agosto, y la CFE de octubre tampoco. Se le preguntó a Emiliano.
