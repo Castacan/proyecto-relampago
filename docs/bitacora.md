@@ -1272,3 +1272,18 @@ Chrome no estaba conectado, así que se avanzó en lo que no lo necesita:
   - 3 gráficas SVG (`StatementCharts.tsx`): ingresos contra egresos, utilidad por mes y en qué se va el gasto.
 - Colores de las gráficas validados contra la superficie #015169: amarillo #c98500 y violeta #9085e9. Contraste < 3:1, compensado con la cifra escrita en cada barra.
 - Verificado en vivo: ene–mar da los mismos totales que la tabla de Inge, y "sin inversión" en enero da −$920.41.
+
+**2026-11-12 (noche, 2): estado de cuenta de octubre, eventos e inventario**
+- Estado de cuenta Santander oct-2026 (PDF escaneado: lo leí como imágenes; no se guarda en el repo).
+  - Los 16 retiros quedaron como egresos (folios 187–200 + compra de Yohua). Egresos de oct = $32,231.80 = retiros del banco.
+  - Clip depositó $17,067.73 (ventas del gym con tarjeta + 23 inscripciones por Clip, sin comisión y con días de retraso). Para cuadrarlo hace falta el reporte de depósitos del portal de Clip.
+- `erp_eventos.sql` (Run hecho):
+  - `expenses.event`;
+  - tabla `other_income`;
+  - inscripciones de competencias como ingreso del evento;
+  - selector "Solo gym / Gym + eventos" en Estados financieros.
+- Datos capturados:
+  - JAM Jaibas Al Muro: 5 egresos etiquetados ($19,900).
+  - Patrocinios: Alexia $1,740, Camila $4,000 y Víctor $3,480.
+- Inventario: conteo de Inge del 11-nov aplicado. El agua bajó de 60 a 14 (−46).
+- Productos nuevos: Playera Jaibamuro ($300, 20 pzs) y Bolsa Jaibamuro ($0, 8 pzs, regalo con las primeras 8 playeras).
