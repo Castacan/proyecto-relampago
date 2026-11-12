@@ -1,6 +1,7 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { call, money, METHOD_LABELS, PAID_FROM, csvDownload } from '../../../lib/erp'
-import { Page, Card, Stat, Spinner, input, label, btnGhost } from '../../../components/erp/ui'
+import { Page, Card, Stat, Spinner, input, label, btnGhost, btnSmall } from '../../../components/erp/ui'
+import StatementCharts from './StatementCharts'
 
 // Estado de resultados y flujo de efectivo por mes (admin). Es para tu control;
 // los estados contables formales (balance general, declaraciones) los hace la contadora.
@@ -11,15 +12,23 @@ interface Data {
   position: { inventory_cost_cents: number; payables_cents: number; cash_in_register_cents: number | null; active_members: number; active_subscriptions: number; mrr_cents: number }
 }
 const MONTHS = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic']
-type Row = { label: string; values: number[]; kind?: 'total' | 'sub' | 'neg' | 'info' | 'group' | 'concept' }
+type Kind = 'total' | 'sub' | 'neg' | 'info' | 'group' | 'concept'
+/** key: para contraer (secciones y grupos). parents: llaves de las que depende para verse. */
+type Row = { label: string; values: number[]; kind?: Kind; key?: string; parents?: string[] }
 
 // Formato de Inge (erp_estado_resultados.sql): grupo con su total y los conceptos debajo.
 type DCell = { group: string; concept: string; month: number; cents: number }
 interface Detail { year: number; cost_centers: string[] | null; income: DCell[]; discounts: Cell[]; expenses: DCell[] }
 const INCOME_ORDER = ['Servicio', 'Plan', 'Producto', 'Otros']
 const EXPENSE_ORDER = ['Gastos fijos', 'Gastos variables', 'Inversión', 'Compra de productos', 'Impuestos']
+const INVERSION = 'Inversión'
 
-function detailRows(cells: DCell[], order: string[]): Row[] {
+const byMonth = (cells: Cell[], group?: string) => MONTHS.map((_, i) => cells.filter(c => c.month === i + 1 && (group === undefined || c.group === group)).reduce((a, c) => a + Number(c.cents), 0))
+const groups = (cells: Cell[]) => [...new Set(cells.map(c => c.group ?? ''))].sort((a, b) => byMonth(cells, b).reduce((x, y) => x + y, 0) - byMonth(cells, a).reduce((x, y) => x + y, 0))
+const sub = (a: number[], b: number[]) => a.map((v, i) => v - b[i])
+const sum = (v: number[]) => v.reduce((a, b) => a + b, 0)
+
+function detailRows(cells: DCell[], order: string[], section: string): Row[] {
   const gs = [...new Set(cells.map(c => c.group))].sort((a, b) => {
     const ia = order.indexOf(a), ib = order.indexOf(b)
     return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib) || a.localeCompare(b)
@@ -27,19 +36,15 @@ function detailRows(cells: DCell[], order: string[]): Row[] {
   const out: Row[] = []
   for (const g of gs) {
     const gc = cells.filter(c => c.group === g)
-    out.push({ label: g, values: byMonth(gc), kind: 'group' })
+    const key = `${section}/${g}`
+    out.push({ label: g, values: byMonth(gc), kind: 'group', key, parents: [section] })
     const concepts = [...new Set(gc.map(c => c.concept))]
-      .map(c => ({ label: c, values: byMonth(gc.filter(x => x.concept === c)), kind: 'concept' as const }))
+      .map(c => ({ label: c, values: byMonth(gc.filter(x => x.concept === c)), kind: 'concept' as const, parents: [section, key] }))
       .sort((a, b) => sum(b.values) - sum(a.values))
     out.push(...concepts)
   }
   return out
 }
-
-const byMonth = (cells: Cell[], group?: string) => MONTHS.map((_, i) => cells.filter(c => c.month === i + 1 && (group === undefined || c.group === group)).reduce((a, c) => a + Number(c.cents), 0))
-const groups = (cells: Cell[]) => [...new Set(cells.map(c => c.group ?? ''))].sort((a, b) => byMonth(cells, b).reduce((x, y) => x + y, 0) - byMonth(cells, a).reduce((x, y) => x + y, 0))
-const sub = (a: number[], b: number[]) => a.map((v, i) => v - b[i])
-const sum = (v: number[]) => v.reduce((a, b) => a + b, 0)
 
 export default function StatementsPage() {
   const [year, setYear] = useState(new Date().getFullYear())
@@ -48,8 +53,13 @@ export default function StatementsPage() {
   const [detError, setDetError] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [tab, setTab] = useState<'formato' | 'resultados' | 'flujo'>('formato')
+  const [collapsed, setCollapsed] = useState<Set<string>>(new Set())
+  const [picked, setPicked] = useState<Set<number> | null>(null)   // null = todos los meses con movimiento
+  const [withInv, setWithInv] = useState(true)
+  const [charts, setCharts] = useState(true)
+
   useEffect(() => {
-    setD(null); setDet(null); setDetError(false)
+    setD(null); setDet(null); setDetError(false); setPicked(null)
     call<Data>('get_financial_statements', { p_year: year }).then(({ data, error }) => {
       if (error || !data) { setError(error === 'forbidden' ? 'Solo un admin puede ver los estados financieros.' : 'No se pudo cargar. ¿Ya se corrió erp_crm.sql?'); return }
       setError(null); setD(data)
@@ -60,64 +70,93 @@ export default function StatementsPage() {
     })
   }, [year])
 
-  if (error) return <Page title="Estados financieros"><p className="text-alerta text-sm">{error}</p></Page>
-
-  let rows: Row[] = []
-  // Meses a mostrar: en tu formato solo los que tienen movimiento; en los otros, los 12.
-  let shown = MONTHS.map((_, i) => i)
-  if (tab === 'formato' && det) {
-    const inc = byMonth(det.income), disc = byMonth(det.discounts), exp = byMonth(det.expenses)
-    const net = sub(inc, disc)
-    rows = [
-      { label: 'Ingresos', values: [], kind: 'sub' }, ...detailRows(det.income, INCOME_ORDER),
-      ...(sum(disc) ? [{ label: 'Descuentos', values: disc.map(v => -v), kind: 'neg' as const }] : []),
-      { label: 'Total ingresos', values: net, kind: 'total' },
-      { label: 'Egresos', values: [], kind: 'sub' }, ...detailRows(det.expenses, [...EXPENSE_ORDER, ...(det.cost_centers ?? [])]),
-      { label: 'Total egresos', values: exp, kind: 'total' },
-      { label: 'Utilidad neta', values: sub(net, exp), kind: 'total' },
-    ]
-    shown = shown.filter(i => inc[i] || exp[i])
-    if (!shown.length) shown = [new Date().getMonth()]
-  } else if (d) {
-    if (tab === 'resultados') {
-      const incomeRows = groups(d.income).map(g => ({ label: g, values: byMonth(d.income, g) }))
+  // Renglones de la pestaña activa + meses que tienen movimiento.
+  const { rows, available, chart } = useMemo(() => {
+    let rows: Row[] = []
+    let available = MONTHS.map((_, i) => i)
+    let chart: { inc: number[]; exp: number[]; net: number[]; byGroup: { label: string; values: number[] }[] } | null = null
+    if (tab === 'formato' && det) {
+      const inc = byMonth(det.income), disc = byMonth(det.discounts), exp = byMonth(det.expenses)
+      const inv = byMonth(det.expenses.filter(c => c.group === INVERSION))
+      const net = sub(inc, disc)
+      const expUsed = withInv ? exp : sub(exp, inv)
+      const util = sub(net, expUsed)
+      const expRows = detailRows(det.expenses, [...EXPENSE_ORDER, ...(det.cost_centers ?? [])], 'Egresos')
+      rows = [
+        { label: 'Ingresos', values: [], kind: 'sub', key: 'Ingresos' }, ...detailRows(det.income, INCOME_ORDER, 'Ingresos'),
+        ...(sum(disc) ? [{ label: 'Descuentos', values: disc.map(v => -v), kind: 'neg' as const, parents: ['Ingresos'] }] : []),
+        { label: 'Total ingresos', values: net, kind: 'total' },
+        { label: 'Egresos', values: [], kind: 'sub', key: 'Egresos' },
+        ...expRows.map(r => !withInv && (r.label === INVERSION && r.kind === 'group') ? { ...r, label: `${INVERSION} (no se resta)` } : r),
+        { label: withInv ? 'Total egresos' : 'Total egresos (sin inversión)', values: expUsed, kind: 'total' },
+        { label: withInv ? 'Utilidad neta' : 'Utilidad sin inversión', values: util, kind: 'total' },
+      ]
+      available = available.filter(i => inc[i] || exp[i])
+      if (!available.length) available = [new Date().getMonth()]
+      chart = {
+        inc: net, exp: expUsed, net: util,
+        byGroup: [...new Set(det.expenses.map(c => c.group))].filter(g => withInv || g !== INVERSION)
+          .map(g => ({ label: g, values: byMonth(det.expenses.filter(c => c.group === g)) })),
+      }
+    } else if (d && tab === 'resultados') {
+      const incomeRows = groups(d.income).map(g => ({ label: g, values: byMonth(d.income, g), parents: ['Ingresos'] }))
       const income = byMonth(d.income), disc = byMonth(d.discounts), cogs = byMonth(d.cogs)
       const net = sub(income, disc), gross = sub(net, cogs)
-      const expRows = groups(d.expenses).map(g => ({ label: g, values: byMonth(d.expenses, g) }))
+      const expRows = groups(d.expenses).map(g => ({ label: g, values: byMonth(d.expenses, g).map(v => -v), kind: 'neg' as const, parents: ['Gastos'] }))
       const exp = byMonth(d.expenses)
       rows = [
-        { label: 'Ingresos', values: [], kind: 'sub' }, ...incomeRows,
-        ...(sum(disc) ? [{ label: 'Descuentos generales', values: disc.map(v => -v), kind: 'neg' as const }] : []),
+        { label: 'Ingresos', values: [], kind: 'sub', key: 'Ingresos' }, ...incomeRows,
+        ...(sum(disc) ? [{ label: 'Descuentos generales', values: disc.map(v => -v), kind: 'neg' as const, parents: ['Ingresos'] }] : []),
         { label: 'Ingresos netos', values: net, kind: 'total' },
         { label: 'Costo de lo vendido (productos)', values: cogs.map(v => -v), kind: 'neg' },
         { label: 'Utilidad bruta', values: gross, kind: 'total' },
-        { label: 'Gastos', values: [], kind: 'sub' }, ...expRows.map(r => ({ ...r, values: r.values.map(v => -v), kind: 'neg' as const })),
+        { label: 'Gastos', values: [], kind: 'sub', key: 'Gastos' }, ...expRows,
         { label: 'Total gastos', values: exp.map(v => -v), kind: 'total' },
         { label: 'Utilidad de operación', values: sub(gross, exp), kind: 'total' },
         ...(sum(byMonth(d.inventory_purchases)) ? [{ label: 'Compras de inventario (ya incluidas vía costo de lo vendido)', values: byMonth(d.inventory_purchases), kind: 'info' as const }] : []),
       ]
-    } else {
-      const inRows = groups(d.cash_in).map(g => ({ label: METHOD_LABELS[g] ?? g, values: byMonth(d.cash_in, g) }))
-      const outRows = groups(d.cash_out).map(g => ({ label: PAID_FROM[g] ?? g, values: byMonth(d.cash_out, g).map(v => -v), kind: 'neg' as const }))
+    } else if (d) {
+      const inRows = groups(d.cash_in).map(g => ({ label: METHOD_LABELS[g] ?? g, values: byMonth(d.cash_in, g), parents: ['Entradas'] }))
+      const outRows = groups(d.cash_out).map(g => ({ label: PAID_FROM[g] ?? g, values: byMonth(d.cash_out, g).map(v => -v), kind: 'neg' as const, parents: ['Salidas'] }))
       const cin = byMonth(d.cash_in), cout = byMonth(d.cash_out), net = sub(cin, cout)
       let acc = 0
       rows = [
-        { label: 'Entradas (cobros)', values: [], kind: 'sub' }, ...inRows, { label: 'Total entradas', values: cin, kind: 'total' },
-        { label: 'Salidas (egresos pagados)', values: [], kind: 'sub' }, ...outRows, { label: 'Total salidas', values: cout.map(v => -v), kind: 'total' },
+        { label: 'Entradas (cobros)', values: [], kind: 'sub', key: 'Entradas' }, ...inRows, { label: 'Total entradas', values: cin, kind: 'total' },
+        { label: 'Salidas (egresos pagados)', values: [], kind: 'sub', key: 'Salidas' }, ...outRows, { label: 'Total salidas', values: cout.map(v => -v), kind: 'total' },
         { label: 'Flujo neto del mes', values: net, kind: 'total' },
         { label: 'Acumulado del año', values: net.map(v => (acc += v)), kind: 'info' },
       ]
     }
-  }
+    return { rows, available, chart }
+  }, [tab, d, det, withInv])
+
+  if (error) return <Page title="Estados financieros"><p className="text-alerta text-sm">{error}</p></Page>
+
+  const shown = available.filter(i => !picked || picked.has(i))
+  const total = (r: Row) => shown.reduce((a, i) => a + (r.values[i] ?? 0), 0)
+  const visible = rows.filter(r => !(r.parents ?? []).some(p => collapsed.has(p)))
+  const groupKeys = rows.filter(r => r.key).map(r => r.key as string)
+  const toggle = (k: string) => setCollapsed(prev => { const n = new Set(prev); if (n.has(k)) n.delete(k); else n.add(k); return n })
+  const toggleMonth = (i: number) => setPicked(prev => {
+    const n = new Set(prev ?? available)
+    if (n.has(i)) n.delete(i); else n.add(i)
+    return n.size === 0 || n.size === available.length ? null : n
+  })
 
   const exportCsv = () => csvDownload(`${tab === 'flujo' ? 'flujo_efectivo' : 'estado_resultados'}_${year}.csv`, [
     ['Concepto', ...shown.map(i => MONTHS[i]), 'Total'],
-    ...rows.map(r => [r.kind === 'group' ? r.label.toUpperCase() : r.label,
+    ...rows.map(r => [r.kind === 'group' || r.kind === 'sub' ? r.label.toUpperCase() : r.label,
       ...(r.values.length ? shown.map(i => (r.values[i] / 100).toFixed(2)) : shown.map(() => '')),
-      r.values.length ? (sum(r.values) / 100).toFixed(2) : '']),
+      r.values.length ? (total(r) / 100).toFixed(2) : '']),
   ])
   const ready = tab === 'formato' ? !!det : !!d
+  const tabBtn = (t: typeof tab, text: string) => (
+    <button onClick={() => { setTab(t); setCollapsed(new Set()) }} className={`px-3 py-2 rounded-xl text-sm font-bold ${tab === t ? 'bg-primario text-texto-en-acento' : 'bg-superficie-alta text-zinc-300'}`}>{text}</button>
+  )
+  const hasInv = !!det?.expenses.some(c => c.group === INVERSION)
 
+  // Colores alternados (renglones visibles con números); el fondo sólido sirve también para la primera columna fija.
+  let zebra = 0
   return (
     <Page title="Estados financieros" width="max-w-7xl"
       subtitle="Estado de resultados y flujo de efectivo por mes, con lo que registras en ventas y egresos. Para tu control; lo contable formal lo hace la contadora."
@@ -125,11 +164,33 @@ export default function StatementsPage() {
       <div className="flex flex-wrap items-end gap-3">
         <div><label className={label}>Año</label><input type="number" value={year} onChange={e => setYear(Number(e.target.value))} className={`${input} max-w-[8rem]`} /></div>
         <div className="flex flex-wrap gap-1">
-          <button onClick={() => setTab('formato')} className={`px-3 py-2 rounded-xl text-sm font-bold ${tab === 'formato' ? 'bg-primario text-texto-en-acento' : 'bg-superficie-alta text-zinc-300'}`}>Estado de resultados</button>
-          <button onClick={() => setTab('resultados')} className={`px-3 py-2 rounded-xl text-sm font-bold ${tab === 'resultados' ? 'bg-primario text-texto-en-acento' : 'bg-superficie-alta text-zinc-300'}`}>Con costo de lo vendido</button>
-          <button onClick={() => setTab('flujo')} className={`px-3 py-2 rounded-xl text-sm font-bold ${tab === 'flujo' ? 'bg-primario text-texto-en-acento' : 'bg-superficie-alta text-zinc-300'}`}>Flujo de efectivo</button>
+          {tabBtn('formato', 'Estado de resultados')}
+          {tabBtn('resultados', 'Con costo de lo vendido')}
+          {tabBtn('flujo', 'Flujo de efectivo')}
         </div>
       </div>
+
+      {ready && (
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-zinc-400 text-xs font-bold mr-1">Meses:</span>
+          <button onClick={() => setPicked(null)} className={`px-2.5 py-1 rounded-lg text-xs font-bold ${!picked ? 'bg-primario text-texto-en-acento' : 'bg-superficie-alta text-zinc-300'}`}>Todos</button>
+          {available.map(i => (
+            <button key={i} onClick={() => toggleMonth(i)} aria-pressed={shown.includes(i)}
+              className={`px-2.5 py-1 rounded-lg text-xs font-bold ${picked && shown.includes(i) ? 'bg-primario/80 text-texto-en-acento' : shown.includes(i) ? 'bg-superficie-alta text-texto-principal' : 'bg-superficie text-zinc-500 line-through'}`}>{MONTHS[i]}</button>
+          ))}
+          <span className="flex-1" />
+          {tab === 'formato' && hasInv && (
+            <div className="flex rounded-lg overflow-hidden border border-zinc-700/50 text-xs font-bold">
+              <button onClick={() => setWithInv(true)} className={`px-2.5 py-1 ${withInv ? 'bg-primario text-texto-en-acento' : 'bg-superficie-alta text-zinc-300'}`}>Utilidad con inversión</button>
+              <button onClick={() => setWithInv(false)} className={`px-2.5 py-1 ${!withInv ? 'bg-primario text-texto-en-acento' : 'bg-superficie-alta text-zinc-300'}`}>Sin inversión</button>
+            </div>
+          )}
+          <button onClick={() => setCollapsed(new Set(groupKeys))} className={btnSmall}>Contraer todo</button>
+          <button onClick={() => setCollapsed(new Set())} className={btnSmall}>Expandir todo</button>
+          {tab === 'formato' && <button onClick={() => setCharts(v => !v)} className={btnSmall}>{charts ? 'Ocultar gráficas' : 'Ver gráficas'}</button>}
+        </div>
+      )}
+
       {tab === 'formato' && detError ? <p className="text-alerta text-sm">No se pudo cargar. ¿Ya se corrió erp_estado_resultados.sql?</p> : !ready || !d ? <Spinner /> : (
         <>
           <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
@@ -139,6 +200,16 @@ export default function StatementsPage() {
             <Stat label="Por pagar" value={money(d.position.payables_cents)} tone={d.position.payables_cents ? 'alert' : undefined} />
             <Stat label="Efectivo en caja" value={d.position.cash_in_register_cents == null ? 'Cerrada' : money(d.position.cash_in_register_cents)} />
           </div>
+
+          {tab === 'formato' && charts && chart && (
+            <StatementCharts
+              months={shown.map(i => MONTHS[i])}
+              inc={shown.map(i => chart.inc[i])} exp={shown.map(i => chart.exp[i])} net={shown.map(i => chart.net[i])}
+              netLabel={withInv ? 'Utilidad neta' : 'Utilidad sin inversión'}
+              breakdown={chart.byGroup.map(g => ({ label: g.label, cents: shown.reduce((a, i) => a + g.values[i], 0) }))
+                .filter(g => g.cents > 0).sort((a, b) => b.cents - a.cents)} />
+          )}
+
           <Card>
             <div className="overflow-x-auto -mx-4 sm:-mx-5 px-4 sm:px-5">
               <table className={`w-full text-sm ${shown.length > 6 ? 'min-w-[980px]' : ''}`}>
@@ -148,22 +219,45 @@ export default function StatementsPage() {
                   <th className="text-right font-semibold py-1.5 pl-2">Total</th>
                 </tr></thead>
                 <tbody>
-                  {rows.map((r, i) => r.kind === 'sub' ? (
-                    <tr key={i}><td colSpan={shown.length + 2} className="pt-4 pb-1 text-zinc-400 text-[11px] font-bold uppercase tracking-widest sticky left-0 bg-superficie">{r.label}</td></tr>
-                  ) : (
-                    <tr key={i} className={r.kind === 'total' ? 'border-t border-zinc-700/60 font-bold' : r.kind === 'group' ? 'border-t border-zinc-700/40 font-bold' : 'border-t border-zinc-800/40'}>
-                      <td className={`py-1.5 pr-3 sticky left-0 bg-superficie ${r.kind === 'info' ? 'text-zinc-500 text-xs' : r.kind === 'group' ? 'text-texto-principal uppercase text-xs tracking-wide pt-3' : r.kind === 'concept' ? 'text-zinc-300 pl-4' : 'text-zinc-200'}`}>{r.label}</td>
-                      {shown.map(k => { const v = r.values[k]; return <td key={k} className={`text-right tabular-nums py-1.5 px-1.5 ${v < 0 ? 'text-alerta/90' : r.kind === 'info' || r.kind === 'concept' ? 'text-zinc-400' : 'text-texto-principal'}`}>{v === 0 ? '—' : money(v)}</td> })}
-                      <td className={`text-right tabular-nums py-1.5 pl-2 ${sum(r.values) < 0 ? 'text-alerta' : r.kind === 'concept' ? 'text-zinc-400' : 'text-texto-principal'}`}>{money(sum(r.values))}</td>
-                    </tr>
-                  ))}
+                  {visible.map((r, i) => {
+                    if (r.kind === 'sub') {
+                      zebra = 0
+                      const open = !collapsed.has(r.key!)
+                      return (
+                        <tr key={i}><td colSpan={shown.length + 2} className="pt-4 pb-1 sticky left-0 bg-superficie">
+                          <button onClick={() => toggle(r.key!)} className="text-zinc-300 hover:text-texto-principal text-[11px] font-bold uppercase tracking-widest inline-flex items-center gap-1.5" aria-expanded={open}>
+                            <span className={`inline-block transition-transform ${open ? 'rotate-90' : ''}`}>▶</span>{r.label}
+                          </button>
+                        </td></tr>
+                      )
+                    }
+                    const isGroup = r.kind === 'group'
+                    if (isGroup || r.kind === 'total') zebra = 0
+                    const stripe = r.kind === 'concept' || r.kind === 'neg' || r.kind === 'info' ? (zebra++ % 2 === 1) : false
+                    const bg = stripe ? 'bg-superficie-alta/60' : 'bg-superficie'
+                    const open = isGroup && !collapsed.has(r.key!)
+                    const tot = total(r)
+                    return (
+                      <tr key={i} className={`${r.kind === 'total' ? 'border-t border-zinc-600/70 font-bold' : isGroup ? 'border-t border-zinc-700/40 font-bold' : ''} ${bg}`}>
+                        <td className={`py-1.5 pr-3 sticky left-0 ${stripe ? 'bg-[#01607c]' : 'bg-superficie'} ${r.kind === 'info' ? 'text-zinc-500 text-xs' : isGroup ? 'text-texto-principal uppercase text-xs tracking-wide pt-3' : r.kind === 'concept' ? 'text-zinc-300 pl-6' : 'text-zinc-200'}`}>
+                          {isGroup ? (
+                            <button onClick={() => toggle(r.key!)} className="inline-flex items-center gap-1.5 hover:text-primario" aria-expanded={open}>
+                              <span className={`inline-block text-[9px] transition-transform ${open ? 'rotate-90' : ''}`}>▶</span>{r.label}
+                            </button>
+                          ) : r.label}
+                        </td>
+                        {shown.map(k => { const v = r.values[k] ?? 0; return <td key={k} className={`text-right tabular-nums py-1.5 px-1.5 ${v < 0 ? 'text-alerta/90' : r.kind === 'info' || r.kind === 'concept' ? 'text-zinc-300' : 'text-texto-principal'}`}>{v === 0 ? '—' : money(v)}</td> })}
+                        <td className={`text-right tabular-nums py-1.5 pl-2 ${tot < 0 ? 'text-alerta' : r.kind === 'concept' ? 'text-zinc-300' : 'text-texto-principal'}`}>{money(tot)}</td>
+                      </tr>
+                    )
+                  })}
                 </tbody>
               </table>
             </div>
           </Card>
           <p className="text-zinc-500 text-xs">
             {tab === 'formato'
-              ? 'Ingresos por mes de la venta; egresos por el mes al que corresponden, incluidas las compras de productos. Para mover un gasto a Inversión, edítalo en Egresos y cambia su centro de costo.'
+              ? 'Ingresos por mes de la venta; egresos por el mes al que corresponden, incluidas las compras de productos. Toca un título para contraerlo. Para mover un gasto a Inversión, edítalo en Egresos y cambia su centro de costo.'
               : tab === 'resultados'
               ? 'Ingresos por mes de la venta; gastos por el mes al que corresponden. El costo de lo vendido usa el costo capturado en cada producto, por eso las compras de inventario no se restan otra vez.'
               : 'Entradas por forma de pago el día de la venta; salidas el día en que se pagó cada egreso (de la caja, banco u otro).'}
