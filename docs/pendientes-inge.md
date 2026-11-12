@@ -1,6 +1,6 @@
-# Pendientes de Inge en la compu
+﻿# Pendientes de Inge en la compu
 
-Actualizado: 2026-11-11. Tacha cada punto conforme lo hagas.
+Actualizado: 2026-11-12. Tacha cada punto conforme lo hagas.
 
 ## Hoy, en cuanto llegues (5 minutos) — Runs 1 y 2 HECHOS el 2026-11-11
 
@@ -11,8 +11,8 @@ En el Chrome de la compu ya hay 3 pestañas abiertas:
    - `sin persona`: **0**
    - `membresias de EVO en Relampago`: **38**
    - `vigentes hoy`: **4**
-3. [ ] **EVO:** inicia sesión y avísame. Yo exporto clientes con correo y celular, y gastos.
-4. [ ] **Supabase, Run de "unir duplicados"** (`erp_unir_personas.sql`). Te lo dejo pegado cuando abras Chrome. Después, en **Personas → Posibles duplicados**, puedes unir las fichas de la misma persona. Solo el admin puede hacerlo, y no se puede deshacer.
+3. [x] **EVO:** contactos y gastos importados el 2026-11-12.
+4. [x] **Supabase, Run de "unir duplicados"** (`erp_unir_personas.sql`). Te lo dejo pegado cuando abras Chrome. Después, en **Personas → Posibles duplicados**, puedes unir las fichas de la misma persona. Solo el admin puede hacerlo, y no se puede deshacer.
 
 Si un Run marca error, mándame foto y no corras lo demás.
 
@@ -76,14 +76,15 @@ Si un Run marca error, mándame foto y no corras lo demás.
 - [x] Ventas históricas (1,182 ventas, $201,046).
 - [x] Membresías: Run hecho el 2026-11-11 (punto 2). Son 4 vigentes, todas de domiciliación.
   - Uno de los 4 (venta EVO 1525768, 7-nov) tiene "Saldo deudor" en EVO: debe esa mensualidad.
-- [ ] Contactos (correo y celular): necesita el punto 3.
-- [ ] Gastos desde oct-2025: necesita el punto 3.
+- [x] Contactos (2026-11-12): 548 de 548 personas con correo o celular; 98 prospectos nuevos.
+- [x] Gastos (2026-11-12): 181 gastos por $208,698.98, con su método de pago y su cuenta (Caja Interno o Santander).
+  - EVO no tiene gastos después del 1-oct-2026. Si hubo gastos en octubre o noviembre que no se capturaron, dímelos.
 - [ ] Los 4 domiciliados: cuando les toque su siguiente cobro en EVO, pasarlos a la domiciliación de Relámpago con su link (registran su tarjeta otra vez). Después se cancela su cobro en EVO.
 - [ ] Dar de baja EVO: al final, después de 1–2 semanas usando los dos.
 
 ## Viejos que siguen abiertos
 
 - Borrar la persona "Test" de la prueba de Openpay. Si no, el día 23 se le intenta cobrar en sandbox.
-- Asistencia del staff: **quitar la restricción de WiFi** (decisión de Inge, 2026-11-12). Es un interruptor: /staff/asistencia/reporte → "Ajustes y WiFi" → desmarcar "Exigir el WiFi del muro para checar" → "Guardar ajustes". La selfie se sigue pidiendo.
+- [x] Asistencia del staff: restricción de WiFi QUITADA (2026-11-12). La selfie se sigue pidiendo.
 - Completar el horario de Erick.
 - Contar cerveza y refresco, que estaban en negativo.

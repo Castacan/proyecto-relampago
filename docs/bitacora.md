@@ -1239,3 +1239,20 @@ Chrome no estaba conectado, así que se avanzó en lo que no lo necesita:
   - Crea a los prospectos que no tienen ficha. Es idempotente.
   - Probado en PGlite con un CSV inventado.
   - Aclaración: en EVO los contactos sí están completos. Lo que faltaba es Relámpago, porque las 450 fichas salieron del reporte de ventas, que solo trae el nombre.
+
+**2026-11-12 (tarde), con Chrome: migración de EVO casi completa**
+- Nómina de Erick, 1ª quincena de noviembre: egreso folio 4, $3,840 en efectivo, pagada por Emiliano de su bolsillo.
+- Asistencia: apagado "Exigir el WiFi del muro" (`require_wifi` = false). La selfie se sigue pidiendo.
+- Verificado en producción: `shoe_size` y `terminal_payments` existen; `get_evo_subscribers` muestra 4 vigentes (el primer cobro de EVO es el 24-nov).
+- `erp_unir_personas.sql`: Run hecho. 0 pares de duplicados.
+- **Contactos de EVO:** exportados de Segmentación (22 clientes y 525 prospectos), agregando antes las columnas de correo, celular y nacimiento, porque el export solo trae lo que se ve en pantalla.
+  - IdProspect es el mismo número que `people.evo_id` de las ventas.
+  - Run hecho: 427 ligados por número de EVO y 98 fichas nuevas. **548 de 548 personas con correo o celular** (antes eran 2).
+- **Gastos de EVO** (`scripts/evo_gastos_sql.py`): 181 gastos, $208,698.98 (igual que EVO), 31 proveedores, nómina ligada a Adán, Ximena y Erick. Run hecho.
+  - Método, cuenta y mes reales salieron de la pantalla vieja de Cuentas a pagar (ver docstring del script), en un UPDATE aparte. Run hecho:
+    - débito / Santander: 65, $59,630.27
+    - efectivo / Santander: 1, $1,422.00
+    - efectivo / Caja Interno: 111, $142,809.00
+    - transferencia / Santander: 4, $4,837.71
+  - EVO no tiene gastos después del 1-oct-2026.
+- Los archivos de EVO y los SQL con datos personales quedaron solo en el scratchpad, no en git.

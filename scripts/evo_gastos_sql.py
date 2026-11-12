@@ -11,8 +11,17 @@ Las fechas vienen como M/D/AAAA.
 El SQL es idempotente: cada gasto lleva su número de EVO (expenses.evo_id).
 · Favorecido → proveedor (expense_payees). Los "Empleados" se ligan con su
   ficha de empleado (por las palabras del nombre) y quedan como Nómina.
-· EVO no guarda cómo se pagó: método 'other', pagado desde 'other'.
+· El Excel no trae cómo se pagó: aquí queda método 'other', pagado desde 'other'.
 · Mes del gasto = mes del vencimiento.
+
+MÉTODO, CUENTA Y MES REALES (2026-11-12): el Excel no los trae, pero la
+pantalla vieja sí (Financiero → "Cuentas a pagar", no la "(nuevo)"). Se abre
+su iframe directo (evo3.w12app.com.br/Financeiro/ContasPagar/ContasPagar?idFilial=…),
+se busca con un rango amplio de vencimiento y se lee la tabla Kendo:
+  jQuery('.k-grid').data('kendoGrid').dataSource → pageSize(500) → data()
+Campos: ID_CONTA_PAGAR (= evo_id), FORMA_PAGAMENTO (1 efectivo, 3 débito,
+7 transferencia…), ID_CONTA_BANCARIA (294 Caja Interno, 295 Santander) y
+DT_COMPETENCIA (mes). Con eso se arma un UPDATE de expenses por evo_id.
 """
 import sys
 import unicodedata
