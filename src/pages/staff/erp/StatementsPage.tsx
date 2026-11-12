@@ -17,6 +17,7 @@ type Row = { label: string; values: number[]; kind?: 'total' | 'sub' | 'neg' | '
 type DCell = { group: string; concept: string; month: number; cents: number }
 interface Detail { year: number; cost_centers: string[] | null; income: DCell[]; discounts: Cell[]; expenses: DCell[] }
 const INCOME_ORDER = ['Servicio', 'Plan', 'Producto', 'Otros']
+const EXPENSE_ORDER = ['Gastos fijos', 'Gastos variables', 'Inversión', 'Compra de productos', 'Impuestos']
 
 function detailRows(cells: DCell[], order: string[]): Row[] {
   const gs = [...new Set(cells.map(c => c.group))].sort((a, b) => {
@@ -71,7 +72,7 @@ export default function StatementsPage() {
       { label: 'Ingresos', values: [], kind: 'sub' }, ...detailRows(det.income, INCOME_ORDER),
       ...(sum(disc) ? [{ label: 'Descuentos', values: disc.map(v => -v), kind: 'neg' as const }] : []),
       { label: 'Total ingresos', values: net, kind: 'total' },
-      { label: 'Egresos', values: [], kind: 'sub' }, ...detailRows(det.expenses, det.cost_centers ?? []),
+      { label: 'Egresos', values: [], kind: 'sub' }, ...detailRows(det.expenses, [...EXPENSE_ORDER, ...(det.cost_centers ?? [])]),
       { label: 'Total egresos', values: exp, kind: 'total' },
       { label: 'Utilidad neta', values: sub(net, exp), kind: 'total' },
     ]
