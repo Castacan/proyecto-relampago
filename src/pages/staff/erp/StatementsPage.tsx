@@ -127,7 +127,18 @@ export default function StatementsPage() {
       const incomeRows = groups(d.income).map(g => ({ label: g, values: byMonth(d.income, g), parents: ['Ingresos'] }))
       const income = byMonth(d.income), disc = byMonth(d.discounts), cogs = byMonth(d.cogs)
       const net = sub(income, disc), gross = sub(net, cogs)
-      const expRows = groups(d.expenses).map(g => ({ label: g, values: byMonth(d.expenses, g).map(v => -v), kind: 'neg' as const, parents: ['Gastos'] }))
+      // Cada grupo se puede abrir con sus proveedores (del detalle), solo si el detalle cuadra con el total del grupo.
+      const expRows: Row[] = groups(d.expenses).flatMap(g => {
+        const vals = byMonth(d.expenses, g)
+        const flat: Row[] = [{ label: g, values: vals.map(v => -v), kind: 'neg', parents: ['Gastos'] }]
+        const dc = det?.expenses.filter(c => c.group === g) ?? []
+        if (!dc.length || byMonth(dc).some((v, i) => v !== vals[i])) return flat
+        const key = `Gastos/${g}`
+        const concepts: Row[] = [...new Set(dc.map(c => c.concept))]
+          .map(c => ({ label: c, values: byMonth(dc.filter(x => x.concept === c)).map(v => -v), kind: 'concept' as const, parents: ['Gastos', key] }))
+          .sort((a, b) => sum(a.values) - sum(b.values))
+        return [{ label: g, values: vals.map(v => -v), kind: 'group', key, parents: ['Gastos'] }, ...concepts]
+      })
       const exp = byMonth(d.expenses)
       rows = [
         { label: 'Ingresos', values: [], kind: 'sub', key: 'Ingresos' }, ...incomeRows,
@@ -258,8 +269,8 @@ export default function StatementsPage() {
                       zebra = 0
                       const open = !collapsed.has(r.key!)
                       return (
-                        <tr key={i}><td colSpan={shown.length + 2} className="pt-4 pb-1 sticky left-0 bg-superficie">
-                          <button onClick={() => toggle(r.key!)} className="text-zinc-300 hover:text-texto-principal text-[11px] font-bold uppercase tracking-widest inline-flex items-center gap-1.5" aria-expanded={open}>
+                        <tr key={i} onClick={() => toggle(r.key!)} className="cursor-pointer"><td colSpan={shown.length + 2} className="pt-4 pb-1 sticky left-0 bg-superficie">
+                          <button onClick={e => { e.stopPropagation(); toggle(r.key!) }} className="text-zinc-300 hover:text-texto-principal text-[11px] font-bold uppercase tracking-widest inline-flex items-center gap-1.5" aria-expanded={open}>
                             <span className={`inline-block transition-transform ${open ? 'rotate-90' : ''}`}>▶</span>{r.label}
                           </button>
                         </td></tr>
@@ -272,10 +283,10 @@ export default function StatementsPage() {
                     const open = isGroup && !collapsed.has(r.key!)
                     const tot = total(r)
                     return (
-                      <tr key={i} className={`${r.kind === 'total' ? 'border-t border-zinc-600/70 font-bold' : isGroup ? 'border-t border-zinc-700/40 font-bold' : ''} ${bg}`}>
+                      <tr key={i} onClick={isGroup ? () => toggle(r.key!) : undefined} className={`${isGroup ? 'cursor-pointer hover:brightness-110 ' : ''}${r.kind === 'total' ? 'border-t border-zinc-600/70 font-bold' : isGroup ? 'border-t border-zinc-700/40 font-bold' : ''} ${bg}`}>
                         <td className={`py-1.5 pr-3 sticky left-0 ${stripe ? 'bg-[#01607c]' : 'bg-superficie'} ${r.kind === 'info' ? 'text-zinc-500 text-xs' : isGroup ? 'text-texto-principal uppercase text-xs tracking-wide pt-3' : r.kind === 'concept' ? 'text-zinc-300 pl-6' : 'text-zinc-200'}`}>
                           {isGroup ? (
-                            <button onClick={() => toggle(r.key!)} className="inline-flex items-center gap-1.5 hover:text-primario" aria-expanded={open}>
+                            <button onClick={e => { e.stopPropagation(); toggle(r.key!) }} className="inline-flex items-center gap-1.5 hover:text-primario" aria-expanded={open}>
                               <span className={`inline-block text-[9px] transition-transform ${open ? 'rotate-90' : ''}`}>▶</span>{r.label}
                             </button>
                           ) : r.label}
