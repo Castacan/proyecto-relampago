@@ -17,9 +17,10 @@ type Kind = 'total' | 'sub' | 'neg' | 'info' | 'group' | 'concept'
 type Row = { label: string; values: number[]; kind?: Kind; key?: string; parents?: string[] }
 
 // Formato de Inge (erp_estado_resultados.sql): grupo con su total y los conceptos debajo.
-type DCell = { group: string; concept: string; month: number; cents: number }
+// event: NULL = gym; con nombre = evento (competencia, etc.; erp_eventos.sql).
+type DCell = { group: string; concept: string; month: number; cents: number; event?: string | null }
 interface Detail { year: number; cost_centers: string[] | null; income: DCell[]; discounts: Cell[]; expenses: DCell[] }
-const INCOME_ORDER = ['Servicio', 'Plan', 'Producto', 'Otros']
+const INCOME_ORDER = ['Servicio', 'Plan', 'Producto', 'Otros', 'Inscripciones', 'Patrocinio', 'Otros ingresos']
 const EXPENSE_ORDER = ['Gastos fijos', 'Gastos variables', 'Inversión', 'Compra de productos', 'Impuestos']
 const INVERSION = 'Inversión'
 
@@ -28,7 +29,7 @@ const groups = (cells: Cell[]) => [...new Set(cells.map(c => c.group ?? ''))].so
 const sub = (a: number[], b: number[]) => a.map((v, i) => v - b[i])
 const sum = (v: number[]) => v.reduce((a, b) => a + b, 0)
 
-function detailRows(cells: DCell[], order: string[], section: string): Row[] {
+function detailRows(cells: DCell[], order: string[], section: string, outer: string[] = []): Row[] {
   const gs = [...new Set(cells.map(c => c.group))].sort((a, b) => {
     const ia = order.indexOf(a), ib = order.indexOf(b)
     return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib) || a.localeCompare(b)
@@ -37,9 +38,9 @@ function detailRows(cells: DCell[], order: string[], section: string): Row[] {
   for (const g of gs) {
     const gc = cells.filter(c => c.group === g)
     const key = `${section}/${g}`
-    out.push({ label: g, values: byMonth(gc), kind: 'group', key, parents: [section] })
+    out.push({ label: g, values: byMonth(gc), kind: 'group', key, parents: [...outer, section] })
     const concepts = [...new Set(gc.map(c => c.concept))]
-      .map(c => ({ label: c, values: byMonth(gc.filter(x => x.concept === c)), kind: 'concept' as const, parents: [section, key] }))
+      .map(c => ({ label: c, values: byMonth(gc.filter(x => x.concept === c)), kind: 'concept' as const, parents: [...outer, section, key] }))
       .sort((a, b) => sum(b.values) - sum(a.values))
     out.push(...concepts)
   }
@@ -56,6 +57,7 @@ export default function StatementsPage() {
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set())
   const [picked, setPicked] = useState<Set<number> | null>(null)   // null = todos los meses con movimiento
   const [withInv, setWithInv] = useState(true)
+  const [scope, setScope] = useState<'gym' | 'todo'>('todo')   // gym solo o gym + eventos
   const [charts, setCharts] = useState(true)
 
   useEffect(() => {
@@ -76,27 +78,50 @@ export default function StatementsPage() {
     let available = MONTHS.map((_, i) => i)
     let chart: { inc: number[]; exp: number[]; net: number[]; byGroup: { label: string; values: number[] }[] } | null = null
     if (tab === 'formato' && det) {
-      const inc = byMonth(det.income), disc = byMonth(det.discounts), exp = byMonth(det.expenses)
-      const inv = byMonth(det.expenses.filter(c => c.group === INVERSION))
-      const net = sub(inc, disc)
-      const expUsed = withInv ? exp : sub(exp, inv)
-      const util = sub(net, expUsed)
-      const expRows = detailRows(det.expenses, [...EXPENSE_ORDER, ...(det.cost_centers ?? [])], 'Egresos')
+      const expOrder = [...EXPENSE_ORDER, ...(det.cost_centers ?? [])]
+      const used = (cells: DCell[]) => withInv ? cells : cells.filter(c => c.group !== INVERSION)
+      const invLabel = (r: Row) => !withInv && r.label === INVERSION && r.kind === 'group' ? { ...r, label: `${INVERSION} (no se resta)` } : r
+      const gymInc = det.income.filter(c => !c.event), gymExp = det.expenses.filter(c => !c.event)
+      const events = [...new Set([...det.income, ...det.expenses].map(c => c.event).filter((e): e is string => !!e))].sort()
+      const showEvents = scope === 'todo' && events.length > 0
+      const disc = byMonth(det.discounts)
+      const gNet = sub(byMonth(gymInc), disc), gExp = byMonth(used(gymExp)), gUtil = sub(gNet, gExp)
+      const gymWord = showEvents ? ' del gym' : ''
       rows = [
-        { label: 'Ingresos', values: [], kind: 'sub', key: 'Ingresos' }, ...detailRows(det.income, INCOME_ORDER, 'Ingresos'),
+        { label: `Ingresos${gymWord}`, values: [], kind: 'sub', key: 'Ingresos' }, ...detailRows(gymInc, INCOME_ORDER, 'Ingresos'),
         ...(sum(disc) ? [{ label: 'Descuentos', values: disc.map(v => -v), kind: 'neg' as const, parents: ['Ingresos'] }] : []),
-        { label: 'Total ingresos', values: net, kind: 'total' },
-        { label: 'Egresos', values: [], kind: 'sub', key: 'Egresos' },
-        ...expRows.map(r => !withInv && (r.label === INVERSION && r.kind === 'group') ? { ...r, label: `${INVERSION} (no se resta)` } : r),
-        { label: withInv ? 'Total egresos' : 'Total egresos (sin inversión)', values: expUsed, kind: 'total' },
-        { label: withInv ? 'Utilidad neta' : 'Utilidad sin inversión', values: util, kind: 'total' },
+        { label: `Total ingresos${gymWord}`, values: gNet, kind: 'total' },
+        { label: `Egresos${gymWord}`, values: [], kind: 'sub', key: 'Egresos' },
+        ...detailRows(gymExp, expOrder, 'Egresos').map(invLabel),
+        { label: `Total egresos${gymWord}${withInv ? '' : ' (sin inversión)'}`, values: gExp, kind: 'total' },
+        { label: `${withInv ? 'Utilidad' : 'Utilidad sin inversión'}${showEvents ? ' del gym' : ' neta'}`, values: gUtil, kind: 'total' },
       ]
-      available = available.filter(i => inc[i] || exp[i])
+      let tInc = gNet, tExp = gExp
+      if (showEvents) {
+        for (const ev of events) {
+          const k = `Evento:${ev}`
+          const eInc = det.income.filter(c => c.event === ev), eExp = det.expenses.filter(c => c.event === ev)
+          const ei = byMonth(eInc), ee = byMonth(used(eExp))
+          rows.push(
+            { label: `Evento: ${ev}`, values: [], kind: 'sub', key: k },
+            ...detailRows(eInc, INCOME_ORDER, `${k}/ing`, [k]),
+            { label: 'Ingresos del evento', values: ei, kind: 'total', parents: [k] },
+            ...detailRows(eExp, expOrder, `${k}/egr`, [k]).map(invLabel),
+            { label: 'Egresos del evento', values: ee, kind: 'total', parents: [k] },
+            { label: `Resultado: ${ev}`, values: sub(ei, ee), kind: 'total' },
+          )
+          tInc = tInc.map((v, i) => v + ei[i]); tExp = tExp.map((v, i) => v + ee[i])
+        }
+        rows.push({ label: withInv ? 'Utilidad total (gym + eventos)' : 'Utilidad total sin inversión (gym + eventos)', values: sub(tInc, tExp), kind: 'total' })
+      }
+      const allInc = showEvents ? det.income : gymInc, allExp = showEvents ? det.expenses : gymExp
+      const anyInc = byMonth(allInc), anyExp = byMonth(allExp)
+      available = available.filter(i => anyInc[i] || anyExp[i])
       if (!available.length) available = [new Date().getMonth()]
       chart = {
-        inc: net, exp: expUsed, net: util,
-        byGroup: [...new Set(det.expenses.map(c => c.group))].filter(g => withInv || g !== INVERSION)
-          .map(g => ({ label: g, values: byMonth(det.expenses.filter(c => c.group === g)) })),
+        inc: tInc, exp: tExp, net: sub(tInc, tExp),
+        byGroup: [...new Set(used(allExp).map(c => c.group))]
+          .map(g => ({ label: g, values: byMonth(used(allExp).filter(c => c.group === g)) })),
       }
     } else if (d && tab === 'resultados') {
       const incomeRows = groups(d.income).map(g => ({ label: g, values: byMonth(d.income, g), parents: ['Ingresos'] }))
@@ -128,7 +153,7 @@ export default function StatementsPage() {
       ]
     }
     return { rows, available, chart }
-  }, [tab, d, det, withInv])
+  }, [tab, d, det, withInv, scope])
 
   if (error) return <Page title="Estados financieros"><p className="text-alerta text-sm">{error}</p></Page>
 
@@ -156,6 +181,7 @@ export default function StatementsPage() {
     <button onClick={() => { setTab(t); setCollapsed(new Set()) }} className={`px-3 py-2 rounded-xl text-sm font-bold ${tab === t ? 'bg-primario text-texto-en-acento' : 'bg-superficie-alta text-zinc-300'}`}>{text}</button>
   )
   const hasInv = !!det?.expenses.some(c => c.group === INVERSION)
+  const hasEvents = !!det && [...det.income, ...det.expenses].some(c => c.event)
 
   // Colores alternados (renglones visibles con números); el fondo sólido sirve también para la primera columna fija.
   let zebra = 0
@@ -181,6 +207,12 @@ export default function StatementsPage() {
               className={`px-2.5 py-1 rounded-lg text-xs font-bold ${picked && shown.includes(i) ? 'bg-primario/80 text-texto-en-acento' : picked ? 'bg-superficie text-zinc-500' : 'bg-superficie-alta text-texto-principal'}`}>{MONTHS[i]}</button>
           ))}
           <span className="flex-1" />
+          {tab === 'formato' && hasEvents && (
+            <div className="flex rounded-lg overflow-hidden border border-zinc-700/50 text-xs font-bold">
+              <button onClick={() => setScope('gym')} className={`px-2.5 py-1 ${scope === 'gym' ? 'bg-primario text-texto-en-acento' : 'bg-superficie-alta text-zinc-300'}`}>Solo gym</button>
+              <button onClick={() => setScope('todo')} className={`px-2.5 py-1 ${scope === 'todo' ? 'bg-primario text-texto-en-acento' : 'bg-superficie-alta text-zinc-300'}`}>Gym + eventos</button>
+            </div>
+          )}
           {tab === 'formato' && hasInv && (
             <div className="flex rounded-lg overflow-hidden border border-zinc-700/50 text-xs font-bold">
               <button onClick={() => setWithInv(true)} className={`px-2.5 py-1 ${withInv ? 'bg-primario text-texto-en-acento' : 'bg-superficie-alta text-zinc-300'}`}>Utilidad con inversión</button>
