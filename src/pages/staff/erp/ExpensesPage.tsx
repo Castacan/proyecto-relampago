@@ -1,5 +1,6 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
+import { supabase } from '../../../lib/supabase'
 import { call, erpError, money, toCents, toPesos, fmtDate, todayMx, csvDownload, EXPENSE_STATUS, EXPENSE_METHODS, PAID_FROM, PAYEE_KINDS } from '../../../lib/erp'
 import { Page, Card, Stat, Badge, Empty, Spinner, Msg, input, label, btnPrimary, btnGhost, btnSmall, btnDanger, MoneyField } from '../../../components/erp/ui'
 
@@ -40,6 +41,7 @@ export default function ExpensesPage() {
   const [error, setError] = useState<string | null>(null)
   const [tab, setTab] = useState<Tab>('egresos')
   const [creating, setCreating] = useState(false)
+  const [quick, setQuick] = useState(false)
 
   const load = useCallback(async () => {
     const { data, error } = await call<Data>('get_expenses', { p_month: `${month}-01` })
@@ -55,7 +57,11 @@ export default function ExpensesPage() {
 
   return (
     <Page title="Egresos" subtitle="Lo que pagas: proveedores, servicios, nómina, impuestos. Lo pagado de la caja sale solo del efectivo."
-      actions={<button onClick={() => { setTab('egresos'); setCreating(v => !v) }} className={btnPrimary}>{creating ? 'Cerrar' : '+ Nuevo egreso'}</button>}>
+      actions={<>
+        <button onClick={() => { setTab('egresos'); setQuick(v => !v) }} className={btnGhost}>{quick ? 'Cerrar' : '⚡ Gasto rápido'}</button>
+        <button onClick={() => { setTab('egresos'); setCreating(v => !v) }} className={btnPrimary}>{creating ? 'Cerrar' : '+ Nuevo egreso'}</button>
+      </>}>
+      {quick && <QuickExpense d={d} onSaved={() => { setQuick(false); load() }} />}
       <div className="flex flex-wrap gap-1 border-b border-zinc-800/80">
         {tabs.map(([k, v]) => (
           <button key={k} onClick={() => setTab(k)}
@@ -570,6 +576,134 @@ function EventPicker({ value, events, onSave }: { value: string | null; events: 
       {changed && <button disabled={busy} onClick={async () => { setBusy(true); setErr(await onSave(next || null)); setBusy(false) }} className={btnSmall}>{busy ? 'Guardando…' : 'Guardar evento'}</button>}
       <Msg text={err} />
     </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Gasto rápido (Edge Function gasto-rapido): escribir o dictar → revisar → guardar
+// ---------------------------------------------------------------------------
+
+interface QuickItem {
+  kind: 'expense' | 'stock_purchase'; payee_name: string | null; description: string; cost_center: string; category: string | null
+  amount_cents: number; date: string; method: string; paid_from: string; event: string | null
+  product_id: string | null; quantity: number | null; paid_by_emiliano: boolean; notes: string | null
+}
+
+type SpeechRec = { lang: string; interimResults: boolean; continuous: boolean; start: () => void; stop: () => void
+  onresult: ((e: { results: ArrayLike<ArrayLike<{ transcript: string }>> }) => void) | null; onend: (() => void) | null }
+
+function QuickExpense({ d, onSaved }: { d: Data; onSaved: () => void }) {
+  const [text, setText] = useState('')
+  const [items, setItems] = useState<QuickItem[] | null>(null)
+  const [questions, setQuestions] = useState<string[]>([])
+  const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState<string | null>(null)
+  const [listening, setListening] = useState(false)
+  const recRef = useRef<SpeechRec | null>(null)
+  const w = window as unknown as { SpeechRecognition?: new () => SpeechRec; webkitSpeechRecognition?: new () => SpeechRec }
+  const Rec = w.SpeechRecognition ?? w.webkitSpeechRecognition
+
+  const dictate = () => {
+    if (!Rec) return
+    if (listening) { recRef.current?.stop(); return }
+    const r = new Rec(); r.lang = 'es-MX'; r.interimResults = false; r.continuous = true
+    const base = text ? text.trim() + ' ' : ''
+    r.onresult = e => { setText(base + Array.from(e.results).map(x => x[0].transcript).join(' ')) }
+    r.onend = () => setListening(false)
+    recRef.current = r; setListening(true); r.start()
+  }
+
+  const interpret = async () => {
+    setBusy(true); setErr(null); setItems(null); setQuestions([])
+    const { data, error } = await supabase.functions.invoke('gasto-rapido', { body: { text } })
+    setBusy(false)
+    if (error || !data || data.error) {
+      setErr(data?.error === 'not_configured' ? 'Falta poner la llave de Anthropic en Supabase (ANTHROPIC_API_KEY).'
+        : data?.error === 'forbidden' ? 'Solo un admin puede usar Gasto rápido.' : 'No se pudo interpretar. Intenta de nuevo o captúralo a mano.')
+      return
+    }
+    setItems(data.items ?? []); setQuestions(data.questions ?? [])
+  }
+
+  const upd = (i: number, p: Partial<QuickItem>) => setItems(prev => prev ? prev.map((x, k) => k === i ? { ...x, ...p } : x) : prev)
+
+  const saveAll = async () => {
+    if (!items?.length) return
+    setBusy(true); setErr(null)
+    for (const it of items) {
+      const notes = [it.notes, it.paid_by_emiliano ? 'Pagado por Emiliano de su bolsillo (el muro se lo debe).' : null, 'Capturado con Gasto rápido.'].filter(Boolean).join(' ')
+      const month = `${it.date.slice(0, 7)}-01`
+      let id: string | undefined
+      if (it.kind === 'stock_purchase' && it.product_id && it.quantity) {
+        const { data, error } = await call<{ expense_id: string }>('stock_entry', { p: {
+          product_id: it.product_id, quantity: it.quantity, unit_cost_cents: Math.round(it.amount_cents / it.quantity), note: it.description,
+          expense: { payee_name: it.payee_name, due_on: it.date, paid: true, method: it.method, paid_from: it.paid_from } } })
+        if (error || !data) { setBusy(false); setErr(`${it.description}: ${erpError(error ?? undefined)}`); return }
+        id = data.expense_id
+        await call('admin_save_expense', { p: { id, amount_cents: it.amount_cents, paid_on: it.date, period_month: month, notes } })
+      } else {
+        const { data, error } = await call<{ id: string }>('admin_save_expense', { p: {
+          payee_name: it.payee_name, description: it.description, cost_center: it.cost_center, category: it.category,
+          amount_cents: it.amount_cents, due_on: it.date, period_month: month, pay_now: true, paid_on: it.date,
+          method: it.method, paid_from: it.paid_from, notes } })
+        if (error || !data) { setBusy(false); setErr(`${it.description}: ${erpError(error ?? undefined)}`); return }
+        id = data.id
+      }
+      if (id && it.event) await call('admin_set_expense_event', { p_expense_id: id, p_event: it.event })
+    }
+    setBusy(false)
+    onSaved()
+  }
+
+  return (
+    <Card title="⚡ Gasto rápido" tone="accent">
+      <p className="text-zinc-400 text-xs">Escribe o dicta como lo dirías: "ayer le pagué 350 a la de limpieza en efectivo de mi bolsillo", "compré 12 gomitas a 30 cada una con efectivo de la caja". Revisa lo que entendió y guarda.</p>
+      <div className="flex gap-2 items-start">
+        <textarea value={text} onChange={e => setText(e.target.value)} rows={3} className={input} placeholder="¿Qué pagaste?" />
+        {Rec && <button onClick={dictate} className={`${btnSmall} ${listening ? 'bg-alerta text-white' : ''}`} title="Dictar">{listening ? '■ Parar' : '🎤 Dictar'}</button>}
+      </div>
+      <div className="flex items-center gap-3">
+        <button onClick={interpret} disabled={busy || text.trim().length < 4} className={btnPrimary}>{busy && !items ? 'Interpretando…' : 'Interpretar'}</button>
+        <Msg text={err} />
+      </div>
+      {questions.length > 0 && <div className="rounded-xl border border-amarillo-suave/40 bg-amarillo-suave/10 p-3 text-sm text-texto-principal">{questions.map((q, i) => <p key={i}>❓ {q}</p>)}</div>}
+      {items && items.length === 0 && <Empty>No encontré un gasto claro. Agrega el monto y a quién se pagó.</Empty>}
+      {items && items.length > 0 && (
+        <div className="space-y-2">
+          {items.map((it, i) => (
+            <div key={i} className="rounded-xl bg-fondo/60 p-3 grid sm:grid-cols-2 lg:grid-cols-4 gap-2 items-end">
+              <div className="lg:col-span-2"><label className={label}>Concepto{it.kind === 'stock_purchase' && it.quantity ? ` · entran ${it.quantity} al inventario` : ''}</label>
+                <input value={it.description} onChange={x => upd(i, { description: x.target.value })} className={input} /></div>
+              <div><label className={label}>A quién</label><input value={it.payee_name ?? ''} onChange={x => upd(i, { payee_name: x.target.value || null })} className={input} /></div>
+              <MoneyField id={`q-amt-${i}`} label="Monto" value={toPesos(it.amount_cents)} onChange={v => upd(i, { amount_cents: toCents(v) })} />
+              <div><label className={label}>Fecha</label><input type="date" value={it.date} onChange={x => upd(i, { date: x.target.value })} className={input} /></div>
+              {it.kind === 'expense' && <div><label className={label}>Centro de costos</label>
+                <select value={it.cost_center} onChange={x => upd(i, { cost_center: x.target.value })} className={input}>
+                  {[...new Set([...d.cost_centers, it.cost_center])].map(c => <option key={c}>{c}</option>)}
+                </select></div>}
+              <div><label className={label}>Forma</label>
+                <select value={it.method} onChange={x => upd(i, { method: x.target.value })} className={input}>
+                  {Object.entries(EXPENSE_METHODS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+                </select></div>
+              <div><label className={label}>Salió de</label>
+                <select value={it.paid_from} onChange={x => upd(i, { paid_from: x.target.value })} className={input}>
+                  {Object.entries(PAID_FROM).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+                </select></div>
+              <div><label className={label}>Evento</label>
+                <select value={it.event ?? ''} onChange={x => upd(i, { event: x.target.value || null })} className={input}>
+                  <option value="">Ninguno</option>{[...new Set([...(d.events ?? []), ...(it.event ? [it.event] : [])])].map(ev => <option key={ev}>{ev}</option>)}
+                </select></div>
+              <label className="flex items-center gap-2 text-sm text-zinc-300 sm:col-span-2">
+                <input type="checkbox" checked={it.paid_by_emiliano} onChange={x => upd(i, { paid_by_emiliano: x.target.checked })} /> Lo pagó Emiliano de su bolsillo
+              </label>
+              {it.notes && <p className="text-zinc-400 text-xs sm:col-span-2 lg:col-span-4">Nota: {it.notes}</p>}
+              <button onClick={() => setItems(prev => prev ? prev.filter((_, k) => k !== i) : prev)} className={`${btnSmall} justify-self-start`}>Quitar</button>
+            </div>
+          ))}
+          <button onClick={saveAll} disabled={busy} className={btnPrimary}>{busy ? 'Guardando…' : `Guardar ${items.length === 1 ? 'egreso' : `${items.length} egresos`}`}</button>
+        </div>
+      )}
+    </Card>
   )
 }
 
