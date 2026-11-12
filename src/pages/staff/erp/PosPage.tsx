@@ -66,8 +66,12 @@ export default function PosPage() {
   const loadTodayPeople = useCallback(async () => { const { data } = await call<{ people: TodayPerson[] }>('get_today_people'); setTodayPeople(data?.people ?? []) }, [])
   useEffect(() => { loadTodayPeople() }, [loadTodayPeople])
 
-  useEffect(() => {
+  // Productos (con su existencia): se recargan después de cada venta para que el stock se vea al día.
+  const loadProducts = useCallback(() => {
     call<{ products: Product[] }>('get_products', { p_include_inactive: false }).then(({ data }) => setProducts((data?.products ?? []).filter(p => !p.is_recurring && p.for_sale !== false)))
+  }, [])
+  useEffect(() => {
+    loadProducts()
     call<{ open: unknown; require_open_cash: boolean }>('get_cash_status').then(({ data }) => { setCashOpen(!!data?.open); setRequireCash(data?.require_open_cash ?? true) })
     call<{ is_admin: boolean }>('get_erp_settings').then(({ data }) => setIsAdmin(!!data?.is_admin))
   }, [])
@@ -170,7 +174,7 @@ export default function PosPage() {
       setTerm(null); loadUnlinked()
     }
     setDone({ folio: data.folio, total: data.total_cents, change }); setEntryMsg(null)
-    loadTodayPeople(); setPricingKey(k => k + 1)
+    loadTodayPeople(); loadProducts(); setPricingKey(k => k + 1)
     setLines([]); setDiscount(''); setPayments([{ method: 'cash', amount: '', reference: '' }]); setCashGiven(''); setNote('')
   }
 

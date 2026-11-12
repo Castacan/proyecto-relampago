@@ -4,6 +4,7 @@ import { useCanSee } from '../../../lib/staffSections'
 import { call, fmtDate, fmtDateTime, money } from '../../../lib/erp'
 import { fmtTime } from '../../../lib/classes'
 import { CashAlerts, type CashAlert } from './CashPage'
+import { VoidRequestsCard } from './SalesPage'
 import { Page, Card, Stat, Spinner, Empty, Badge, btnPrimary, btnGhost } from '../../../components/erp/ui'
 
 interface Dashboard {
@@ -58,6 +59,7 @@ function Home() {
     <Page title="Inicio" subtitle={fmtDate(d.today)}
       actions={<><Link hideIfLocked to="/staff/vender" className={btnPrimary}>Vender</Link><Link hideIfLocked to="/staff/personas" className={btnGhost}>Buscar persona</Link></>}>
       <CashAlerts alerts={alerts} onAck={loadAlerts} />
+      {d.is_admin && <VoidRequestsCard />}
       {!d.cash && d.require_open_cash && (
         <Card tone="alert">
           <div className="flex flex-wrap items-center justify-between gap-3">

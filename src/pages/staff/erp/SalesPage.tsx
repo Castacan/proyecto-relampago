@@ -8,6 +8,60 @@ interface Sale {
   note: string | null; void_reason: string | null; person_id: string | null; person_name: string | null; seller: string | null
   items: { description: string; quantity: number; total_cents: number }[] | null
   payments: { method: string; amount_cents: number; reference: string | null }[] | null
+  void_request?: { id: string; status: 'pending' | 'approved' | 'rejected'; reason: string; decision_note: string | null; requested_by: string | null; created_at: string } | null
+}
+
+interface VoidRequest {
+  id: string; sale_id: string; folio: number; total_cents: number; sale_at: string; reason: string; created_at: string
+  requested_by: string | null; person_name: string | null; items: string | null; methods: string | null
+}
+
+const VOID_ERRORS: Record<string, string> = {
+  reason_required: 'Escribe el motivo (mínimo 5 letras).',
+  only_today: 'Solo se pueden pedir cancelaciones de ventas de hoy.',
+  already_requested: 'Esa venta ya tiene una cancelación pendiente.',
+  subscription_sale: 'Los cobros de domiciliación no se cancelan aquí.',
+}
+
+/** (Admin) Cancelaciones que pidió el staff: aprobar (se anula la venta) o rechazar. Sale en Inicio y en el Historial. */
+export function VoidRequestsCard({ onChanged }: { onChanged?: () => void }) {
+  const [reqs, setReqs] = useState<VoidRequest[]>([])
+  const [err, setErr] = useState<string | null>(null)
+  const [busy, setBusy] = useState<string | null>(null)
+  const load = useCallback(async () => {
+    const { data } = await call<{ requests: VoidRequest[] }>('get_void_requests')
+    setReqs(data?.requests ?? [])
+  }, [])
+  useEffect(() => { load() }, [load])
+  if (reqs.length === 0) return null
+  const decide = async (r: VoidRequest, approve: boolean) => {
+    if (approve && !window.confirm(`¿Anular la venta #${r.folio} por ${money(r.total_cents)}? El dinero se devuelve aparte.`)) return
+    setBusy(r.id); setErr(null)
+    const { error } = await call('admin_decide_void', { p_request_id: r.id, p_approve: approve, p_note: null })
+    setBusy(null)
+    if (error) { setErr(erpError(error)); return }
+    load(); onChanged?.()
+  }
+  return (
+    <Card title={`Cancelaciones por aprobar (${reqs.length})`} tone="accent">
+      <div className="divide-y divide-zinc-800/80">
+        {reqs.map(r => (
+          <div key={r.id} className="py-2 flex flex-wrap items-center justify-between gap-2 text-sm">
+            <div className="min-w-0">
+              <p className="text-texto-principal font-semibold">#{r.folio} · {r.items} · {money(r.total_cents)}</p>
+              <p className="text-zinc-400 text-xs">{fmtDateTime(r.sale_at)} · {r.person_name ?? 'Sin persona'} · {(r.methods ?? '').split(', ').map(m => METHOD_LABELS[m] ?? m).join(', ')}</p>
+              <p className="text-amarillo-suave text-xs">Pidió {r.requested_by ?? 'staff'}: "{r.reason}"</p>
+            </div>
+            <span className="flex gap-2">
+              <button disabled={busy === r.id} onClick={() => decide(r, true)} className={btnDanger}>Aprobar y anular</button>
+              <button disabled={busy === r.id} onClick={() => decide(r, false)} className={btnSmall}>Rechazar</button>
+            </span>
+          </div>
+        ))}
+      </div>
+      <Msg text={err} />
+    </Card>
+  )
 }
 
 
@@ -16,11 +70,12 @@ export function SalesHistoryPage() {
   const [to, setTo] = useState(todayMx())
   const [sales, setSales] = useState<Sale[] | null>(null)
   const [isAdmin, setIsAdmin] = useState(false)
+  const [onlyToday, setOnlyToday] = useState(false)
   const [open, setOpen] = useState<string | null>(null)
   const load = useCallback(async () => {
     setSales(null)
-    const { data } = await call<{ sales: Sale[] }>('get_sales', { p_from: from, p_to: to })
-    setSales(data?.sales ?? [])
+    const { data } = await call<{ sales: Sale[]; only_today?: boolean }>('get_sales', { p_from: from, p_to: to })
+    setSales(data?.sales ?? []); setOnlyToday(!!data?.only_today)
   }, [from, to])
   useEffect(() => { load() }, [load])
   useEffect(() => { call<{ is_admin: boolean }>('get_erp_settings').then(({ data }) => setIsAdmin(!!data?.is_admin)) }, [])
@@ -35,11 +90,15 @@ export function SalesHistoryPage() {
   ])
 
   return (
-    <Page title="Historial de ventas" actions={<button onClick={exportCsv} disabled={!sales?.length} className={btnGhost}>Descargar CSV</button>}>
-      <div className="flex flex-wrap items-end gap-3">
-        <div><label className={label}>Desde</label><input type="date" value={from} onChange={e => setFrom(e.target.value)} className={input} /></div>
-        <div><label className={label}>Hasta</label><input type="date" value={to} onChange={e => setTo(e.target.value)} className={input} /></div>
-      </div>
+    <Page title="Historial de ventas" subtitle={onlyToday ? 'Ventas de hoy. Si alguna está mal, ábrela y pide su cancelación: el admin la aprueba.' : undefined}
+      actions={isAdmin ? <button onClick={exportCsv} disabled={!sales?.length} className={btnGhost}>Descargar CSV</button> : undefined}>
+      {isAdmin && <VoidRequestsCard onChanged={load} />}
+      {!onlyToday && (
+        <div className="flex flex-wrap items-end gap-3">
+          <div><label className={label}>Desde</label><input type="date" value={from} onChange={e => setFrom(e.target.value)} className={input} /></div>
+          <div><label className={label}>Hasta</label><input type="date" value={to} onChange={e => setTo(e.target.value)} className={input} /></div>
+        </div>
+      )}
       <div className="grid grid-cols-2 gap-3">
         <Stat label="Vendido" value={money(completed.reduce((a, s) => a + s.total_cents, 0))} sub={`${completed.length} ventas`} tone="accent" />
         <Stat label="Anuladas" value={(sales ?? []).length - completed.length} />
@@ -55,6 +114,7 @@ export function SalesHistoryPage() {
                 </div>
                 <span className="flex items-center gap-2 shrink-0">
                   {s.status === 'voided' && <Badge cls="text-white bg-alerta">Anulada</Badge>}
+                  {s.status === 'completed' && s.void_request?.status === 'pending' && <Badge cls="text-amarillo-suave bg-amarillo-suave/10">Cancelación pedida</Badge>}
                   <span className="text-texto-principal font-bold tabular-nums">{money(s.total_cents)}</span>
                 </span>
               </button>
@@ -72,10 +132,15 @@ function SaleDetail({ s, isAdmin, onChanged }: { s: Sale; isAdmin: boolean; onCh
   const [reason, setReason] = useState('')
   const [error, setError] = useState<string | null>(null)
   const voidIt = async () => {
-    const { error } = await call('admin_void_sale', { p_sale_id: s.id, p_reason: reason })
-    if (error) { setError(erpError(error)); return }
+    // Admin anula directo; el staff solo pide la cancelación (el admin la aprueba).
+    const { error } = isAdmin
+      ? await call('admin_void_sale', { p_sale_id: s.id, p_reason: reason })
+      : await call('staff_request_void', { p_sale_id: s.id, p_reason: reason })
+    if (error) { setError(VOID_ERRORS[error] ?? erpError(error)); return }
     onChanged()
   }
+  const vr = s.void_request
+  const canAsk = s.status === 'completed' && s.source !== 'subscription' && vr?.status !== 'pending'
   return (
     <div className="px-4 pb-4 space-y-2 text-sm">
       {(s.items ?? []).map((i, k) => <p key={k} className="text-zinc-300">{i.description}{i.quantity > 1 ? ` ×${i.quantity}` : ''} · {money(i.total_cents)}</p>)}
@@ -84,17 +149,25 @@ function SaleDetail({ s, isAdmin, onChanged }: { s: Sale; isAdmin: boolean; onCh
       {s.seller && <p className="text-zinc-500 text-xs">Vendió: {s.seller}</p>}
       {s.note && <p className="text-zinc-500 text-xs">Nota: {s.note}</p>}
       {s.void_reason && <p className="text-alerta text-xs">Anulada: {s.void_reason}</p>}
+      {vr && s.status === 'completed' && (
+        <p className={`text-xs ${vr.status === 'pending' ? 'text-amarillo-suave' : 'text-zinc-400'}`}>
+          {vr.status === 'pending' ? `Cancelación pedida por ${vr.requested_by ?? 'staff'}: "${vr.reason}". Espera la aprobación del admin.`
+            : vr.status === 'rejected' ? `El admin rechazó la cancelación${vr.decision_note ? `: ${vr.decision_note}` : '.'}` : ''}
+        </p>
+      )}
       <div className="flex flex-wrap gap-2">
         {s.person_id && <Link to={`/staff/personas/${s.person_id}`} className={btnSmall}>Ver ficha</Link>}
-        {isAdmin && s.status === 'completed' && s.source !== 'subscription' && <button onClick={() => setVoiding(v => !v)} className={btnSmall}>Anular venta</button>}
+        {canAsk && <button onClick={() => setVoiding(v => !v)} className={btnSmall}>{isAdmin ? 'Anular venta' : 'Pedir cancelación'}</button>}
       </div>
       {voiding && (
         <div className="flex gap-2">
-          <input value={reason} onChange={e => setReason(e.target.value)} placeholder="Motivo (queda registrado)" className={input} />
-          <button onClick={voidIt} className={btnDanger}>Anular</button>
+          <input value={reason} onChange={e => setReason(e.target.value)} placeholder={isAdmin ? 'Motivo (queda registrado)' : '¿Por qué hay que cancelarla?'} className={input} />
+          <button onClick={voidIt} className={btnDanger}>{isAdmin ? 'Anular' : 'Pedir'}</button>
         </div>
       )}
-      {voiding && <p className="text-zinc-500 text-xs">Anular quita la membresía que dio esta venta. El dinero se devuelve aparte (efectivo, terminal o transferencia).</p>}
+      {voiding && <p className="text-zinc-500 text-xs">{isAdmin
+        ? 'Anular quita la membresía que dio esta venta. El dinero se devuelve aparte (efectivo, terminal o transferencia).'
+        : 'No se cancela todavía: le llega al admin para que la apruebe.'}</p>}
       <Msg text={error} />
     </div>
   )
