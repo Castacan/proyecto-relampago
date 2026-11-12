@@ -1287,3 +1287,20 @@ Chrome no estaba conectado, así que se avanzó en lo que no lo necesita:
   - Patrocinios: Alexia $1,740, Camila $4,000 y Víctor $3,480.
 - Inventario: conteo de Inge del 11-nov aplicado. El agua bajó de 60 a 14 (−46).
 - Productos nuevos: Playera Jaibamuro ($300, 20 pzs) y Bolsa Jaibamuro ($0, 8 pzs, regalo con las primeras 8 playeras).
+
+**2026-11-12 (noche, 3): ajustes de Emiliano, Test borrado, Egresos con eventos y Gasto rápido**
+- Datos capturados:
+  - Armadores de la competencia: folios 203 y 204 ($9,600 + $7,600, 11-nov), pagados por Emiliano.
+  - Patrocinio en efectivo de las gomitas: $1,500 el 25-oct, que recibió Emiliano.
+  - Ferreleo = ferretería. Barra de coco en 0. Limpieza del 10-nov ($350, folio 202), pagada por Emiliano.
+- **Sin cobros automáticos** (regla de Emiliano). A "Test":
+  - se le canceló la domiciliación (queda 0 activas);
+  - se archivó la persona;
+  - su venta de $600 se anula con un SQL pegado en Supabase (falta Run).
+- `erp_eventos_ui.sql` (falta Run): `get_expenses` regresa `event` y la lista de eventos.
+- Egresos:
+  - selector de evento en cada egreso;
+  - pestaña "Otros ingresos";
+  - botón **⚡ Gasto rápido**: escribir o dictar, Claude propone y el admin guarda.
+- Edge Function `gasto-rapido`: modelo claude-opus-5-5 con effort low, salida con esquema y respaldo si Claude se niega. Falta que Emiliano ponga el secreto `ANTHROPIC_API_KEY` y despliegue la función (Verify JWT ENCENDIDO).
+- Checador: no hay nada pendiente de correr.
