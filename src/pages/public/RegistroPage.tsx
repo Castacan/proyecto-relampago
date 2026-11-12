@@ -78,8 +78,112 @@ export default function RegistroPage() {
       <div className="border-t border-zinc-200 pt-3 space-y-1 text-sm text-zinc-500">
         {reg.documents.filter(d => d.signed_at).map(d => <p key={d.id}>✓ {d.title}</p>)}
       </div>
+      {!reg.person.is_minor && <Dependents guardianName={reg.person.full_name} />}
       <button onClick={() => setEditing(true)} className="text-zinc-500 text-sm underline">Corregir mis datos</button>
       <button onClick={() => signOut()} className="block text-zinc-400 text-xs underline">Salir (registrar a otra persona)</button>
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Menores a mi cargo (erp_menores.sql): el tutor registra a sus hijos y firma por ellos.
+// ---------------------------------------------------------------------------
+
+interface Dependent {
+  id: string; full_name: string; birth_date: string | null; gender: string | null; shoe_size: string | null
+  is_minor: boolean; has_face: boolean
+  documents: { id: string; doc_key: string; title: string; body: string; required: boolean; signed_at: string | null }[]
+}
+
+const DEP_ERRORS: Record<string, string> = {
+  invalid_name: 'Escribe el nombre completo del menor.',
+  birth_date_required: 'Escribe la fecha de nacimiento del menor.',
+  invalid_birth_date: 'Revisa la fecha de nacimiento.',
+  not_a_minor: 'Solo puedes registrar aquí a menores de 18 años. Un adulto se registra con su propio correo.',
+  guardian_must_be_adult: 'Para registrar a un menor, el tutor debe ser mayor de edad.',
+  too_many: 'Ya registraste a muchos menores. Pide ayuda en recepción.',
+  profile_required: 'Primero completa tus datos (con tu celular).',
+}
+
+function Dependents({ guardianName }: { guardianName: string }) {
+  const [list, setList] = useState<Dependent[] | null>(null)
+  const [adding, setAdding] = useState(false)
+  const [signing, setSigning] = useState<Dependent | null>(null)
+  const load = useCallback(async () => {
+    const { data } = await call<{ dependents: Dependent[] }>('get_my_dependents')
+    setList(data?.dependents ?? [])
+  }, [])
+  useEffect(() => { load() }, [load])
+
+  if (signing) {
+    const pending = signing.documents.filter(d => d.required && !d.signed_at)
+    return (
+      <div className="border-t border-zinc-200 pt-3 space-y-3">
+        <p className="font-black text-zinc-900">Firma por {signing.full_name.split(' ')[0]}</p>
+        <p className="text-sm text-zinc-600">Como tutor, lees y firmas los documentos a nombre de tu menor. Tu nombre queda como tutor.</p>
+        <SignFlow light docs={pending} defaultName={signing.full_name} isMinor defaultGuardian={guardianName}
+          onSign={async p => { const { error } = await call('sign_dependent_document', { p_person_id: signing.id, p }); return error }}
+          onDone={() => { setSigning(null); load() }} />
+        <button onClick={() => setSigning(null)} className="text-zinc-500 text-sm underline">Volver</button>
+      </div>
+    )
+  }
+
+  return (
+    <div className="border-t border-zinc-200 pt-3 space-y-2">
+      <p className="font-bold text-zinc-900">Menores a mi cargo</p>
+      {list === null ? <p className="text-zinc-500 text-sm">Cargando…</p> : list.length === 0 && !adding ? (
+        <p className="text-sm text-zinc-600">¿Vienes con tu hijo o hija? Regístralo aquí y firma su responsiva. No necesita correo.</p>
+      ) : list.map(dep => {
+        const pending = dep.documents.filter(d => d.required && !d.signed_at)
+        return (
+          <div key={dep.id} className="rounded-xl border border-zinc-200 p-3 text-sm">
+            <p className="font-bold text-zinc-900">{dep.full_name}</p>
+            {pending.length > 0 ? (
+              <button onClick={() => setSigning(dep)} className="mt-2 w-full py-2.5 rounded-xl bg-primario text-texto-en-acento font-bold">Firmar su responsiva ({pending.length})</button>
+            ) : (
+              <p className="text-zinc-600">✓ Documentos firmados.{dep.has_face ? ' Ya lo reconocemos en recepción.' : ' Pasen a recepción para su foto.'}</p>
+            )}
+          </div>
+        )
+      })}
+      {adding
+        ? <DependentForm onSaved={async id => {
+            setAdding(false)
+            const { data } = await call<{ dependents: Dependent[] }>('get_my_dependents')
+            const deps = data?.dependents ?? []
+            setList(deps)
+            const dep = deps.find(x => x.id === id)
+            if (dep && dep.documents.some(d => d.required && !d.signed_at)) setSigning(dep)
+          }} onCancel={() => setAdding(false)} />
+        : <button onClick={() => setAdding(true)} className="w-full py-3 rounded-xl border-2 border-primario text-primario font-bold">+ Registrar a un menor</button>}
+    </div>
+  )
+}
+
+function DependentForm({ onSaved, onCancel }: { onSaved: (id: string) => void; onCancel: () => void }) {
+  const [f, setF] = useState({ full_name: '', birth_date: '', gender: '', shoe_size: '' })
+  const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState<string | null>(null)
+  const save = async () => {
+    setBusy(true); setErr(null)
+    const { data, error } = await call<{ person_id: string }>('save_my_dependent', { p: f })
+    setBusy(false)
+    if (error || !data) { setErr(DEP_ERRORS[error ?? ''] ?? erpError(error ?? undefined)); return }
+    onSaved(data.person_id)
+  }
+  return (
+    <div className="space-y-3 rounded-xl bg-zinc-50 p-3">
+      <div><label className={lbl}>Nombre completo del menor</label><input value={f.full_name} onChange={e => setF({ ...f, full_name: e.target.value })} className={field} autoComplete="off" /></div>
+      <div><label className={lbl}>Fecha de nacimiento</label><input type="date" value={f.birth_date} onChange={e => setF({ ...f, birth_date: e.target.value })} className={field} /></div>
+      <div><label className={lbl}>Género (opcional)</label>
+        <select value={f.gender} onChange={e => setF({ ...f, gender: e.target.value })} className={field}>
+          <option value="">Prefiero no decir</option><option value="F">Femenino</option><option value="M">Masculino</option><option value="X">Otro</option>
+        </select></div>
+      <div><label className={lbl}>Talla de gatas (opcional)</label><input value={f.shoe_size} onChange={e => setF({ ...f, shoe_size: e.target.value })} className={field} placeholder="Ej. 22 MX" /></div>
+      {err && <p className="text-red-600 text-sm font-semibold">{err}</p>}
+      <button onClick={save} disabled={busy} className={btn}>{busy ? 'Guardando…' : 'Guardar y firmar su responsiva'}</button>
+      <button onClick={onCancel} className="w-full text-zinc-500 text-sm underline">Cancelar</button>
     </div>
   )
 }
