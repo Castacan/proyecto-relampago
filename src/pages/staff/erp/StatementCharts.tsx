@@ -81,7 +81,8 @@ function NetByMonth({ months, net }: { months: string[]; net: number[] }) {
   const W = 640, H = 180, L = 8, R = 8, T = 18, B = 22
   const max = Math.max(1, ...net.map(Math.abs))
   const hasNeg = net.some(v => v < 0), hasPos = net.some(v => v > 0)
-  const top = hasPos ? max : 0, bottom = hasNeg ? -max : 0
+  // Holgura para que la cifra quepa arriba de la barra positiva y abajo de la negativa sin pisar el mes.
+  const top = hasPos ? max * 1.12 : 0, bottom = hasNeg ? -max * 1.3 : 0
   const y = (v: number) => T + (H - T - B) * ((top - v) / ((top - bottom) || 1))
   const bw = (W - L - R) / months.length
   const barW = Math.min(36, bw - 12)
