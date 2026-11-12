@@ -13,6 +13,11 @@ interface Expense {
   method: string | null; paid_from: string | null; invoice_ref: string | null; notes: string | null
   recurring_id: string | null; cancel_reason: string | null; created_by_name: string | null; from_cash: boolean
   stock: { product: string; quantity: number } | null
+  event?: string | null   // evento (competencia, etc.); NULL = gasto del gym (erp_eventos.sql)
+}
+interface OtherIncome {
+  id: string; received_on: string; payer: string | null; description: string; category: string; amount_cents: number
+  method: string; account: string; event: string | null; notes: string | null; is_cancelled: boolean
 }
 interface Payee { id: string; name: string; kind: string; default_cost_center: string | null; default_category: string | null; phone: string | null; notes: string | null; is_active: boolean }
 interface Recurring {
@@ -24,9 +29,10 @@ interface Data {
   totals: { paid: number; pending: number; overdue: number }
   by_cost_center: { cost_center: string; cents: number }[]
   sales_cents: number; payees: Payee[]; categories: string[]; recurring: Recurring[]
+  events?: string[]
 }
 
-type Tab = 'egresos' | 'recurrentes' | 'proveedores' | 'centros'
+type Tab = 'egresos' | 'ingresos' | 'recurrentes' | 'proveedores' | 'centros'
 
 export default function ExpensesPage() {
   const [month, setMonth] = useState(todayMx().slice(0, 7))
@@ -45,7 +51,7 @@ export default function ExpensesPage() {
   if (error) return <Page title="Egresos"><p className="text-alerta text-sm">{error}</p></Page>
   if (!d) return <Page title="Egresos"><Spinner /></Page>
 
-  const tabs: [Tab, string][] = [['egresos', 'Egresos'], ['recurrentes', `Recurrentes (${d.recurring.filter(r => r.is_active).length})`], ['proveedores', 'A quién se paga'], ['centros', 'Centros de costos']]
+  const tabs: [Tab, string][] = [['egresos', 'Egresos'], ['ingresos', 'Otros ingresos'], ['recurrentes', `Recurrentes (${d.recurring.filter(r => r.is_active).length})`], ['proveedores', 'A quién se paga'], ['centros', 'Centros de costos']]
 
   return (
     <Page title="Egresos" subtitle="Lo que pagas: proveedores, servicios, nómina, impuestos. Lo pagado de la caja sale solo del efectivo."
@@ -58,6 +64,7 @@ export default function ExpensesPage() {
       </div>
 
       {tab === 'egresos' && <ExpensesTab d={d} month={month} setMonth={setMonth} creating={creating} setCreating={setCreating} reload={load} />}
+      {tab === 'ingresos' && <OtherIncomeTab year={Number(month.slice(0, 4))} />}
       {tab === 'recurrentes' && <RecurringTab d={d} reload={load} />}
       {tab === 'proveedores' && <PayeesTab d={d} reload={load} />}
       {tab === 'centros' && <CentersTab d={d} reload={load} />}
@@ -154,6 +161,7 @@ function ExpensesTab({ d, month, setMonth, creating, setCreating, reload }: {
                     <p className="text-zinc-500 text-xs">
                       #{e.folio} · {e.cost_center}{e.category ? ` · ${e.category}` : ''} · {e.status === 'paid' ? `pagado ${fmtDate(e.paid_on)}` : `vence ${fmtDate(e.due_on)}`}
                       {!inMonth(e) && ` · de ${e.period_month.slice(0, 7)}`}{e.recurring_id && ' · 🔁'}
+                      {e.event && <span className="text-amarillo-suave"> · Evento: {e.event}</span>}
                     </p>
                   </div>
                   <span className="flex items-center gap-2 shrink-0">
@@ -204,6 +212,11 @@ function ExpenseDetail({ e, d, onChanged }: { e: Expense; d: Data; onChanged: ()
         {e.notes && <p className="sm:col-span-2"><span className="text-zinc-500">Notas:</span> {e.notes}</p>}
         {e.cancel_reason && <p className="sm:col-span-2 text-alerta">Cancelado: {e.cancel_reason}</p>}
       </div>
+      {e.status !== 'cancelled' && <EventPicker value={e.event ?? null} events={d.events ?? []} onSave={async ev => {
+        const { error } = await call('admin_set_expense_event', { p_expense_id: e.id, p_event: ev })
+        if (error) return erpError(error)
+        onChanged(); return null
+      }} />}
       {e.status !== 'cancelled' && (
         <div className="flex flex-wrap gap-2">
           {e.status === 'pending' && <button onClick={() => setMode(mode === 'pay' ? 'none' : 'pay')} className={btnSmall}>Marcar pagado</button>}
@@ -528,5 +541,136 @@ function CentersTab({ d, reload }: { d: Data; reload: () => void }) {
         <Msg text={msg?.text ?? null} tone={msg?.tone} />
       </div>
     </Card>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Eventos (erp_eventos.sql): etiqueta de evento en un gasto y "Otros ingresos"
+// ---------------------------------------------------------------------------
+
+const NEW_EVENT = '__nuevo__'
+
+/** Selector de evento: lista de eventos conocidos, "ninguno" (gym) o uno nuevo. */
+function EventPicker({ value, events, onSave }: { value: string | null; events: string[]; onSave: (ev: string | null) => Promise<string | null> }) {
+  const [sel, setSel] = useState(value ?? '')
+  const [custom, setCustom] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState<string | null>(null)
+  const next = sel === NEW_EVENT ? custom.trim() : sel
+  const changed = (next || null) !== (value ?? null) && (sel !== NEW_EVENT || custom.trim().length >= 2)
+  return (
+    <div className="flex flex-wrap items-center gap-2">
+      <span className="text-zinc-500 text-xs">Evento:</span>
+      <select value={sel} onChange={x => setSel(x.target.value)} className={`${input} max-w-[16rem] py-1.5`}>
+        <option value="">Ninguno (gasto del gym)</option>
+        {[...new Set([...events, ...(value ? [value] : [])])].map(ev => <option key={ev} value={ev}>{ev}</option>)}
+        <option value={NEW_EVENT}>+ Otro evento…</option>
+      </select>
+      {sel === NEW_EVENT && <input value={custom} onChange={x => setCustom(x.target.value)} placeholder="Nombre del evento" className={`${input} max-w-[14rem] py-1.5`} />}
+      {changed && <button disabled={busy} onClick={async () => { setBusy(true); setErr(await onSave(next || null)); setBusy(false) }} className={btnSmall}>{busy ? 'Guardando…' : 'Guardar evento'}</button>}
+      <Msg text={err} />
+    </div>
+  )
+}
+
+const INCOME_CATEGORIES = ['Patrocinio', 'Donativo', 'Reembolso', 'Otros ingresos']
+
+/** Ingresos que no son ventas del mostrador: patrocinios, donativos, reembolsos… */
+function OtherIncomeTab({ year }: { year: number }) {
+  const [items, setItems] = useState<OtherIncome[] | null>(null)
+  const [events, setEvents] = useState<string[]>([])
+  const [creating, setCreating] = useState(false)
+  const [err, setErr] = useState<string | null>(null)
+  const load = useCallback(async () => {
+    const { data, error } = await call<{ items: OtherIncome[]; events: string[] }>('get_other_income', { p_year: year })
+    if (error || !data) { setErr('No se pudo cargar. ¿Ya se corrió erp_eventos.sql?'); setItems([]); return }
+    setItems(data.items); setEvents(data.events ?? [])
+  }, [year])
+  useEffect(() => { load() }, [load])
+
+  const live = (items ?? []).filter(i => !i.is_cancelled)
+  return (
+    <>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="text-zinc-400 text-sm">Patrocinios, donativos y otros ingresos que no se cobran en Vender. Si son de un evento, elígelo: así salen en su sección del estado de resultados. {year}: <b className="text-texto-principal">{money(live.reduce((a, i) => a + i.amount_cents, 0))}</b></p>
+        <button onClick={() => setCreating(v => !v)} className={btnPrimary}>{creating ? 'Cerrar' : '+ Nuevo ingreso'}</button>
+      </div>
+      <Msg text={err} />
+      {creating && <Card title="Nuevo ingreso" tone="accent"><OtherIncomeForm events={events} onSaved={() => { setCreating(false); load() }} /></Card>}
+      {items === null ? <Spinner /> : items.length === 0 ? <Empty>No hay otros ingresos en {year}.</Empty> : (
+        <div className="bg-superficie rounded-2xl border border-zinc-800/80 divide-y divide-zinc-800/80 overflow-hidden">
+          {items.map(i => (
+            <div key={i.id} className="px-4 py-3 flex items-center justify-between gap-3">
+              <div className="min-w-0">
+                <p className={`text-sm font-semibold truncate ${i.is_cancelled ? 'text-zinc-500 line-through' : 'text-texto-principal'}`}>
+                  {i.description}{i.payer && <span className="text-zinc-400 font-normal"> · {i.payer}</span>}
+                </p>
+                <p className="text-zinc-500 text-xs">
+                  {fmtDate(i.received_on)} · {i.category} · {EXPENSE_METHODS[i.method] ?? i.method} · {PAID_FROM[i.account] ?? i.account}
+                  {i.event && <span className="text-amarillo-suave"> · Evento: {i.event}</span>}
+                </p>
+                {i.notes && <p className="text-zinc-500 text-xs truncate">{i.notes}</p>}
+              </div>
+              <span className="flex items-center gap-2 shrink-0">
+                <span className="text-texto-principal font-bold tabular-nums">{money(i.amount_cents)}</span>
+                {!i.is_cancelled && <button onClick={async () => {
+                  if (!window.confirm(`¿Cancelar el ingreso "${i.description}" por ${money(i.amount_cents)}?`)) return
+                  const { error } = await call('admin_save_other_income', { p: { id: i.id, is_cancelled: true } })
+                  if (error) setErr(erpError(error)); else load()
+                }} className={btnSmall}>Cancelar</button>}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+    </>
+  )
+}
+
+function OtherIncomeForm({ events, onSaved }: { events: string[]; onSaved: () => void }) {
+  const [f, setF] = useState({ received_on: todayMx(), payer: '', description: '', category: 'Patrocinio', amount: '', method: 'transfer', account: 'bank', event: '', notes: '' })
+  const [custom, setCustom] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState<string | null>(null)
+  const set = (p: Partial<typeof f>) => setF(prev => ({ ...prev, ...p }))
+  const save = async () => {
+    const event = f.event === NEW_EVENT ? custom.trim() : f.event
+    if (toCents(f.amount) <= 0) { setErr('Escribe el monto.'); return }
+    if (f.description.trim().length < 2) { setErr('Escribe el concepto.'); return }
+    setBusy(true); setErr(null)
+    const { error } = await call('admin_save_other_income', { p: { ...f, amount_cents: toCents(f.amount), event: event || null } })
+    setBusy(false)
+    if (error) { setErr(erpError(error)); return }
+    onSaved()
+  }
+  return (
+    <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
+      <div><label className={label}>Fecha</label><input type="date" value={f.received_on} onChange={x => set({ received_on: x.target.value })} className={input} /></div>
+      <div><label className={label}>De quién</label><input value={f.payer} onChange={x => set({ payer: x.target.value })} placeholder="Ej. Tienda de gomitas" className={input} /></div>
+      <div className="lg:col-span-2"><label className={label}>Concepto</label><input value={f.description} onChange={x => set({ description: x.target.value })} placeholder="Ej. Patrocinio de la competencia" className={input} /></div>
+      <div><label className={label}>Tipo</label>
+        <select value={f.category} onChange={x => set({ category: x.target.value })} className={input}>{INCOME_CATEGORIES.map(c => <option key={c}>{c}</option>)}</select></div>
+      <MoneyField id="oi-amount" label="Monto" value={f.amount} onChange={v => set({ amount: v })} />
+      <div><label className={label}>Forma</label>
+        <select value={f.method} onChange={x => set({ method: x.target.value, account: x.target.value === 'cash' ? 'other' : 'bank' })} className={input}>
+          {Object.entries(EXPENSE_METHODS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+        </select></div>
+      <div><label className={label}>Llegó a</label>
+        <select value={f.account} onChange={x => set({ account: x.target.value })} className={input}>
+          <option value="bank">Banco / cuenta</option><option value="other">Otro (efectivo fuera de la caja, etc.)</option>
+        </select></div>
+      <div><label className={label}>Evento</label>
+        <select value={f.event} onChange={x => set({ event: x.target.value })} className={input}>
+          <option value="">Ninguno (ingreso del gym)</option>
+          {events.map(ev => <option key={ev} value={ev}>{ev}</option>)}
+          <option value={NEW_EVENT}>+ Otro evento…</option>
+        </select></div>
+      {f.event === NEW_EVENT && <div><label className={label}>Nombre del evento</label><input value={custom} onChange={x => setCustom(x.target.value)} className={input} /></div>}
+      <div className="sm:col-span-2 lg:col-span-3"><label className={label}>Notas</label><input value={f.notes} onChange={x => set({ notes: x.target.value })} className={input} /></div>
+      <div className="sm:col-span-2 lg:col-span-4 flex items-center gap-3">
+        <button onClick={save} disabled={busy} className={btnPrimary}>{busy ? 'Guardando…' : 'Guardar ingreso'}</button>
+        <Msg text={err} />
+      </div>
+    </div>
   )
 }
