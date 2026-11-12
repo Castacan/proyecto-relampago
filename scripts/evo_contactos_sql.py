@@ -29,11 +29,11 @@ from datetime import date, datetime
 
 # dato → encabezados posibles (normalizados: minúsculas, sin acentos ni signos).
 COLUMNAS = {
-    'cid': ['id', 'codigo', 'id cliente', 'codigo cliente', 'id del cliente', 'matricula', 'id evo', 'idcliente', 'cod'],
+    'cid': ['id', 'codigo', 'id cliente', 'codigo cliente', 'id del cliente', 'matricula', 'id evo', 'idcliente', 'idprospect', 'id prospecto', 'cod'],
     'nombre': ['nombre', 'nombres', 'nombre del cliente', 'cliente', 'prospecto', 'nombre completo'],
     'apellido': ['apellido', 'apellidos'],
     'email': ['email', 'e mail', 'correo', 'correo electronico', 'mail'],
-    'celular': ['celular', 'telefono celular', 'movil', 'whatsapp', 'cel'],
+    'celular': ['celular', 'telefono celular', 'telefono movil', 'movil', 'whatsapp', 'cel'],
     'telefono': ['telefono', 'tel', 'telefono fijo', 'telefonos'],
     'nacimiento': ['nacimiento', 'fecha de nacimiento', 'fecha nacimiento', 'cumpleanos', 'data de nascimento'],
     'genero': ['sexo', 'genero'],
@@ -188,11 +188,18 @@ INSERT INTO evo_contacts (cid, persona, email, phone, birth, gender, tipo) VALUE
 UPDATE evo_contacts c SET person_id = p.id, how = 'evo_id'
 FROM people p WHERE c.cid IS NOT NULL AND p.evo_id = c.cid;
 
+-- Por correo igual (sirve para prospectos que ya se registraron en la app).
+UPDATE evo_contacts c SET person_id = p.id, how = 'correo'
+FROM people p
+WHERE c.person_id IS NULL AND c.email IS NOT NULL AND lower(p.email) = c.email;
+
+-- Por nombre. Con número de EVO, solo contra fichas sin número; sin número
+-- (prospectos), contra cualquier ficha.
 UPDATE evo_contacts c SET person_id = m.id, how = 'nombre'
 FROM (
   SELECT c2.ctid AS c_tid, min(p.id::text)::uuid AS id
   FROM evo_contacts c2
-  JOIN people p ON p.evo_id IS NULL AND NOT p.is_archived
+  JOIN people p ON (c2.cid IS NULL OR p.evo_id IS NULL) AND NOT p.is_archived
    AND regexp_replace(translate(lower(btrim(p.full_name)), 'áéíóúüñ', 'aeiouun'), '\s+', ' ', 'g')
      = regexp_replace(translate(lower(btrim(c2.persona)), 'áéíóúüñ', 'aeiouun'), '\s+', ' ', 'g')
   WHERE c2.person_id IS NULL
@@ -239,6 +246,7 @@ WHERE c.person_id IS NULL
 -- Revisión
 SELECT 'contactos en el archivo' AS que, count(*)::text AS cuantos FROM evo_contacts
 UNION ALL SELECT 'ligados por numero de EVO', count(*)::text FROM evo_contacts WHERE how = 'evo_id'
+UNION ALL SELECT 'ligados por correo', count(*)::text FROM evo_contacts WHERE how = 'correo'
 UNION ALL SELECT 'ligados por nombre', count(*)::text FROM evo_contacts WHERE how = 'nombre'
 UNION ALL SELECT 'fichas nuevas', count(*)::text FROM evo_contacts WHERE person_id IS NULL
 UNION ALL SELECT 'correo ya usado por otra ficha (posible duplicado)', count(*)::text FROM evo_contacts WHERE email_used_by IS NOT NULL
