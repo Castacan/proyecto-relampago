@@ -1,4 +1,4 @@
-﻿# Pendientes de Inge en la compu
+# Pendientes de Inge en la compu
 
 Actualizado: 2026-11-12. Tacha cada punto conforme lo hagas.
 
