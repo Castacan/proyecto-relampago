@@ -1304,3 +1304,13 @@ Chrome no estaba conectado, así que se avanzó en lo que no lo necesita:
   - botón **⚡ Gasto rápido**: escribir o dictar, Claude propone y el admin guarda.
 - Edge Function `gasto-rapido`: modelo claude-opus-5-5 con effort low, salida con esquema y respaldo si Claude se niega. Falta que Emiliano ponga el secreto `ANTHROPIC_API_KEY` y despliegue la función (Verify JWT ENCENDIDO).
 - Checador: no hay nada pendiente de correr.
+
+**2026-11-12 (noche, 4): menores a cargo y skill de gastos**
+- `erp_menores.sql` (falta Run) + /registro → "Menores a mi cargo":
+  - el tutor registra a sus hijos, sin correo, y firma su responsiva;
+  - solo menores de 18;
+  - solo el tutor ve y firma.
+  - Probado en PGlite.
+  - Ojo: si se unen dos fichas de tutores, los menores no se pasan solos (la llave `guardian_person_id` apunta a la misma tabla de personas).
+- Skill de claude.ai `docs/skill-gastos-jaibamuro/SKILL.md` (zip en Descargas): Emiliano anota gastos en Claude normal y pega aquí el bloque "GASTOS JAIBAMURO".
+- Camila $640 (13-oct) = complemento del patrocinio de la competencia, capturado en Otros ingresos.
