@@ -137,8 +137,10 @@ export default function StatementsPage() {
   const visible = rows.filter(r => !(r.parents ?? []).some(p => collapsed.has(p)))
   const groupKeys = rows.filter(r => r.key).map(r => r.key as string)
   const toggle = (k: string) => setCollapsed(prev => { const n = new Set(prev); if (n.has(k)) n.delete(k); else n.add(k); return n })
+  // Con "Todos" activo, tocar un mes elige solo ese; luego cada toque suma o quita.
   const toggleMonth = (i: number) => setPicked(prev => {
-    const n = new Set(prev ?? available)
+    if (!prev) return available.length === 1 ? null : new Set([i])
+    const n = new Set(prev)
     if (n.has(i)) n.delete(i); else n.add(i)
     return n.size === 0 || n.size === available.length ? null : n
   })
@@ -176,7 +178,7 @@ export default function StatementsPage() {
           <button onClick={() => setPicked(null)} className={`px-2.5 py-1 rounded-lg text-xs font-bold ${!picked ? 'bg-primario text-texto-en-acento' : 'bg-superficie-alta text-zinc-300'}`}>Todos</button>
           {available.map(i => (
             <button key={i} onClick={() => toggleMonth(i)} aria-pressed={shown.includes(i)}
-              className={`px-2.5 py-1 rounded-lg text-xs font-bold ${picked && shown.includes(i) ? 'bg-primario/80 text-texto-en-acento' : shown.includes(i) ? 'bg-superficie-alta text-texto-principal' : 'bg-superficie text-zinc-500 line-through'}`}>{MONTHS[i]}</button>
+              className={`px-2.5 py-1 rounded-lg text-xs font-bold ${picked && shown.includes(i) ? 'bg-primario/80 text-texto-en-acento' : picked ? 'bg-superficie text-zinc-500' : 'bg-superficie-alta text-texto-principal'}`}>{MONTHS[i]}</button>
           ))}
           <span className="flex-1" />
           {tab === 'formato' && hasInv && (
