@@ -16,7 +16,7 @@ const GRID = 'rgba(255,255,255,0.10)'
 const short = (cents: number) => {
   const v = cents / 100
   const a = Math.abs(v)
-  const s = a >= 1000 ? `${(a / 1000).toFixed(a >= 10000 ? 0 : 1)}k` : a.toFixed(0)
+  const s = a >= 1000 ? `${(a / 1000).toFixed(a >= 100000 ? 0 : 1).replace(/\.0$/, '')}k` : a.toFixed(0)
   return `${v < 0 ? '−' : ''}$${s}`
 }
 

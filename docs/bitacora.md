@@ -1256,3 +1256,19 @@ Chrome no estaba conectado, así que se avanzó en lo que no lo necesita:
     - transferencia / Santander: 4, $4,837.71
   - EVO no tiene gastos después del 1-oct-2026.
 - Los archivos de EVO y los SQL con datos personales quedaron solo en el scratchpad, no en git.
+
+**2026-11-12 (noche): Estado de resultados con el formato de Inge**
+- Inge pasó su estado de ene–mar 2026. Coincide al centavo con Relámpago (ingresos 14,200 / 9,550 / 19,500; egresos 15,619.42 / 9,734.39 / 22,463.55). Solo cambiaba cómo se agrupa.
+- Centros de costo nuevos **Inversión** e **Impuestos**. Inge decide qué es inversión: se cambia el centro de costo del gasto en Egresos.
+- Ya movidos según la tabla de Inge:
+  - A Inversión: soporte de TV (Steren, ene), taladros (feb), tornillos y agarres de Spartan (mar).
+  - A Impuestos: SAT (mar).
+- `erp_estado_resultados.sql` (`get_income_statement`): ingresos por Servicio, Plan y Producto con su concepto; egresos por centro de costo con su proveedor (empleados = Nómina). Run hecho.
+- Pantalla Estados financieros (pestaña principal):
+  - contraer o expandir cada título;
+  - elegir meses (tocar un mes con "Todos" activo elige solo ese);
+  - utilidad con o sin inversión;
+  - renglones alternados;
+  - 3 gráficas SVG (`StatementCharts.tsx`): ingresos contra egresos, utilidad por mes y en qué se va el gasto.
+- Colores de las gráficas validados contra la superficie #015169: amarillo #c98500 y violeta #9085e9. Contraste < 3:1, compensado con la cifra escrita en cada barra.
+- Verificado en vivo: ene–mar da los mismos totales que la tabla de Inge, y "sin inversión" en enero da −$920.41.
