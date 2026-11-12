@@ -109,11 +109,16 @@ function Dependents({ guardianName }: { guardianName: string }) {
   const [list, setList] = useState<Dependent[] | null>(null)
   const [adding, setAdding] = useState(false)
   const [signing, setSigning] = useState<Dependent | null>(null)
+  // Si erp_menores.sql aún no se corrió en la base, ocultamos la sección en vez de mostrar errores.
+  const [unavailable, setUnavailable] = useState(false)
   const load = useCallback(async () => {
-    const { data } = await call<{ dependents: Dependent[] }>('get_my_dependents')
+    const { data, error } = await call<{ dependents: Dependent[] }>('get_my_dependents')
+    if (error) { setUnavailable(true); return }
     setList(data?.dependents ?? [])
   }, [])
   useEffect(() => { load() }, [load])
+
+  if (unavailable) return null
 
   if (signing) {
     const pending = signing.documents.filter(d => d.required && !d.signed_at)
