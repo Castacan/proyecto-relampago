@@ -1322,3 +1322,17 @@ Chrome no estaba conectado, así que se avanzó en lo que no lo necesita:
   - En las dos pestañas se puede tocar todo el renglón del título para abrir o cerrar, no solo el texto.
   - Probado en vivo.
 - Revisión de gastos ago–nov: falta toda la nómina de octubre (~$12k en efectivo). Contadora, Mercadotecnia, Meta y comisiones de Clip no aparecen desde agosto, y la CFE de octubre tampoco. Se le preguntó a Emiliano.
+
+**2026-11-13: clientes con contraseña y fin del cobro doble de clases (f769fe9)**
+- Cuentas de clientes con contraseña. Solo frontend: no hay SQL ni cambios en Supabase.
+  - `ClientPasswordAuth` se usa en la hoja de /clases, el leaderboard y /registro.
+  - Entrar: correo + contraseña.
+  - Primera vez u olvidé mi contraseña: se manda el código con el mismo correo OTP en español que ya existía; después `SetPasswordPrompt`, montado en App, pide crear la contraseña (`updateUser`).
+  - Bandera `jm_password_pending` en localStorage, para que también funcione si abren el link del correo en otra pestaña.
+  - Se evitó `signUp` porque la plantilla "Confirm sign up" de Supabase sigue en inglés y solo trae link.
+  - /clases, /registro y /mi-cuenta tienen enlaces a "Mis datos y firmas", "Contraseña" y "Salir".
+  - Probado en local contra producción: la hoja abre, la contraseña equivocada da el mensaje correcto y "Crear mi cuenta" pide el correo.
+  - FALTA probar con un correo real: código → crear contraseña → entrar.
+- Vender, al elegir persona: muestra sus "Clases reservadas".
+  - Las que están por cobrar se cobran ahí con `admin_mark_booking_paid`, que crea la venta ligada a la reserva.
+  - Una clase en el carrito exige persona. Si esa persona ya tiene reserva, se bloquea salvo que marquen "Es otra clase".
