@@ -20,15 +20,26 @@ const addDays = (d: string, n: number) => { const x = new Date(d + 'T12:00:00Z')
 
 export default function ChecklistAdminPage() {
   return (
-    <Page title="Turnos" subtitle="Quién es el encargado cada día, qué se desmonta el sábado y cómo quedó cada turno."
-      actions={<><Link to="/staff/turno" className={btnSmall}>Ver turno de hoy</Link><Link to="/staff/config/checklist" className={btnSmall}>Editar plantilla</Link></>}>
-      <PlanCard />
+    <Page title="Turnos" subtitle="Revisa si el staff hizo todo en cada turno. Toca un día para ver tarea por tarea, con hora y foto."
+      actions={<><Link to="/staff/turno" className={btnSmall}>Ver turno de hoy</Link><Link to="/staff/config/checklist" className={btnSmall}>Editar las tareas</Link></>}>
       <HistoryCard />
+      <PlanSection />
     </Page>
   )
 }
 
-function PlanCard() {
+function PlanSection() {
+  const [open, setOpen] = useState(false)
+  if (open) return <PlanCard onHide={() => setOpen(false)} />
+  return (
+    <button onClick={() => setOpen(true)} className="w-full text-left rounded-2xl border border-zinc-800 bg-superficie p-4 hover:bg-superficie-alta/40">
+      <p className="text-texto-principal font-bold">Planear los próximos días ▸</p>
+      <p className="text-zinc-500 text-sm">Quién es el encargado cada día y qué rutas se desmontan el sábado.</p>
+    </button>
+  )
+}
+
+function PlanCard({ onHide }: { onHide: () => void }) {
   const [from, setFrom] = useState(todayMx())
   const [plan, setPlan] = useState<Plan | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -55,11 +66,12 @@ function PlanCard() {
     if (error) { setError(checklistError(error)); return }
     load()
   }
-  if (!plan) return <Card title="Encargados"><Spinner /></Card>
+  if (!plan) return <Card title="Planear: encargado por día"><Spinner /></Card>
   const routeName = (id: string) => { const r = plan.routes.find(x => x.id === id); return r ? `#${r.route_number} ${r.color} ${r.grade}` : 'ruta ya retirada' }
   return (
-    <Card title="Encargado de turno por día" actions={
+    <Card title="Planear: encargado por día" actions={
       <div className="flex gap-1">
+        <button onClick={onHide} className={btnSmall}>Ocultar</button>
         <button onClick={() => setFrom(addDays(from, -7))} className={btnSmall}>←</button>
         <button onClick={() => setFrom(todayMx())} className={btnSmall}>Hoy</button>
         <button onClick={() => setFrom(addDays(from, 7))} className={btnSmall}>→</button>
@@ -163,7 +175,8 @@ function HistoryCard() {
     call<{ staff: { id: string; name: string }[]; days: HistDay[] }>('get_checklist_history', { p_from: from, p_to: to, p_person: person || null }).then(({ data }) => setData(data))
   }, [from, to, person])
   return (
-    <Card title="Historial de turnos">
+    <Card title="¿Cómo quedó cada turno?">
+      <p className="text-zinc-500 text-xs mb-2">Verde = cerrado completo. Rojo = faltaron tareas obligatorias o no cerraron el turno. Toca un día para ver el detalle.</p>
       <div className="flex flex-wrap gap-2 mb-3">
         <input type="date" value={from} onChange={e => setFrom(e.target.value)} className={`${field} w-40`} aria-label="Desde" />
         <input type="date" value={to} onChange={e => setTo(e.target.value)} className={`${field} w-40`} aria-label="Hasta" />
