@@ -16,7 +16,9 @@ interface Payment { method: string; amount: string; reference: string }
 const TERMINAL = 'clip_terminal'
 interface Unlinked { id: string; amount_cents: number; description: string | null; card_brand: string | null; card_last4: string | null; created_at: string; by: string | null }
 const sleep = (ms: number) => new Promise(r => setTimeout(r, ms))
-interface Booking { id: string; status: string; payment_status: string; amount_cents: number; class_name: string; starts_at: string; paid_with: string | null }
+interface Booking { id: string; status: string; payment_status: string; amount_cents: number; class_name: string; starts_at: string; paid_with: string | null
+  deposit_status?: string; deposit_cents?: number; due_cents?: number }
+const dueOf = (b: Booking) => b.due_cents ?? b.amount_cents
 // Una clase en el carrito: producto de tipo clase o del grupo "Clases".
 const isClassProduct = (p: Product) => p.kind === 'class' || /^clases?\b/i.test(p.category ?? '')
 const classWhen = (iso: string) => new Date(iso).toLocaleString('es-MX', { timeZone: 'America/Mexico_City', weekday: 'short', day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' })
@@ -136,7 +138,7 @@ export default function PosPage() {
     const { error } = await call('admin_mark_booking_paid', { p_booking_id: b.id, p_paid_with: method })
     setPayingBooking(null)
     if (error) { setError(erpError(error)); return }
-    setBookingMsg({ text: `Clase cobrada: ${b.class_name} (${classWhen(b.starts_at)}) · ${money(b.amount_cents)} · ${METHOD_LABELS[method] ?? method}. Quedó en el Historial de ventas.`, tone: 'ok' })
+    setBookingMsg({ text: `Clase cobrada: ${b.class_name} (${classWhen(b.starts_at)}) · ${money(dueOf(b))} · ${METHOD_LABELS[method] ?? method}. Quedó en el Historial de ventas.`, tone: 'ok' })
     setProfileKey(k => k + 1); loadTodayPeople()
   }
 
@@ -333,9 +335,11 @@ export default function PosPage() {
                 {bookings.map(b => (
                   <div key={b.id} className="rounded-xl bg-superficie-alta px-3 py-2 text-sm">
                     <p className="text-texto-principal font-semibold">{b.class_name} · {classWhen(b.starts_at)}</p>
-                    {b.payment_status === 'pending' ? (
+                    {b.deposit_status === 'pending' ? (
+                      <p className="text-amarillo-suave text-xs font-bold mt-0.5">Esperando su anticipo en línea (todavía no paga)</p>
+                    ) : b.payment_status === 'pending' ? (
                       <div className="flex flex-wrap items-center gap-2 mt-1.5">
-                        <span className="text-amarillo-suave text-xs font-bold">Por cobrar {money(b.amount_cents)}</span>
+                        <span className="text-amarillo-suave text-xs font-bold">Por cobrar {money(dueOf(b))}{(b.deposit_status === 'paid' || b.deposit_status === 'credit') ? ` (ya dio ${money(b.deposit_cents ?? 0)} de anticipo)` : ''}</span>
                         {['cash', 'card', 'transfer'].map(m => (
                           <button key={m} onClick={() => payBooking(b, m)} disabled={payingBooking !== null} className={btnSmall}>
                             {payingBooking === b.id ? 'Cobrando…' : `Cobrar en ${(METHOD_LABELS[m] ?? m).toLowerCase()}`}

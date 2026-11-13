@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../lib/auth'
 import { useClimber } from '../../hooks/useClimber'
 import ClimberAuthSheet from '../../components/ClimberAuthSheet'
 import {
   BOOKING_STATUS_LABELS, classError, fmtDateKey, fmtTime, formatMoney, isActiveBooking, mxDateKey, sendClassEmails,
+  startClassDeposit, checkClassDeposit,
   type BookingInfo, type Calendar, type CalendarSession,
 } from '../../lib/classes'
 import logoHorizontal from '../../assets/logo-horizontal.png'
@@ -50,6 +51,36 @@ export default function ClassesPage() {
   }, [session?.user?.id])
 
   useEffect(() => { if (!authLoading) load() }, [authLoading, load])
+
+  // Regreso de Clip (?reserva=<id>&pago=ok|error): consultar el pago y avisar.
+  const [params, setParams] = useSearchParams()
+  useEffect(() => {
+    const id = params.get('reserva'), pago = params.get('pago')
+    if (authLoading || !id || !session?.user) return
+    let alive = true
+    ;(async () => {
+      if (pago === 'error') setNotice('El pago no se completó. Tu lugar sigue apartado unos minutos: puedes intentar de nuevo desde "Mis reservas".')
+      else setNotice('Confirmando tu pago con Clip…')
+      for (let i = 0; i < (pago === 'ok' ? 8 : 1) && alive; i++) {
+        await checkClassDeposit(id)
+        const { data: b } = await db.rpc('get_my_class_bookings')
+        const list: BookingInfo[] = Array.isArray(b) ? b : []
+        setMine(list)
+        const bk = list.find(x => x.id === id)
+        if (bk && bk.deposit_status && bk.deposit_status !== 'pending') {
+          if (bk.status === 'booked') setNotice(`¡Listo! Tu lugar en ${bk.class_name} está confirmado.${(bk.due_cents ?? 0) > 0 ? ` Pagas ${formatMoney(bk.due_cents ?? 0)} en el gym.` : ''}`)
+          else setNotice('Recibimos tu pago, pero ya no había lugar: tu anticipo quedó guardado para otra clase.')
+          break
+        }
+        if (pago !== 'ok') break
+        if (i === 7) setNotice('Todavía no vemos tu pago. Si ya pagaste, en unos minutos se confirma solo; si no, págalo desde "Mis reservas".')
+        else await new Promise(r => setTimeout(r, 3000))
+      }
+      if (alive) { load(); setParams({}, { replace: true }) }
+    })()
+    return () => { alive = false }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [authLoading, session?.user?.id])
 
   const days = useMemo(() => {
     const map = new Map<string, CalendarSession[]>()
@@ -217,11 +248,21 @@ function BookingSheet({ s, cal, needsProfile, onClose, onBooked }: {
 }) {
   const canFree = s.is_member && s.eligible_free_monthly && s.free_left > 0
   const canGym = cal.settings.allow_pay_at_gym
-  const [option, setOption] = useState<'free_monthly' | 'at_gym' | ''>(canFree ? 'free_monthly' : canGym ? 'at_gym' : '')
+  const deposit = cal.settings.deposit_cents ?? 0
+  const canOnline = deposit > 0
+  const [credit, setCredit] = useState(0)
+  useEffect(() => {
+    if (!canOnline) return
+    db.rpc('get_my_class_credit').then(({ data }: { data: { amount_cents?: number } | null }) => setCredit(data?.amount_cents ?? 0))
+  }, [canOnline])
+  const [option, setOption] = useState<'free_monthly' | 'at_gym' | 'online' | 'credit' | ''>(canFree ? 'free_monthly' : canOnline ? 'online' : canGym ? 'at_gym' : '')
+  useEffect(() => { if (credit > 0) setOption(o => o === 'online' ? 'credit' : o) }, [credit])
   const [accept, setAccept] = useState(false)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const price = s.is_member ? s.member_price_cents : s.price_cents
+  const dep = Math.min(deposit, price)
+  const rest = price - dep
   // Responsiva: si le falta firmar algo obligatorio, firma aquí mismo antes de reservar.
   const [docs, setDocs] = useState<MyDocs | null>(null)
   const loadDocs = useCallback(async () => {
@@ -236,11 +277,21 @@ function BookingSheet({ s, cal, needsProfile, onClose, onBooked }: {
     if (!accept) { setError('Acepta las reglas de la clase.'); return }
     setBusy(true); setError(null)
     const { data, error } = await db.rpc('book_class', { p_session_id: s.id, p_option: option })
+    if (error || !data || data.error) { setBusy(false); setError(classError(data?.error)); return }
+    if (data.needs_payment) {
+      // Lugar apartado: a pagar el anticipo en Clip.
+      const r = await startClassDeposit(data.booking.id)
+      if (r.url) { window.location.href = r.url; return }
+      setBusy(false)
+      onBooked(`Tu lugar en ${s.name} quedó apartado ${cal.settings.deposit_hold_minutes ?? 30} minutos, pero no se pudo abrir el pago (${r.message}). Págalo desde "Mis reservas".`)
+      return
+    }
     setBusy(false)
-    if (error || !data || data.error) { setError(classError(data?.error)); return }
     sendClassEmails([data.booking.id], 'confirmation')
     onBooked(option === 'free_monthly'
       ? `Listo: reservaste ${s.name} con tu clase gratis del mes.`
+      : option === 'credit'
+      ? `Listo: reservaste ${s.name} con tu anticipo guardado.${rest > 0 ? ` Pagas ${formatMoney(rest)} en el gym.` : ''}`
       : `Listo: reservaste ${s.name}. Pagas ${formatMoney(price)} en el gym.`)
   }
 
@@ -280,6 +331,26 @@ function BookingSheet({ s, cal, needsProfile, onClose, onBooked }: {
                   </span>
                 </label>
               )}
+              {canOnline && credit > 0 && (
+                <label className={`flex items-start gap-3 p-3 rounded-xl border cursor-pointer ${option === 'credit' ? 'border-primario bg-primario/10' : 'border-zinc-700/50'}`}>
+                  <input type="radio" name="opt" checked={option === 'credit'} onChange={() => setOption('credit')} className="mt-1 accent-primario" />
+                  <span className="text-sm">
+                    <span className="text-texto-principal font-bold block">Usar mi anticipo guardado ({formatMoney(credit)})</span>
+                    <span className="text-zinc-400 text-xs">{rest > 0 ? `Pagas ${formatMoney(rest)} en el gym.` : 'Es todo tu pago.'} Si cancelas esta clase, ese anticipo ya no se guarda otra vez.</span>
+                  </span>
+                </label>
+              )}
+              {canOnline && (
+                <label className={`flex items-start gap-3 p-3 rounded-xl border cursor-pointer ${option === 'online' ? 'border-primario bg-primario/10' : 'border-zinc-700/50'}`}>
+                  <input type="radio" name="opt" checked={option === 'online'} onChange={() => setOption('online')} className="mt-1 accent-primario" />
+                  <span className="text-sm">
+                    <span className="text-texto-principal font-bold block">Pagar anticipo con tarjeta · {formatMoney(dep)}</span>
+                    <span className="text-zinc-400 text-xs">
+                      {rest > 0 ? `Pagas ${formatMoney(rest)} restantes en el gym.` : `Es todo tu pago${s.is_member ? ' (precio miembro)' : ''}.`} Te apartamos el lugar {cal.settings.deposit_hold_minutes ?? 30} minutos mientras pagas. Si cancelas, te guardamos el anticipo una vez para otra clase.
+                    </span>
+                  </span>
+                </label>
+              )}
               {canGym && (
                 <label className={`flex items-start gap-3 p-3 rounded-xl border cursor-pointer ${option === 'at_gym' ? 'border-primario bg-primario/10' : 'border-zinc-700/50'}`}>
                   <input type="radio" name="opt" checked={option === 'at_gym'} onChange={() => setOption('at_gym')} className="mt-1 accent-primario" />
@@ -289,7 +360,7 @@ function BookingSheet({ s, cal, needsProfile, onClose, onBooked }: {
                   </span>
                 </label>
               )}
-              {!canFree && !canGym && <p className="text-zinc-400 text-sm">Por ahora esta clase se reserva con el staff.</p>}
+              {!canFree && !canGym && !canOnline && <p className="text-zinc-400 text-sm">Por ahora esta clase se reserva con el staff.</p>}
             </fieldset>
 
             <label className="flex items-start gap-3 cursor-pointer">
@@ -300,9 +371,9 @@ function BookingSheet({ s, cal, needsProfile, onClose, onBooked }: {
             </label>
 
             {error && <p role="alert" className="text-alerta text-sm font-semibold">{error}</p>}
-            <button onClick={submit} disabled={busy || (!canFree && !canGym)}
+            <button onClick={submit} disabled={busy || (!canFree && !canGym && !canOnline)}
               className="w-full py-4 rounded-2xl bg-primario hover:bg-primario-hover text-texto-en-acento font-black text-base disabled:opacity-50 active:scale-95 transition-all">
-              {busy ? 'Reservando...' : 'Confirmar reserva'}
+              {busy ? 'Reservando...' : option === 'online' ? `Apartar y pagar ${formatMoney(dep)}` : 'Confirmar reserva'}
             </button>
           </>
         )}
@@ -318,9 +389,20 @@ function MyBookingCard({ booking: b, cancelHours, onChanged }: { booking: Bookin
   const [error, setError] = useState<string | null>(null)
   const started = new Date(b.starts_at) <= new Date()
   const late = new Date(b.starts_at).getTime() - Date.now() < cancelHours * 3600_000
+  const awaitingDeposit = b.status === 'pending_payment' && b.deposit_status === 'pending'
+  const holdOk = !!b.hold_expires_at && new Date(b.hold_expires_at) > new Date()
   const what = b.price_tier === 'free_monthly' ? 'Clase gratis del mes'
+    : awaitingDeposit ? (holdOk ? `Falta pagar el anticipo (${formatMoney(b.deposit_cents ?? 0)}) · apartado hasta las ${fmtTime(b.hold_expires_at ?? '')}` : 'Se venció el apartado: paga el anticipo para recuperar tu lugar si sigue libre')
     : b.payment_status === 'paid' ? `${formatMoney(b.amount_cents)} · pagado`
+    : (b.deposit_status === 'paid' || b.deposit_status === 'credit') ? `Anticipo pagado · pagas ${formatMoney(b.due_cents ?? 0)} en el gym`
     : b.amount_cents > 0 ? `${formatMoney(b.amount_cents)} · pagas en el gym` : BOOKING_STATUS_LABELS[b.status]
+  const [paying, setPaying] = useState(false)
+  const pay = async () => {
+    setPaying(true); setError(null)
+    const r = await startClassDeposit(b.id)
+    if (r.url) { window.location.href = r.url; return }
+    setPaying(false); setError(r.message ?? 'No se pudo abrir el pago.')
+  }
 
   const cancel = async () => {
     setBusy(true); setError(null)
@@ -328,7 +410,9 @@ function MyBookingCard({ booking: b, cancelHours, onChanged }: { booking: Bookin
     setBusy(false)
     if (error || !data || data.error) { setError(classError(data?.error)); return }
     sendClassEmails([b.id], 'cancel')
-    onChanged(data.status === 'cancelled_late'
+    onChanged(b.deposit_status === 'paid'
+      ? `Cancelaste ${b.class_name}. Tu anticipo quedó guardado para otra clase.`
+      : data.status === 'cancelled_late'
       ? `Cancelaste ${b.class_name}. Como faltaban menos de ${cancelHours} h, cuenta como falta.`
       : `Cancelaste ${b.class_name}.`)
   }
@@ -345,10 +429,17 @@ function MyBookingCard({ booking: b, cancelHours, onChanged }: { booking: Bookin
           <button onClick={() => setConfirming(true)} className="shrink-0 text-zinc-400 hover:text-alerta text-xs font-bold">Cancelar</button>
         )}
       </div>
+      {awaitingDeposit && !confirming && (
+        <button onClick={pay} disabled={paying} className="w-full py-2.5 rounded-xl bg-primario text-texto-en-acento text-sm font-bold disabled:opacity-50">
+          {paying ? 'Abriendo pago…' : `Pagar anticipo ${formatMoney(b.deposit_cents ?? 0)}`}
+        </button>
+      )}
       {confirming && (
         <div className="space-y-2">
           <p className={`text-xs font-semibold ${late ? 'text-amarillo-suave' : 'text-zinc-300'}`}>
-            {late
+            {b.deposit_status === 'paid' ? 'Te guardamos tu anticipo para otra clase (solo una vez).'
+              : b.deposit_status === 'credit' ? 'Esta clase la reservaste con tu anticipo guardado: si cancelas, lo pierdes.'
+              : late
               ? `Faltan menos de ${cancelHours} horas: si cancelas, cuenta como falta${b.price_tier === 'free_monthly' ? ' y se gasta tu clase gratis' : ''}.`
               : 'Cancelas a tiempo: no pierdes nada.'}
           </p>

@@ -12,6 +12,9 @@ export interface ClassSettings {
   overbook_tolerance: number
   allow_pay_at_gym: boolean
   rules_text: string | null
+  /** Anticipo con Clip (clases_anticipo.sql). 0/ausente = sin anticipo. */
+  deposit_cents?: number
+  deposit_hold_minutes?: number
 }
 
 export type BookingStatus =
@@ -89,6 +92,11 @@ export interface BookingInfo {
   starts_at: string
   ends_at: string
   instructor_name: string | null
+  // Anticipo (clases_anticipo.sql); ausentes si aún no se corre ese SQL.
+  deposit_cents?: number
+  deposit_status?: 'none' | 'pending' | 'paid' | 'credit'
+  due_cents?: number
+  hold_expires_at?: string | null
 }
 
 export const ACTIVE_STATUSES: BookingStatus[] = ['pending_payment', 'booked', 'attended', 'no_show']
@@ -154,6 +162,26 @@ export const CLASS_ERRORS: Record<string, string> = {
   name_taken: 'Ya existe una clase con ese nombre.',
   reason_required: 'Escribe el motivo.',
   forbidden: 'No tienes permiso para esto.',
+  no_credit: 'Ya no tienes anticipo guardado.',
+  deposit_disabled: 'Por ahora no se puede pagar el anticipo en línea.',
+  not_payable: 'Esa reserva ya no está esperando pago. Actualiza la página.',
+  already_paid: 'Ese anticipo ya está pagado.',
+  busy: 'Estamos generando tu link de pago. Intenta en un minuto.',
+  not_configured: 'El pago en línea no está disponible por ahora. Avísale al staff.',
+  clip_error: 'Clip no respondió. Intenta de nuevo en un momento.',
+  server_error: 'No se pudo completar. Intenta de nuevo.',
+}
+
+// Anticipo con Clip (Edge Function class-payments).
+export async function startClassDeposit(bookingId: string): Promise<{ url?: string; message?: string }> {
+  const { data, error } = await supabase.functions.invoke('class-payments', { body: { action: 'pay', booking_id: bookingId } })
+  if (error || !data) return { message: 'No se pudo abrir el pago. Revisa tu conexión e intenta de nuevo.' }
+  if (data.payment_url) return { url: data.payment_url as string }
+  return { message: classError(data.error) }
+}
+
+export async function checkClassDeposit(bookingId: string): Promise<void> {
+  await supabase.functions.invoke('class-payments', { body: { action: 'check', booking_id: bookingId } })
 }
 
 export const classError = (code: string | undefined, fallback = 'No se pudo completar. Intenta de nuevo.') =>

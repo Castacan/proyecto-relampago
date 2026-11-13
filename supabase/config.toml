@@ -5,3 +5,6 @@ project_id = "nptpavtkqskzqurwaysm"
 # cuenta (firma por pago en la URL + consulta a la API de Clip).
 [functions.competition-payments]
 verify_jwt = false
+
+[functions.class-payments]
+verify_jwt = false
