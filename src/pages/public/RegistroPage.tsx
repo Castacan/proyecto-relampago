@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useState } from 'react'
 import { call, erpError } from '../../lib/erp'
-import { useAuth, signInWithMagicLink, verifyEmailOtp, signOut } from '../../lib/auth'
+import { useAuth, signOut } from '../../lib/auth'
+import ClientPasswordAuth from '../../components/auth/ClientPasswordAuth'
+import { setPasswordPending } from '../../lib/passwordPending'
 import SignFlow from '../../components/erp/SignFlow'
 
 // /registro: el cliente nuevo escanea el QR de recepción y desde su celular
@@ -79,7 +81,9 @@ export default function RegistroPage() {
         {reg.documents.filter(d => d.signed_at).map(d => <p key={d.id}>✓ {d.title}</p>)}
       </div>
       {!reg.person.is_minor && <Dependents guardianName={reg.person.full_name} />}
+      <a href="/clases" className="block text-center py-3 rounded-xl bg-primario text-texto-en-acento font-bold">Ver y reservar clases</a>
       <button onClick={() => setEditing(true)} className="text-zinc-500 text-sm underline">Corregir mis datos</button>
+      <button onClick={() => setPasswordPending(true)} className="block text-zinc-500 text-sm underline">Crear o cambiar mi contraseña</button>
       <button onClick={() => signOut()} className="block text-zinc-400 text-xs underline">Salir (registrar a otra persona)</button>
     </div>
   )
@@ -194,44 +198,10 @@ function DependentForm({ onSaved, onCancel }: { onSaved: (id: string) => void; o
 }
 
 function EmailStep() {
-  const [email, setEmail] = useState('')
-  const [sent, setSent] = useState(false)
-  const [code, setCode] = useState('')
-  const [busy, setBusy] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const send = async () => {
-    setBusy(true); setError(null)
-    const err = await signInWithMagicLink(email.trim(), window.location.href)
-    setBusy(false)
-    if (err) { setError('No se pudo enviar el código. Revisa tu correo.'); return }
-    setSent(true)
-  }
-  const verify = async () => {
-    setBusy(true); setError(null)
-    const err = await verifyEmailOtp(email.trim(), code.trim())
-    setBusy(false)
-    if (err) setError('Código incorrecto o vencido. Intenta de nuevo.')
-  }
-  if (!sent) return (
-    <div className="space-y-3">
-      <p className="text-zinc-700">Escribe tu correo. Te mandamos un código para crear tu cuenta (o entrar si ya tienes una).</p>
-      <label htmlFor="reg-email" className={lbl}>Correo</label>
-      <input id="reg-email" type="email" inputMode="email" autoComplete="email" value={email} onChange={e => setEmail(e.target.value)} className={field} placeholder="tucorreo@ejemplo.com" />
-      {error && <p className="text-red-600 text-sm">{error}</p>}
-      <button onClick={send} disabled={busy || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email.trim())} className={btn}>{busy ? 'Enviando…' : 'Mandar código'}</button>
-      <p className="text-zinc-500 text-sm">¿No puedes abrir tu correo en este celular? Avísale a recepción y te registramos ahí.</p>
-    </div>
-  )
-  return (
-    <div className="space-y-3">
-      <p className="text-zinc-700">Te mandamos un código a <b>{email}</b>. Escríbelo aquí (revisa también spam).</p>
-      <label htmlFor="reg-code" className={lbl}>Código</label>
-      <input id="reg-code" inputMode="numeric" autoComplete="one-time-code" value={code} onChange={e => setCode(e.target.value.replace(/\D/g, ''))} className={`${field} text-center text-2xl tracking-[0.4em] font-mono`} maxLength={8} />
-      {error && <p className="text-red-600 text-sm">{error}</p>}
-      <button onClick={verify} disabled={busy || code.length < 6} className={btn}>{busy ? 'Revisando…' : 'Continuar'}</button>
-      <button onClick={() => { setSent(false); setCode('') }} className="text-zinc-500 text-sm underline">Cambiar correo</button>
-    </div>
-  )
+  // Al entrar (con contraseña o código) useAuth trae la sesión y la página pasa al paso 2.
+  return <ClientPasswordAuth theme="light"
+    intro="Entra con tu correo y contraseña. ¿Es tu primera vez? Toca «Crear mi cuenta»: te mandamos un código y eliges tu contraseña."
+    onAuthed={() => {}} />
 }
 
 function DataStep({ reg, onSaved }: { reg: Reg; onSaved: () => void }) {

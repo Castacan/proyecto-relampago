@@ -10,6 +10,7 @@ import SendsPage from './pages/staff/SendsPage'
 import CalibrationPage from './pages/staff/CalibrationPage'
 import VolumeCatalogPage from './pages/staff/VolumeCatalogPage'
 import { ErrorBoundary } from './components/ErrorBoundary'
+import SetPasswordPrompt from './components/auth/SetPasswordPrompt'
 import PublicWallPage from './pages/public/PublicWallPage'
 import PublicRoutePage from './pages/public/PublicRoutePage'
 import LeaderboardDisplay from './pages/public/LeaderboardDisplay'
@@ -149,6 +150,7 @@ export default function App() {
         <Route path="/" element={<HubPage />} />
         <Route path="*" element={<NotFoundPage />} />
       </Routes>
+      <SetPasswordPrompt />
     </BrowserRouter>
   )
 }

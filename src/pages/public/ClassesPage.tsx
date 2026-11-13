@@ -10,6 +10,7 @@ import {
 } from '../../lib/classes'
 import logoHorizontal from '../../assets/logo-horizontal.png'
 import { call } from '../../lib/erp'
+import { setPasswordPending } from '../../lib/passwordPending'
 import SignFlow from '../../components/erp/SignFlow'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -87,7 +88,7 @@ export default function ClassesPage() {
         <Link to="/"><img src={logoHorizontal} alt="Jaibamuro" className="h-5 w-auto" /></Link>
         {loggedIn
           ? <Link to="/mi-cuenta" className="text-primario text-xs font-bold hover:text-primario-hover">Mi cuenta</Link>
-          : <button onClick={() => setAuthOpen(true)} className="text-primario text-xs font-bold hover:text-primario-hover">Iniciar sesión</button>}
+          : <button onClick={() => setAuthOpen(true)} className="text-primario text-xs font-bold hover:text-primario-hover">Entrar o crear cuenta</button>}
       </header>
 
       <div className="max-w-md mx-auto w-full px-5 py-6 space-y-6">
@@ -110,6 +111,11 @@ export default function ClassesPage() {
                 ? <>Membresía vigente hasta el <span className="text-texto-principal font-semibold">{fmtDateKey(cal.me.membership_until)}</span></>
                 : 'Sin membresía vigente'}
             </p>
+            <div className="flex flex-wrap gap-x-4 gap-y-1 mt-2 text-xs">
+              <Link to="/registro" className="text-primario font-bold hover:text-primario-hover">Mis datos y firmas</Link>
+              <button onClick={() => setPasswordPending(true)} className="text-zinc-400 hover:text-texto-principal underline">Contraseña</button>
+              <button onClick={() => supabase.auth.signOut()} className="text-zinc-400 hover:text-texto-principal underline">Salir</button>
+            </div>
           </div>
         )}
 

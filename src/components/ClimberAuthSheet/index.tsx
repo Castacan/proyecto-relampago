@@ -1,8 +1,8 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../lib/auth'
-import { signInWithMagicLink, verifyEmailOtp } from '../../lib/auth'
 import { markPendingOnboarding, clearPendingOnboarding } from '../../lib/pendingOnboarding'
+import ClientPasswordAuth from '../auth/ClientPasswordAuth'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const db = supabase as unknown as any
@@ -17,87 +17,31 @@ interface Props {
   purpose?: 'climbing' | 'classes'
 }
 
-type Step = 'email' | 'sent' | 'setup' | 'saving'
+type Step = 'auth' | 'setup' | 'saving'
 
-const RESEND_DELAY = 30
-
+// Entrar con correo y contraseña (o crear la cuenta con un código; ver
+// ClientPasswordAuth). Para escalar, después pide el alias del leaderboard.
 export default function ClimberAuthSheet({ isOpen, onClose, onDone, startAtSetup, purpose = 'climbing' }: Props) {
   const forClasses = purpose === 'classes'
   const { session } = useAuth()
-  const [step, setStep] = useState<Step>(startAtSetup ? 'setup' : 'email')
-  const [email, setEmail] = useState('')
-  const [sending, setSending] = useState(false)
-  const [sendError, setSendError] = useState<string | null>(null)
+  const [step, setStep] = useState<Step>(startAtSetup ? 'setup' : 'auth')
   const [displayName, setDisplayName] = useState('')
   const [visible, setVisible] = useState(true)
   const [saveError, setSaveError] = useState<string | null>(null)
-  const [countdown, setCountdown] = useState(RESEND_DELAY)
-  const [resending, setResending] = useState(false)
-  const [code, setCode] = useState('')
-  const [verifyingCode, setVerifyingCode] = useState(false)
-  const [codeError, setCodeError] = useState<string | null>(null)
-  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
-
-  // Cuando la sesión se activa (magic link/código), avanzar a setup —
-  // pero solo si de verdad no tiene perfil todavía. Antes esto pasaba a
-  // 'setup' sin checar nada, así que alguien que ya tenía alias guardado
-  // (ej. abriendo el sheet a mano con "Entrar" en vez de por un link
-  // frío) volvía a ver el paso de "elige tu alias" en cada login. Se
-  // consulta directo a la DB en vez de depender de un prop `climber` del
-  // padre, que puede no estar listo todavía en este mismo instante.
-  useEffect(() => {
-    if (!(session?.user && step === 'sent')) return
-    if (forClasses) { onDone(); return }
-    let cancelled = false
-    ;(async () => {
-      const { data } = await db.from('climbers').select('id').eq('id', session.user.id).single()
-      if (cancelled) return
-      if (data) {
-        clearPendingOnboarding()
-        onDone()
-      } else {
-        setStep('setup')
-      }
-    })()
-    return () => { cancelled = true }
-  }, [session?.user?.id, step])
-
-  // Countdown timer para reenvío
-  useEffect(() => {
-    if (step !== 'sent') return
-    setCountdown(RESEND_DELAY)
-    timerRef.current = setInterval(() => {
-      setCountdown(prev => {
-        if (prev <= 1) {
-          clearInterval(timerRef.current!)
-          return 0
-        }
-        return prev - 1
-      })
-    }, 1000)
-    return () => { if (timerRef.current) clearInterval(timerRef.current) }
-  }, [step])
 
   // Resetear estado al abrir
   useEffect(() => {
     if (isOpen) {
-      setStep(startAtSetup ? 'setup' : 'email')
-      setEmail('')
-      setSendError(null)
+      setStep(startAtSetup ? 'setup' : 'auth')
       setDisplayName('')
       setVisible(true)
       setSaveError(null)
-      setCode('')
-      setCodeError(null)
     }
   }, [isOpen, startAtSetup])
 
   // Bloquear scroll del body mientras el sheet está abierto. En mobile,
-  // enfocar un input dentro de un overlay "fixed" (ej. el de alias en el
-  // paso 'setup') puede hacer que el navegador desplace el body detrás
-  // para mantener el input visible sobre el teclado — y ese scroll no se
-  // deshace solo al cerrar el sheet, dejando el header (arriba del todo)
-  // fuera de vista hasta refrescar. Se restaura y se fuerza scroll a 0
+  // enfocar un input dentro de un overlay "fixed" puede hacer que el
+  // navegador desplace el body detrás; se restaura y se fuerza scroll a 0
   // al cerrar, por si ya hubo drift.
   useEffect(() => {
     if (!isOpen) return
@@ -111,46 +55,13 @@ export default function ClimberAuthSheet({ isOpen, onClose, onDone, startAtSetup
 
   if (!isOpen) return null
 
-  async function handleSendLink() {
-    if (!email.trim()) return
-    setSending(true)
-    setSendError(null)
-    const error = await signInWithMagicLink(email.trim(), window.location.href)
-    setSending(false)
-    if (error) {
-      setSendError('No se pudo enviar el link. Verifica tu correo.')
-    } else {
-      if (!forClasses) markPendingOnboarding()
-      setStep('sent')
-    }
-  }
-
-  async function handleResend() {
-    if (!email.trim()) return
-    setResending(true)
-    const error = await signInWithMagicLink(email.trim(), window.location.href)
-    setResending(false)
-    if (!error) {
-      setCountdown(RESEND_DELAY)
-      timerRef.current = setInterval(() => {
-        setCountdown(prev => {
-          if (prev <= 1) { clearInterval(timerRef.current!); return 0 }
-          return prev - 1
-        })
-      }, 1000)
-    }
-  }
-
-  async function handleVerifyCode() {
-    if (code.trim().length < 6 || !email.trim()) return
-    setVerifyingCode(true)
-    setCodeError(null)
-    const error = await verifyEmailOtp(email.trim(), code.trim())
-    setVerifyingCode(false)
-    if (error) {
-      setCodeError('Código incorrecto o expirado. Intenta de nuevo.')
-    }
-    // Si es correcto, useAuth detecta la sesión y el useEffect de arriba avanza a 'setup'
+  // Ya entró: para clases terminamos; para escalar, alias si todavía no tiene perfil.
+  async function afterAuth() {
+    if (forClasses) { onDone(); return }
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return
+    const { data } = await db.from('climbers').select('id').eq('id', user.id).maybeSingle()
+    if (data) { clearPendingOnboarding(); onDone() } else setStep('setup')
   }
 
   async function handleSaveProfile() {
@@ -182,102 +93,23 @@ export default function ClimberAuthSheet({ isOpen, onClose, onDone, startAtSetup
   return (
     <div className="fixed inset-0 bg-black/75 backdrop-blur-sm flex items-end z-50" onClick={onClose}>
       <div
-        className="w-full bg-superficie rounded-t-3xl px-6 pt-6 pb-12 border-t border-zinc-800/80 max-w-md mx-auto"
+        className="w-full bg-superficie rounded-t-3xl px-6 pt-6 pb-12 border-t border-zinc-800/80 max-w-md mx-auto max-h-[92vh] overflow-y-auto"
         onClick={e => e.stopPropagation()}
       >
         <div className="w-10 h-1 bg-zinc-700 rounded-full mx-auto mb-6" />
 
-        {step === 'email' && (
+        {step === 'auth' && (
           <>
             <h2 className="text-texto-principal font-black text-xl tracking-tight mb-1">{forClasses ? 'Aparta tu lugar' : 'Suma tus puntos'}</h2>
-            <p className="text-zinc-500 text-sm mb-6">{forClasses
-              ? 'Escribe tu correo y te mandamos un código de 6 números para entrar. No necesitas contraseña.'
-              : 'Inicia sesión para registrar tus sends y aparecer en el leaderboard.'}</p>
-            <p className="text-zinc-500 text-[11px] font-semibold uppercase tracking-widest mb-2">Tu correo</p>
-            <input
-              type="email"
-              value={email}
-              onChange={e => setEmail(e.target.value)}
-              onKeyDown={e => { if (e.key === 'Enter') handleSendLink() }}
-              placeholder="correo@ejemplo.com"
-              className="w-full bg-superficie-alta text-texto-principal rounded-xl px-4 py-3.5 text-sm mb-4 outline-none border border-zinc-700/50 hover:border-zinc-600 focus:border-primario/60 transition-all placeholder:text-zinc-600"
-              autoComplete="email"
-              inputMode="email"
+            <ClientPasswordAuth
+              theme="dark"
+              intro={forClasses
+                ? 'Entra con tu correo y contraseña. ¿Primera vez? Crea tu cuenta en un minuto.'
+                : 'Entra para registrar tus sends y aparecer en el leaderboard.'}
+              onAuthed={afterAuth}
+              onCodeSent={() => { if (!forClasses) markPendingOnboarding() }}
+              onCancel={onClose}
             />
-            {sendError && <p className="text-red-400 text-xs mb-3">{sendError}</p>}
-            <button
-              onClick={handleSendLink}
-              disabled={sending || !email.trim()}
-              className="w-full py-4 rounded-2xl bg-primario hover:bg-primario-hover text-texto-en-acento font-bold text-sm transition-all disabled:opacity-40 active:scale-95"
-            >
-              {sending ? 'Enviando...' : forClasses ? 'Mandar código' : 'Enviar link mágico'}
-            </button>
-            <button onClick={onClose} className="w-full py-3 text-zinc-500 hover:text-zinc-300 text-sm font-medium transition-colors mt-1">
-              Cancelar
-            </button>
-          </>
-        )}
-
-        {step === 'sent' && (
-          <>
-            <div className="text-center py-4">
-              <div className="text-4xl mb-4">📬</div>
-              <h2 className="text-texto-principal font-black text-xl tracking-tight mb-2">Revisa tu correo</h2>
-              <p className="text-zinc-400 text-sm leading-relaxed">
-                Te enviamos un link a <span className="text-texto-principal font-semibold">{email}</span>.
-                <br />Ábrelo en este mismo celular para continuar.
-              </p>
-              <p className="text-zinc-600 text-xs mt-3">El link expira en 1 hora.</p>
-            </div>
-
-            <div className="mt-2 mb-5">
-              <div className="flex items-center gap-3 mb-4">
-                <div className="flex-1 h-px bg-superficie-alta" />
-                <span className="text-zinc-600 text-[11px] font-semibold uppercase tracking-widest">o ingresa el código</span>
-                <div className="flex-1 h-px bg-superficie-alta" />
-              </div>
-              <input
-                type="text"
-                inputMode="numeric"
-                autoComplete="one-time-code"
-                value={code}
-                onChange={e => { setCode(e.target.value.replace(/\D/g, '').slice(0, 6)); setCodeError(null) }}
-                onKeyDown={e => { if (e.key === 'Enter') handleVerifyCode() }}
-                placeholder="000000"
-                maxLength={6}
-                className="w-full bg-superficie-alta text-texto-principal rounded-xl px-4 py-3.5 text-center text-2xl font-black tracking-[0.3em] mb-2 outline-none border border-zinc-700/50 hover:border-zinc-600 focus:border-primario/60 transition-all placeholder:text-zinc-700"
-              />
-              {codeError && <p className="text-red-400 text-xs mb-2 text-center">{codeError}</p>}
-              <button
-                onClick={handleVerifyCode}
-                disabled={verifyingCode || code.length < 6}
-                className="w-full py-3.5 rounded-2xl bg-primario hover:bg-primario-hover text-texto-en-acento font-bold text-sm transition-all disabled:opacity-40 active:scale-95"
-              >
-                {verifyingCode ? 'Verificando...' : 'Confirmar código'}
-              </button>
-            </div>
-
-            <div className="space-y-2">
-              {countdown > 0 ? (
-                <p className="text-center text-zinc-600 text-xs">
-                  Puedes reenviar en {countdown}s
-                </p>
-              ) : (
-                <button
-                  onClick={handleResend}
-                  disabled={resending}
-                  className="w-full py-3 rounded-2xl bg-superficie-alta border border-zinc-700/50 text-zinc-300 text-sm font-semibold hover:bg-superficie-alta-hover transition-all disabled:opacity-40 active:scale-95"
-                >
-                  {resending ? 'Reenviando...' : 'Reenviar link'}
-                </button>
-              )}
-              <button
-                onClick={() => setStep('email')}
-                className="w-full py-2.5 text-zinc-600 hover:text-zinc-400 text-sm font-medium transition-colors"
-              >
-                Cambiar correo
-              </button>
-            </div>
           </>
         )}
 

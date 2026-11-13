@@ -16,22 +16,38 @@ interface Payment { method: string; amount: string; reference: string }
 const TERMINAL = 'clip_terminal'
 interface Unlinked { id: string; amount_cents: number; description: string | null; card_brand: string | null; card_last4: string | null; created_at: string; by: string | null }
 const sleep = (ms: number) => new Promise(r => setTimeout(r, ms))
+interface Booking { id: string; status: string; payment_status: string; amount_cents: number; class_name: string; starts_at: string; paid_with: string | null }
+// Una clase en el carrito: producto de tipo clase o del grupo "Clases".
+const isClassProduct = (p: Product) => p.kind === 'class' || /^clases?\b/i.test(p.category ?? '')
+const classWhen = (iso: string) => new Date(iso).toLocaleString('es-MX', { timeZone: 'America/Mexico_City', weekday: 'short', day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' })
 
 export default function PosPage() {
   const [params] = useSearchParams()
   const [products, setProducts] = useState<Product[] | null>(null)
   const [person, setPerson] = useState<Person | null>(null)
   const [lines, setLines] = useState<Line[]>([])
-  // Talla de gatas de la persona elegida (para la renta).
+  // Talla de gatas de la persona elegida (para la renta) y sus clases reservadas
+  // (para cobrarlas desde la reserva y no cobrar doble).
   const [shoeSize, setShoeSize] = useState<string | null>(null)
+  const [bookings, setBookings] = useState<Booking[]>([])
+  const [profileKey, setProfileKey] = useState(0)
   useEffect(() => {
-    setShoeSize(null)
+    setShoeSize(null); setBookings([])
     if (!person?.id) return
     let alive = true
-    call<{ person: { shoe_size?: string | null } }>('get_person_profile', { p_person_id: person.id })
-      .then(({ data }) => { if (alive) setShoeSize(data?.person?.shoe_size ?? null) })
+    call<{ person: { shoe_size?: string | null }; bookings?: Booking[] }>('get_person_profile', { p_person_id: person.id })
+      .then(({ data }) => {
+        if (!alive) return
+        setShoeSize(data?.person?.shoe_size ?? null)
+        const since = Date.now() - 12 * 3600_000
+        setBookings((data?.bookings ?? [])
+          .filter(b => (b.status === 'booked' || b.status === 'pending_payment') && new Date(b.starts_at).getTime() >= since)
+          .sort((a, b) => a.starts_at.localeCompare(b.starts_at)))
+      })
     return () => { alive = false }
-  }, [person?.id])
+  }, [person?.id, profileKey])
+  const [otherClass, setOtherClass] = useState(false)
+  useEffect(() => { setOtherClass(false) }, [person?.id])
   const [discount, setDiscount] = useState('')
   const [payments, setPayments] = useState<Payment[]>([{ method: 'cash', amount: '', reference: '' }])
   const [cashGiven, setCashGiven] = useState('')
@@ -110,6 +126,19 @@ export default function PosPage() {
   const cashPart = payments.filter(p => p.method === 'cash').reduce((a, p) => a + toCents(p.amount), 0)
   const change = cashGiven ? Math.max(toCents(cashGiven) - cashPart, 0) : 0
   const needsPerson = lines.some(l => l.product.grants_membership)
+  const classInCart = lines.some(l => isClassProduct(l.product))
+  const [payingBooking, setPayingBooking] = useState<string | null>(null)
+  const [bookingMsg, setBookingMsg] = useState<{ text: string; tone: 'ok' | 'error' } | null>(null)
+  useEffect(() => { setBookingMsg(null) }, [person?.id])
+  const payBooking = async (b: Booking, method: string) => {
+    setError(null); setDone(null); setPayingBooking(b.id)
+    // Cobra la reserva: marca la reserva pagada y crea la venta ligada a ella.
+    const { error } = await call('admin_mark_booking_paid', { p_booking_id: b.id, p_paid_with: method })
+    setPayingBooking(null)
+    if (error) { setError(erpError(error)); return }
+    setBookingMsg({ text: `Clase cobrada: ${b.class_name} (${classWhen(b.starts_at)}) · ${money(b.amount_cents)} · ${METHOD_LABELS[method] ?? method}. Quedó en el Historial de ventas.`, tone: 'ok' })
+    setProfileKey(k => k + 1); loadTodayPeople()
+  }
 
   const { groups, loose } = useMemo(() => {
     const g = new Map<string, Product[]>()
@@ -138,6 +167,14 @@ export default function PosPage() {
     setError(null)
     if (lines.length === 0) { setError('Agrega al menos un artículo.'); return }
     if (needsPerson && !person) { setError('Elige a la persona: el plan le da membresía.'); return }
+    if (classInCart && !person) { setError('Elige a la persona: cada clase se cobra a nombre del cliente.'); return }
+    if (classInCart && bookings.length > 0 && !otherClass) {
+      const b = bookings[0]
+      setError(b.payment_status === 'pending'
+        ? `${person!.full_name.split(' ')[0]} ya tiene reservada ${b.class_name} (${classWhen(b.starts_at)}) por cobrar. Cóbrala en "Clases reservadas" para no cobrar doble. Si es otra clase distinta, marca "Es otra clase".`
+        : `${person!.full_name.split(' ')[0]} ya tiene pagada su clase de ${b.class_name} (${classWhen(b.starts_at)}). Si es otra clase distinta, marca "Es otra clase".`)
+      return
+    }
     if (paid !== total && total > 0) { setError(`Los pagos suman ${money(paid)} y el total es ${money(total)}.`); return }
     if (freeUsedInCart > freeLeft) { setError(`Solo le queda ${freeLeft} clase gratis este mes.`); return }
     const termLines = payments.filter(p => p.method === TERMINAL && toCents(p.amount) > 0)
@@ -289,6 +326,36 @@ export default function PosPage() {
             <PersonPicker selected={person} onPick={p => { setPerson(p); setDone(null) }} />
             {person && shoeSize && <p className="text-texto-principal text-sm mt-2">🧗 Talla de gatas: <span className="font-bold">{shoeSize}</span></p>}
             {needsPerson && !person && <p className="text-amarillo-suave text-xs mt-2">Necesaria: hay un plan en la venta.</p>}
+            {classInCart && !person && <p className="text-amarillo-suave text-xs mt-2">Necesaria: hay una clase en la venta.</p>}
+            {person && bookings.length > 0 && (
+              <div className="mt-3 border-t border-zinc-700/50 pt-3 space-y-2">
+                <p className="text-zinc-400 text-[11px] font-bold uppercase tracking-widest">Clases reservadas</p>
+                {bookings.map(b => (
+                  <div key={b.id} className="rounded-xl bg-superficie-alta px-3 py-2 text-sm">
+                    <p className="text-texto-principal font-semibold">{b.class_name} · {classWhen(b.starts_at)}</p>
+                    {b.payment_status === 'pending' ? (
+                      <div className="flex flex-wrap items-center gap-2 mt-1.5">
+                        <span className="text-amarillo-suave text-xs font-bold">Por cobrar {money(b.amount_cents)}</span>
+                        {['cash', 'card', 'transfer'].map(m => (
+                          <button key={m} onClick={() => payBooking(b, m)} disabled={payingBooking !== null} className={btnSmall}>
+                            {payingBooking === b.id ? 'Cobrando…' : `Cobrar en ${(METHOD_LABELS[m] ?? m).toLowerCase()}`}
+                          </button>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-exito text-xs font-bold mt-0.5">{b.payment_status === 'paid' ? `✓ Pagada${b.paid_with ? ` (${(METHOD_LABELS[b.paid_with] ?? b.paid_with).toLowerCase()})` : ''}` : '✓ Sin costo (clase gratis o de su plan)'}</p>
+                    )}
+                  </div>
+                ))}
+                {classInCart && (
+                  <label className="flex items-center gap-2 text-xs text-zinc-300">
+                    <input type="checkbox" checked={otherClass} onChange={e => setOtherClass(e.target.checked)} />
+                    Es otra clase (no la reservada): cobrarla aquí
+                  </label>
+                )}
+              </div>
+            )}
+            {bookingMsg && <div className="mt-2"><Msg text={bookingMsg.text} tone={bookingMsg.tone} /></div>}
           </Card>
           <Card title={group ?? 'Artículos'} actions={group ? <button onClick={() => setGroup(null)} className={btnSmall}>← Todos</button> : undefined}>
             {products === null ? <Spinner /> : products.length === 0 ? <Empty>No hay productos. Créalos en Configuración → Productos y servicios.</Empty> : group ? (

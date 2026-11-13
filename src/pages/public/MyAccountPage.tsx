@@ -6,6 +6,7 @@ import { useClimber } from '../../hooks/useClimber'
 import { getColorHex } from '../../lib/colors'
 import ClimberAuthSheet from '../../components/ClimberAuthSheet'
 import MyMembership from '../../components/MyMembership'
+import { setPasswordPending } from '../../lib/passwordPending'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const db = supabase as unknown as any
@@ -160,6 +161,11 @@ export default function MyAccountPage() {
       </div>
 
       <div className="flex-1 max-w-md mx-auto w-full px-5 py-6 space-y-6">
+        <div className="flex flex-wrap gap-2 text-sm">
+          <Link to="/clases" className="px-3 py-2 rounded-xl bg-primario text-texto-en-acento font-bold">Mis clases</Link>
+          <Link to="/registro" className="px-3 py-2 rounded-xl bg-superficie-alta text-texto-principal font-semibold">Mis datos y firmas</Link>
+          <button onClick={() => setPasswordPending(true)} className="px-3 py-2 rounded-xl bg-superficie-alta text-texto-principal font-semibold">Contraseña</button>
+        </div>
 
         {/* Nombre / alias */}
         <div>
