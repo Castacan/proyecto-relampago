@@ -97,7 +97,7 @@ export default function ChecklistPage() {
               {day.status === 'closed' && <p className="text-exito text-sm font-semibold mt-2">Turno cerrado por {day.closed_by_name ?? '—'} · {fmtDateTime(day.closed_at)}</p>}
             </div>
 
-            {day.cash_open_other_day && <Msg text="Hay una caja abierta de otro día. Ciérrala en Caja antes de contar el fondo de hoy." />}
+            {isToday && day.cash_open_other_day && <Msg text="Hay una caja abierta de otro día. Ciérrala en Caja antes de contar el fondo de hoy." />}
 
             {/* Bitácora anterior + reglas */}
             {isToday && day.prev && (day.prev.log || day.prev.notes.length > 0) && <PrevLog prev={day.prev} />}
@@ -157,7 +157,8 @@ export default function ChecklistPage() {
             {day.cash && (
               <p className="text-zinc-500 text-xs px-1">
                 Caja: fondo {money(day.cash.opening_cents)}
-                {day.cash.closed_at != null && <> · contado {money(day.cash.counted_cents)} · esperado {money(day.cash.expected_cents)} · diferencia <span className={day.cash.difference_cents ? 'text-alerta font-bold' : ''}>{money(day.cash.difference_cents)}</span></>}
+                {day.cash.closed_at != null && day.cash.counted_cents == null && <> · esperado {money(day.cash.expected_cents)} · <span className="text-alerta font-bold">nadie hizo el corte en Caja: el sistema la cerró solo a medianoche</span></>}
+                {day.cash.closed_at != null && day.cash.counted_cents != null && <> · contado {money(day.cash.counted_cents)} · esperado {money(day.cash.expected_cents)} · diferencia <span className={day.cash.difference_cents ? 'text-alerta font-bold' : ''}>{money(day.cash.difference_cents)}</span></>}
               </p>
             )}
 
