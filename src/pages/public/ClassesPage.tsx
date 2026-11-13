@@ -87,7 +87,7 @@ export default function ClassesPage() {
       <header className="flex items-center justify-between px-5 py-4 border-b border-zinc-800/40">
         <Link to="/"><img src={logoHorizontal} alt="Jaibamuro" className="h-5 w-auto" /></Link>
         {loggedIn
-          ? <Link to="/mi-cuenta" className="text-primario text-xs font-bold hover:text-primario-hover">Mi cuenta</Link>
+          ? <Link to="/entrar" className="text-primario text-xs font-bold hover:text-primario-hover">Mi cuenta</Link>
           : <button onClick={() => setAuthOpen(true)} className="text-primario text-xs font-bold hover:text-primario-hover">Entrar o crear cuenta</button>}
       </header>
 

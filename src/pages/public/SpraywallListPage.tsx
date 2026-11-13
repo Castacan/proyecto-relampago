@@ -31,12 +31,15 @@ export default function SpraywallListPage() {
           <img src={logoVertical} alt="Jaibamuro" className="h-7 w-auto" />
           <span className="text-texto-principal font-bold text-sm tracking-tight">Spraywall</span>
         </div>
-        <Link
-          to="/muro"
-          className="text-zinc-500 hover:text-zinc-300 text-xs font-semibold transition-colors"
-        >
-          ← Muro
-        </Link>
+        <div className="flex items-center gap-3">
+          <Link to="/entrar" className="text-primario hover:text-primario-hover text-xs font-bold transition-colors">Mi cuenta</Link>
+          <Link
+            to="/muro"
+            className="text-zinc-500 hover:text-zinc-300 text-xs font-semibold transition-colors"
+          >
+            ← Muro
+          </Link>
+        </div>
       </header>
 
       <div className="max-w-md mx-auto w-full px-4 py-5">
