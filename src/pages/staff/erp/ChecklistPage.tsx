@@ -271,6 +271,13 @@ function TaskSheet({ t, day, editable, onClose, onDone }: { t: DayTask; day: Che
     if (t.requires_photo && !photo) { setError('Toma la foto primero.'); return }
     if (askAmount && amount === '') { setError('Escribe el monto.'); return }
     setBusy(true)
+    // Corte: primero se cierra la Caja de verdad (igual que en la pantalla de Caja)
+    // y después se marca la tarea. Así el corte nunca se queda solo en el checklist.
+    if (t.kind === 'cash_close' && askAmount) {
+      const { data: cd, error: ce } = await call<{ expected_cash?: number }>('close_cash', { p_counted_cents: toCents(amount), p_note: note.trim() || null })
+      if (ce === 'difference_needs_note') { setBusy(false); setNeedsNote(cd?.expected_cash ?? null); setError(`No cuadra: se esperaban ${money(cd?.expected_cash)}. Escribe en la nota por qué.`); return }
+      if (ce) { setBusy(false); setError(checklistError(ce)); return }
+    }
     const { data, error } = await call<{ expected_cash?: number }>('checklist_complete_task', {
       p_task_id: t.id, p: { photo_path: photo, amount_cents: askAmount ? toCents(amount) : null, note: note.trim() || null },
     })
