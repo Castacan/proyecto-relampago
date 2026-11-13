@@ -1336,3 +1336,22 @@ Chrome no estaba conectado, así que se avanzó en lo que no lo necesita:
 - Vender, al elegir persona: muestra sus "Clases reservadas".
   - Las que están por cobrar se cobran ahí con `admin_mark_booking_paid`, que crea la venta ligada a la reserva.
   - Una clase en el carrito exige persona. Si esa persona ya tiene reserva, se bloquea salvo que marquen "Es otra clase".
+
+**2026-11-13 (2): /entrar y anticipo de clases con Clip (d6d5f39, 32efd80)**
+- /entrar: es la entrada de los clientes; /login sigue siendo solo del staff. Con sesión muestra un menú: Mis clases, Mis datos y firmas, Mis puntos, Contraseña y Salir.
+  - "Mi cuenta" en /clases y Spraywall lleva ahí.
+- Anticipo de clases (reglas de Emiliano):
+  - $100 con tarjeta por Clip, igual que la competencia.
+  - Al miembro el anticipo le cubre todo, porque su clase vale $100.
+  - El lugar se aparta 30 min.
+  - Si cancela, el anticipo se guarda UNA vez como saldo; si cancela otra vez, lo pierde.
+  - Si el gym cancela la clase, se le regresa.
+  - La clase gratis del mes no paga anticipo.
+- `clases_anticipo.sql` (FALTA RUN):
+  - `deposit_cents = 10000` y `allow_pay_at_gym = false`;
+  - `book_class` con `'online'` y `'credit'`;
+  - venta del anticipo con source online y método clip, sin caja;
+  - `erp_booking_sale` cobra el resto.
+  - Probado en PGlite: 30/30.
+- Edge Function `class-payments` (FALTA DEPLOY, Verify JWT apagado). Usa los mismos secretos de Clip que la competencia.
+- ORDEN: primero el Deploy de la función y luego el Run del SQL. Sin el SQL, la pantalla sigue como antes.
